@@ -413,6 +413,11 @@
       <label for="dailyGoalInput">一日あたりの目標単位数（任意）:</label><br/>
       <input id="dailyGoalInput" type="number" min="1" style="padding:0.3rem; width:60%; max-width:200px;" />
     </div>
+    <!-- 目次入力欄: ユーザーが各章タイトルを1行ごとに入力できるようにする -->
+    <div style="margin-bottom:0.5rem;">
+      <label for="tocInput">目次リスト（各行に1項目）:</label><br/>
+      <textarea id="tocInput" rows="5" style="padding:0.3rem; width:90%; max-width:400px;"></textarea>
+    </div>
     <button id="saveDetailBtn" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">保存</button>
     <button id="dailyScheduleBtn" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">毎日</button>
     <button id="cancelDetailBtn" style="padding:0.4rem 0.8rem;">キャンセル</button>
@@ -644,6 +649,7 @@
       var unitsInput = document.getElementById('unitsInput');
       var targetDateInput = document.getElementById('targetDateInput');
       var dailyGoalInput = document.getElementById('dailyGoalInput');
+      var tocInput = document.getElementById('tocInput');
       // 名前表示
       if (nameSpan) nameSpan.textContent = materialsList[idx];
       // 詳細情報の読み込み
@@ -651,6 +657,14 @@
       unitsInput.value = detail && detail.units ? detail.units : '';
       targetDateInput.value = detail && detail.targetDate ? detail.targetDate : '';
       dailyGoalInput.value = detail && detail.dailyGoal ? detail.dailyGoal : '';
+      // 目次リストを入力欄に反映
+      if (tocInput) {
+        if (detail && detail.tocList && Array.isArray(detail.tocList)) {
+          tocInput.value = detail.tocList.join('\n');
+        } else {
+          tocInput.value = '';
+        }
+      }
       detailDiv.style.display = 'block';
     }
 
@@ -664,10 +678,19 @@
       var targetDate = targetDateInput.value;
       var dailyGoal = parseInt(dailyGoalInput.value, 10);
       if (!materialsDetails[currentMaterialIndex]) materialsDetails[currentMaterialIndex] = {};
+      // 目次入力欄の内容を取得し、空行を除外した配列にする
+      var tocInputField = document.getElementById('tocInput');
+      var tocLines = [];
+      if (tocInputField && tocInputField.value) {
+        tocLines = tocInputField.value.split(/\n+/).map(function (line) {
+          return line.trim();
+        }).filter(function (line) { return line !== ''; });
+      }
       materialsDetails[currentMaterialIndex] = {
         units: isNaN(units) ? null : units,
         targetDate: targetDate || null,
-        dailyGoal: isNaN(dailyGoal) ? null : dailyGoal
+        dailyGoal: isNaN(dailyGoal) ? null : dailyGoal,
+        tocList: tocLines.length > 0 ? tocLines : null
       };
       // 保存
       localStorage.setItem('material-details', JSON.stringify(materialsDetails));
@@ -682,42 +705,97 @@
     function scheduleMaterial(idx) {
       var detail = materialsDetails[idx];
       if (!detail) return;
+      // もし目次リストが存在する場合は章タイトルごとにスケジュールする
+      var tasks = detail.tocList;
+      if (tasks && Array.isArray(tasks) && tasks.length > 0) {
+        // 開始日: 今日
+        var start = new Date();
+        start.setHours(0, 0, 0, 0);
+        var colIndex = idx;
+        // 期日がある場合は目次を期日までの日数で均等割り当て
+        if (detail.targetDate) {
+          var end = new Date(detail.targetDate);
+          end.setHours(0, 0, 0, 0);
+          var days = Math.floor((end - start) / 86400000) + 1;
+          if (days < 1) days = 1;
+          // dailyGoal が指定されていればそれを単位数とみなす
+          var tasksPerDay;
+          var dGoal = parseInt(detail.dailyGoal, 10);
+          if (!isNaN(dGoal) && dGoal > 0) {
+            tasksPerDay = dGoal;
+          } else {
+            tasksPerDay = Math.ceil(tasks.length / days);
+          }
+          var taskIndex = 0;
+          for (var day = 0; day < days && taskIndex < tasks.length; day++) {
+            var current = new Date(start);
+            current.setDate(start.getDate() + day);
+            var iso = current.toISOString().split('T')[0];
+            var subTasks = tasks.slice(taskIndex, taskIndex + tasksPerDay);
+            taskIndex += tasksPerDay;
+            var content = subTasks.join('\n');
+            var key = iso + '-sub' + (colIndex + 1) + '-prep';
+            var existing = localStorage.getItem(key) || '';
+            var prefix = existing ? existing + '\n' : '';
+            localStorage.setItem(key, prefix + materialsList[idx] + ': ' + content);
+          }
+        } else {
+          // 期日がない場合は毎日順番に dailyGoal または1単位ずつ割り当て
+          var daily = parseInt(detail.dailyGoal, 10);
+          var tasksPerDay2 = (!isNaN(daily) && daily > 0) ? daily : 1;
+          var taskIdx = 0;
+          var dayOffset = 0;
+          while (taskIdx < tasks.length) {
+            var currentDay = new Date(start);
+            currentDay.setDate(start.getDate() + dayOffset);
+            var iso2 = currentDay.toISOString().split('T')[0];
+            var sub = tasks.slice(taskIdx, taskIdx + tasksPerDay2);
+            taskIdx += tasksPerDay2;
+            var content2 = sub.join('\n');
+            var key2 = iso2 + '-sub' + (colIndex + 1) + '-prep';
+            var existing2 = localStorage.getItem(key2) || '';
+            var prefix2 = existing2 ? existing2 + '\n' : '';
+            localStorage.setItem(key2, prefix2 + materialsList[idx] + ': ' + content2);
+            dayOffset++;
+          }
+        }
+        // スケジュール後、表示更新
+        updateCellsForCurrentWeek();
+        return;
+      }
+      // --- 目次がない場合は数値単位ベースの従来のスケジュール処理 ---
       var unitsTotal = parseInt(detail.units, 10);
       var targetDateStr = detail.targetDate;
       var dailyGoal = parseInt(detail.dailyGoal, 10);
       if (!unitsTotal || !targetDateStr) return;
       // 開始日: 今日（時間をゼロに）
-      var start = new Date();
-      start.setHours(0, 0, 0, 0);
-      // 目標日
-      var end = new Date(targetDateStr);
-      end.setHours(0, 0, 0, 0);
-      // 日数計算
-      var days = Math.floor((end - start) / 86400000) + 1;
-      if (days < 1) days = 1;
+      var startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
+      var endDate = new Date(targetDateStr);
+      endDate.setHours(0, 0, 0, 0);
+      var dayCount = Math.floor((endDate - startDate) / 86400000) + 1;
+      if (dayCount < 1) dayCount = 1;
       var unitsPerDay;
       if (!isNaN(dailyGoal) && dailyGoal > 0) {
         unitsPerDay = dailyGoal;
       } else {
-        unitsPerDay = Math.ceil(unitsTotal / days);
+        unitsPerDay = Math.ceil(unitsTotal / dayCount);
       }
       var maxDays = Math.ceil(unitsTotal / unitsPerDay);
-      var unitsRemaining = unitsTotal;
-      // 教材が割り当てられた列（0ベース）
-      var colIndex = idx;
-      for (var i = 0; i < maxDays; i++) {
-        var current = new Date(start);
-        current.setDate(start.getDate() + i);
-        var iso = current.toISOString().split('T')[0];
-        var assign = (i < maxDays - 1) ? unitsPerDay : unitsRemaining;
-        unitsRemaining -= unitsPerDay;
-        if (assign <= 0) continue;
-        var key = iso + '-sub' + (colIndex + 1) + '-prep';
-        var existing = localStorage.getItem(key) || '';
-        var prefix = existing ? existing + '\n' : '';
-        localStorage.setItem(key, prefix + materialsList[idx] + ': ' + assign + '単位');
+      var remaining = unitsTotal;
+      var colIndex2 = idx;
+      for (var j = 0; j < maxDays; j++) {
+        var curr = new Date(startDate);
+        curr.setDate(startDate.getDate() + j);
+        var isoDate = curr.toISOString().split('T')[0];
+        var assignUnits = (j < maxDays - 1) ? unitsPerDay : remaining;
+        remaining -= unitsPerDay;
+        if (assignUnits <= 0) continue;
+        var key3 = isoDate + '-sub' + (colIndex2 + 1) + '-prep';
+        var existing3 = localStorage.getItem(key3) || '';
+        var prefix3 = existing3 ? existing3 + '\n' : '';
+        localStorage.setItem(key3, prefix3 + materialsList[idx] + ': ' + assignUnits + '単位');
       }
-      // 画面上のセルを更新
       updateCellsForCurrentWeek();
     }
 
@@ -780,33 +858,61 @@
     function scheduleMaterialDaily(idx) {
       var detail = materialsDetails[idx];
       if (!detail) return;
+      // 目次リストがある場合は章タイトルを日毎に割り当て
+      var tasks = detail.tocList;
+      if (tasks && Array.isArray(tasks) && tasks.length > 0) {
+        var start = new Date();
+        start.setHours(0, 0, 0, 0);
+        var daily = parseInt(detail.dailyGoal, 10);
+        var tasksPerDay = (!isNaN(daily) && daily > 0) ? daily : 1;
+        var taskIndex = 0;
+        var dayOffset = 0;
+        var colIdx = idx;
+        while (taskIndex < tasks.length) {
+          var current = new Date(start);
+          current.setDate(start.getDate() + dayOffset);
+          var iso = current.toISOString().split('T')[0];
+          var subTasks = tasks.slice(taskIndex, taskIndex + tasksPerDay);
+          taskIndex += tasksPerDay;
+          var content = subTasks.join('\n');
+          var key = iso + '-sub' + (colIdx + 1) + '-prep';
+          var existing = localStorage.getItem(key) || '';
+          var prefix = existing ? existing + '\n' : '';
+          localStorage.setItem(key, prefix + materialsList[idx] + ': ' + content);
+          dayOffset += 1;
+        }
+        // 詳細パネルを閉じる
+        var ddiv = document.getElementById('materialDetail');
+        if (ddiv) ddiv.style.display = 'none';
+        updateCellsForCurrentWeek();
+        return;
+      }
+      // --- 目次がない場合は数値単位ベースで日単位割り当て ---
       var unitsTotal = parseInt(detail.units, 10);
       if (!unitsTotal || unitsTotal <= 0) return;
       var dailyGoal = parseInt(detail.dailyGoal, 10);
       if (isNaN(dailyGoal) || dailyGoal <= 0) {
         dailyGoal = 1;
       }
-      var start = new Date();
-      start.setHours(0, 0, 0, 0);
-      var unitsRemaining = unitsTotal;
-      var colIndex = idx;
-      var dayOffset = 0;
-      while (unitsRemaining > 0) {
-        var assign = unitsRemaining >= dailyGoal ? dailyGoal : unitsRemaining;
-        var current = new Date(start);
-        current.setDate(start.getDate() + dayOffset);
-        var iso = current.toISOString().split('T')[0];
-        var key = iso + '-sub' + (colIndex + 1) + '-prep';
+      var startDate = new Date();
+      startDate.setHours(0, 0, 0, 0);
+      var remaining = unitsTotal;
+      var columnIndex = idx;
+      var offset = 0;
+      while (remaining > 0) {
+        var assignUnits = remaining >= dailyGoal ? dailyGoal : remaining;
+        var currDate = new Date(startDate);
+        currDate.setDate(startDate.getDate() + offset);
+        var isoStr = currDate.toISOString().split('T')[0];
+        var key = isoStr + '-sub' + (columnIndex + 1) + '-prep';
         var existing = localStorage.getItem(key) || '';
         var prefix = existing ? existing + '\n' : '';
-        localStorage.setItem(key, prefix + materialsList[idx] + ': ' + assign + '単位');
-        unitsRemaining -= assign;
-        dayOffset += 1;
+        localStorage.setItem(key, prefix + materialsList[idx] + ': ' + assignUnits + '単位');
+        remaining -= assignUnits;
+        offset += 1;
       }
-      // 詳細パネルを閉じる
-      var detailDiv = document.getElementById('materialDetail');
-      if (detailDiv) detailDiv.style.display = 'none';
-      // セルを更新
+      var detDiv = document.getElementById('materialDetail');
+      if (detDiv) detDiv.style.display = 'none';
       updateCellsForCurrentWeek();
     }
     // リセットボタン
