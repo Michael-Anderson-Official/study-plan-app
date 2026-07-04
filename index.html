@@ -478,25 +478,24 @@
         // リスト表示の更新
         var listEl = document.getElementById('materialsList');
         if (listEl) {
-          listEl.innerHTML = '';
-          materialsList.forEach(function (mat, i) {
+        listEl.innerHTML = '';
+        materialsList.forEach(function (mat, i) {
             var li = document.createElement('li');
-            // 番号と名前
-            var span = document.createElement('span');
-            span.textContent = (i + 1) + '. ' + mat + ' ';
-            li.appendChild(span);
-            // 詳細リンク
-            var detailSpan = document.createElement('span');
-            // [詳細] を表示し、リンクのように見せる
-            detailSpan.textContent = '詳細';
-            detailSpan.setAttribute('data-index', i);
-            detailSpan.style.marginLeft = '0.5rem';
-            detailSpan.style.cursor = 'pointer';
-            detailSpan.style.color = '#0066cc';
-            detailSpan.style.textDecoration = 'underline';
-            // クラスを付与して任意のスタイルを適用できるようにします
-            detailSpan.className = 'detail-link';
-            li.appendChild(detailSpan);
+            // 番号と教材名を表示
+            var nameSpan = document.createElement('span');
+            nameSpan.textContent = (i + 1) + '. ' + mat;
+            li.appendChild(nameSpan);
+            // 詳細ボタンを作成し、リンク風のスタイルを適用
+            var detailBtn = document.createElement('button');
+            detailBtn.textContent = '詳細';
+            detailBtn.setAttribute('data-index', i);
+            detailBtn.style.marginLeft = '0.5rem';
+            detailBtn.style.background = 'none';
+            detailBtn.style.border = 'none';
+            detailBtn.style.color = '#0066cc';
+            detailBtn.style.textDecoration = 'underline';
+            detailBtn.style.cursor = 'pointer';
+            li.appendChild(detailBtn);
             listEl.appendChild(li);
           });
         }
