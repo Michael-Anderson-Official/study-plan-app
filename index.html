@@ -903,27 +903,35 @@
       }
       // --- 目次がない場合は数値単位ベースで日単位割り当て ---
       var unitsTotal = parseInt(detail.units, 10);
+      // If there is no valid number of units, nothing to schedule
       if (!unitsTotal || unitsTotal <= 0) return;
       var dailyGoal = parseInt(detail.dailyGoal, 10);
+      // Default to 1 unit per day when daily goal is missing or invalid
       if (isNaN(dailyGoal) || dailyGoal <= 0) {
         dailyGoal = 1;
       }
+      // Create an array of unit numbers [1, 2, ..., unitsTotal]
+      var tasksArray = [];
+      for (var num = 1; num <= unitsTotal; num++) {
+        tasksArray.push(num);
+      }
       var startDate = new Date();
       startDate.setHours(0, 0, 0, 0);
-      var remaining = unitsTotal;
       var columnIndex = idx;
       var offset = 0;
-      while (remaining > 0) {
-        var assignUnits = remaining >= dailyGoal ? dailyGoal : remaining;
-        var currDate = new Date(startDate);
-        currDate.setDate(startDate.getDate() + offset);
-        var isoStr = currDate.toISOString().split('T')[0];
+      // Group sequential units by dailyGoal and assign each group to consecutive days
+      for (var s = 0; s < tasksArray.length; s += dailyGoal) {
+        var currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + offset);
+        var isoStr = currentDate.toISOString().split('T')[0];
+        var group = tasksArray.slice(s, s + dailyGoal);
+        if (group.length === 0) break;
+        var contentStr = group.join(', ');
         var key = isoStr + '-sub' + (columnIndex + 1) + '-prep';
         var existing = localStorage.getItem(key) || '';
         var prefix = existing ? existing + '\n' : '';
-        localStorage.setItem(key, prefix + materialsList[idx] + ': ' + assignUnits + '単位');
-        remaining -= assignUnits;
-        offset += 1;
+        localStorage.setItem(key, prefix + materialsList[idx] + ': ' + contentStr);
+        offset++;
       }
       var detDiv = document.getElementById('materialDetail');
       if (detDiv) detDiv.style.display = 'none';
