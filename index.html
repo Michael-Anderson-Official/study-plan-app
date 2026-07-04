@@ -385,6 +385,9 @@
   </div>
   <div class="controls">
     <button id="resetButton">一週間をリセット</button>
+    <!-- 週送りボタン -->
+    <button id="prevWeekBtn" style="margin-left:0.5rem;">前週へ</button>
+    <button id="nextWeekBtn" style="margin-left:0.5rem;">次週へ</button>
   </div>
 
   <!-- 教材追加欄 -->
@@ -411,6 +414,7 @@
       <input id="dailyGoalInput" type="number" min="1" style="padding:0.3rem; width:60%; max-width:200px;" />
     </div>
     <button id="saveDetailBtn" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">保存</button>
+    <button id="dailyScheduleBtn" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">毎日</button>
     <button id="cancelDetailBtn" style="padding:0.4rem 0.8rem;">キャンセル</button>
   </div>
 
@@ -425,6 +429,31 @@
     var materialsList = [];
     var materialsDetails = [];
     var currentMaterialIndex = null;
+
+    // 2026年の日本の祝日一覧。赤字表示の対象となります。
+    const holidays2026 = new Set([
+        '2026-01-01', // 元日
+        '2026-01-12', // 成人の日
+        '2026-02-11', // 建国記念の日
+        '2026-02-23', // 天皇誕生日
+        '2026-03-20', // 春分の日
+        '2026-04-29', // 昭和の日
+        '2026-05-04', // みどりの日
+        '2026-05-05', // こどもの日
+        '2026-05-06', // 憲法記念日の振替休日
+        '2026-07-20', // 海の日
+        '2026-08-11', // 山の日
+        '2026-09-21', // 敬老の日
+        '2026-09-22', // 国民の休日（シルバーウィーク）
+        '2026-09-23', // 秋分の日
+        '2026-10-12', // スポーツの日
+        '2026-11-03', // 文化の日
+        '2026-11-23'  // 勤労感謝の日
+    ]);
+    // 曜日名
+    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    // テーブル行要素をキャッシュ
+    const rows = document.querySelectorAll('tbody tr');
 
     // 保存および読み込み
     // DOMContentLoaded イベントを待たずに即時実行します。
@@ -549,57 +578,9 @@
         '2026-11-23'  // 勤労感謝の日
       ]);
       const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-      // 行ごとに処理
-      const rows = document.querySelectorAll('tbody tr');
-      rows.forEach(function (row, index) {
-        const date = new Date(monday);
-        date.setDate(monday.getDate() + index);
-        const iso = date.toISOString().split('T')[0];
-        const display = (date.getMonth() + 1) + '/' + date.getDate();
-        const dayName = dayNames[date.getDay()];
-        const labelCell = row.querySelector('th.row-label');
-        // 日付の表示と曜日をリンクさせる
-        labelCell.textContent = dayName + ' ' + display;
-        // 色分け：日曜日または祝日は赤、土曜日は青、それ以外はデフォルト
-        if (date.getDay() === 0 || holidays2026.has(iso)) {
-          labelCell.style.color = 'red';
-        } else if (date.getDay() === 6) {
-          labelCell.style.color = 'blue';
-        } else {
-          labelCell.style.color = '';
-        }
-        // 各科目セルの data-key を日付ベースに更新
-        const cells = row.querySelectorAll('td.cell');
-        cells.forEach(function (cell, cellIndex) {
-          const subNum = cellIndex + 1;
-          const prepSection = cell.querySelector('.prep');
-          const reviewSection = cell.querySelector('.review');
-          prepSection.setAttribute('data-key', iso + '-sub' + subNum + '-prep');
-          reviewSection.setAttribute('data-key', iso + '-sub' + subNum + '-review');
-        });
-      });
-      // セルの内容読み込み
-      document.querySelectorAll('.section').forEach(function (section) {
-        // data-key は上で日付ベースに更新されているためここで取得
-        var key = section.getAttribute('data-key');
-        var saved = localStorage.getItem(key);
-        if (saved) section.innerText = saved;
-        section.addEventListener('input', function () {
-          // 常に現在の key で保存する
-          localStorage.setItem(section.getAttribute('data-key'), section.innerText);
-        });
-      });
-
-      // 一週間の振り返り欄の読み込みと保存
-      var weeklySummaryKey = 'weekly-summary-' + window.currentWeekStartISO;
-      var weeklySummaryEl = document.getElementById('weeklySummary');
-      if (weeklySummaryEl) {
-        var weeklySaved = localStorage.getItem(weeklySummaryKey);
-        if (weeklySaved) weeklySummaryEl.innerText = weeklySaved;
-        weeklySummaryEl.addEventListener('input', function () {
-          localStorage.setItem(weeklySummaryKey, weeklySummaryEl.innerText);
-        });
-      }
+      // 初期週のUIおよびセル内容を更新
+      updateWeekUI();
+      updateCellsForCurrentWeek();
 
       // 教材リスト内の詳細リンクをクリックしたときの処理（イベント委任）
       var materialsListEl = document.getElementById('materialsList');
@@ -627,6 +608,49 @@
         cancelDetailBtn.addEventListener('click', function () {
           var detailDiv = document.getElementById('materialDetail');
           detailDiv.style.display = 'none';
+        });
+      }
+
+      // 前週・次週ボタンのクリック処理
+      var prevBtn = document.getElementById('prevWeekBtn');
+      if (prevBtn) {
+        prevBtn.addEventListener('click', function () {
+          var start = new Date(window.currentWeekStartISO);
+          start.setDate(start.getDate() - 7);
+          window.currentWeekStartISO = start.toISOString().split('T')[0];
+          updateWeekUI();
+          updateCellsForCurrentWeek();
+        });
+      }
+      var nextBtn = document.getElementById('nextWeekBtn');
+      if (nextBtn) {
+        nextBtn.addEventListener('click', function () {
+          var start = new Date(window.currentWeekStartISO);
+          start.setDate(start.getDate() + 7);
+          window.currentWeekStartISO = start.toISOString().split('T')[0];
+          updateWeekUI();
+          updateCellsForCurrentWeek();
+        });
+      }
+
+      // 毎日ボタンのクリック処理
+      var dailyBtn = document.getElementById('dailyScheduleBtn');
+      if (dailyBtn) {
+        dailyBtn.addEventListener('click', function () {
+          if (currentMaterialIndex === null) return;
+          // 入力値を materialsDetails に保存
+          var unitsInput = document.getElementById('unitsInput');
+          var dailyGoalInput = document.getElementById('dailyGoalInput');
+          var unitsVal = parseInt(unitsInput.value, 10);
+          var dailyGoalVal = parseInt(dailyGoalInput.value, 10);
+          if (!materialsDetails[currentMaterialIndex]) materialsDetails[currentMaterialIndex] = {};
+          materialsDetails[currentMaterialIndex] = {
+            units: isNaN(unitsVal) ? null : unitsVal,
+            targetDate: null,
+            dailyGoal: isNaN(dailyGoalVal) ? null : dailyGoalVal
+          };
+          localStorage.setItem('material-details', JSON.stringify(materialsDetails));
+          scheduleMaterialDaily(currentMaterialIndex);
         });
       }
     // DOMContentLoaded 用のクロージャを削除したため閉じカッコは不要になりました。
@@ -727,6 +751,82 @@
           section.innerText = '';
         }
       });
+    }
+
+    // 週の表示を更新する関数。現在の週開始日 (window.currentWeekStartISO) を基準にラベルや data-key を更新します。
+    function updateWeekUI() {
+      var startDate = new Date(window.currentWeekStartISO);
+      rows.forEach(function (row, idx) {
+        var date = new Date(startDate);
+        date.setDate(startDate.getDate() + idx);
+        var iso = date.toISOString().split('T')[0];
+        var display = (date.getMonth() + 1) + '/' + date.getDate();
+        var dayName = dayNames[date.getDay()];
+        var labelCell = row.querySelector('th.row-label');
+        if (labelCell) {
+          labelCell.textContent = dayName + ' ' + display;
+          if (date.getDay() === 0 || holidays2026.has(iso)) {
+            labelCell.style.color = 'red';
+          } else if (date.getDay() === 6) {
+            labelCell.style.color = 'blue';
+          } else {
+            labelCell.style.color = '';
+          }
+        }
+        // 各科目セルの data-key を更新
+        var cells = row.querySelectorAll('td.cell');
+        cells.forEach(function (cell, cellIdx) {
+          var subNum = cellIdx + 1;
+          var prepSection = cell.querySelector('.prep');
+          var reviewSection = cell.querySelector('.review');
+          if (prepSection) prepSection.setAttribute('data-key', iso + '-sub' + subNum + '-prep');
+          if (reviewSection) reviewSection.setAttribute('data-key', iso + '-sub' + subNum + '-review');
+        });
+      });
+      // 一週間の振り返り欄の読み込みと保存イベントの更新
+      var weeklySummaryEl = document.getElementById('weeklySummary');
+      if (weeklySummaryEl) {
+        var summaryKey = 'weekly-summary-' + window.currentWeekStartISO;
+        var savedSummary = localStorage.getItem(summaryKey);
+        weeklySummaryEl.innerText = savedSummary ? savedSummary : '';
+        weeklySummaryEl.oninput = function () {
+          localStorage.setItem(summaryKey, weeklySummaryEl.innerText);
+        };
+      }
+    }
+
+    // 教材を日単位でスケジュールします。dailyGoalがなければ1単位とみなします。
+    function scheduleMaterialDaily(idx) {
+      var detail = materialsDetails[idx];
+      if (!detail) return;
+      var unitsTotal = parseInt(detail.units, 10);
+      if (!unitsTotal || unitsTotal <= 0) return;
+      var dailyGoal = parseInt(detail.dailyGoal, 10);
+      if (isNaN(dailyGoal) || dailyGoal <= 0) {
+        dailyGoal = 1;
+      }
+      var start = new Date();
+      start.setHours(0, 0, 0, 0);
+      var unitsRemaining = unitsTotal;
+      var colIndex = idx;
+      var dayOffset = 0;
+      while (unitsRemaining > 0) {
+        var assign = unitsRemaining >= dailyGoal ? dailyGoal : unitsRemaining;
+        var current = new Date(start);
+        current.setDate(start.getDate() + dayOffset);
+        var iso = current.toISOString().split('T')[0];
+        var key = iso + '-sub' + (colIndex + 1) + '-prep';
+        var existing = localStorage.getItem(key) || '';
+        var prefix = existing ? existing + '\n' : '';
+        localStorage.setItem(key, prefix + materialsList[idx] + ': ' + assign + '単位');
+        unitsRemaining -= assign;
+        dayOffset += 1;
+      }
+      // 詳細パネルを閉じる
+      var detailDiv = document.getElementById('materialDetail');
+      if (detailDiv) detailDiv.style.display = 'none';
+      // セルを更新
+      updateCellsForCurrentWeek();
     }
     // リセットボタン
     document.getElementById('resetButton').addEventListener('click', function () {
