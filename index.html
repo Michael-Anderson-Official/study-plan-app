@@ -427,7 +427,7 @@
     var currentMaterialIndex = null;
 
     // 保存および読み込み
-    document.addEventListener('DOMContentLoaded', function () {
+    // DOMContentLoaded イベントを待たずに即時実行します。
       // ヘッダー名の読み込み
       document.querySelectorAll('.header-cell').forEach(function (cell) {
         var key = 'header-' + cell.getAttribute('data-header');
@@ -485,14 +485,18 @@
             var span = document.createElement('span');
             span.textContent = (i + 1) + '. ' + mat + ' ';
             li.appendChild(span);
-            // 詳細ボタン
-            var btn = document.createElement('button');
-            btn.textContent = '詳細';
-            btn.setAttribute('data-index', i);
-            btn.style.marginLeft = '0.5rem';
-            btn.style.padding = '0.3rem 0.6rem';
-            btn.style.fontSize = '0.8rem';
-            li.appendChild(btn);
+            // 詳細リンク
+            var detailSpan = document.createElement('span');
+            // [詳細] を表示し、リンクのように見せる
+            detailSpan.textContent = '詳細';
+            detailSpan.setAttribute('data-index', i);
+            detailSpan.style.marginLeft = '0.5rem';
+            detailSpan.style.cursor = 'pointer';
+            detailSpan.style.color = '#0066cc';
+            detailSpan.style.textDecoration = 'underline';
+            // クラスを付与して任意のスタイルを適用できるようにします
+            detailSpan.className = 'detail-link';
+            li.appendChild(detailSpan);
             listEl.appendChild(li);
           });
         }
@@ -598,12 +602,13 @@
         });
       }
 
-      // 教材リスト内の詳細ボタンをクリックしたときの処理（イベント委任）
+      // 教材リスト内の詳細リンクをクリックしたときの処理（イベント委任）
       var materialsListEl = document.getElementById('materialsList');
       if (materialsListEl) {
         materialsListEl.addEventListener('click', function (event) {
           var target = event.target;
-          if (target.tagName.toLowerCase() === 'button' && target.hasAttribute('data-index')) {
+          // data-index 属性を持つ要素をクリックした場合に詳細を開く
+          if (target && target.hasAttribute && target.hasAttribute('data-index')) {
             var idx = parseInt(target.getAttribute('data-index'), 10);
             openMaterialDetail(idx);
           }
@@ -625,7 +630,7 @@
           detailDiv.style.display = 'none';
         });
       }
-    });
+    // DOMContentLoaded 用のクロージャを削除したため閉じカッコは不要になりました。
 
     // 教材詳細を開く
     function openMaterialDetail(idx) {
