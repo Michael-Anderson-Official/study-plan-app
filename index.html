@@ -134,9 +134,9 @@
         </tr>
       </thead>
       <tbody>
-        <!-- 7日間分の行を用意する。デフォルトでは月曜始まり。日付は自由に書き換え可能。 -->
+        <!-- 7日間分の行を用意する。週の開始日は自動的に計算される。 -->
         <tr>
-          <th class="row-label" contenteditable data-day="day1">月</th>
+          <th class="row-label" data-day="day1">月</th>
           <td class="cell">
             <div class="section prep" contenteditable data-key="day1-sub1-prep"></div>
             <div class="section review" contenteditable data-key="day1-sub1-review"></div>
@@ -171,7 +171,7 @@
           </td>
         </tr>
         <tr>
-          <th class="row-label" contenteditable data-day="day2">火</th>
+          <th class="row-label" data-day="day2">火</th>
           <td class="cell">
             <div class="section prep" contenteditable data-key="day2-sub1-prep"></div>
             <div class="section review" contenteditable data-key="day2-sub1-review"></div>
@@ -206,7 +206,7 @@
           </td>
         </tr>
         <tr>
-          <th class="row-label" contenteditable data-day="day3">水</th>
+          <th class="row-label" data-day="day3">水</th>
           <td class="cell">
             <div class="section prep" contenteditable data-key="day3-sub1-prep"></div>
             <div class="section review" contenteditable data-key="day3-sub1-review"></div>
@@ -241,7 +241,7 @@
           </td>
         </tr>
         <tr>
-          <th class="row-label" contenteditable data-day="day4">木</th>
+          <th class="row-label" data-day="day4">木</th>
           <td class="cell">
             <div class="section prep" contenteditable data-key="day4-sub1-prep"></div>
             <div class="section review" contenteditable data-key="day4-sub1-review"></div>
@@ -276,7 +276,7 @@
           </td>
         </tr>
         <tr>
-          <th class="row-label" contenteditable data-day="day5">金</th>
+          <th class="row-label" data-day="day5">金</th>
           <td class="cell">
             <div class="section prep" contenteditable data-key="day5-sub1-prep"></div>
             <div class="section review" contenteditable data-key="day5-sub1-review"></div>
@@ -311,7 +311,7 @@
           </td>
         </tr>
         <tr>
-          <th class="row-label" contenteditable data-day="day6">土</th>
+          <th class="row-label" data-day="day6">土</th>
           <td class="cell">
             <div class="section prep" contenteditable data-key="day6-sub1-prep"></div>
             <div class="section review" contenteditable data-key="day6-sub1-review"></div>
@@ -346,7 +346,7 @@
           </td>
         </tr>
         <tr>
-          <th class="row-label" contenteditable data-day="day7">日</th>
+          <th class="row-label" data-day="day7">日</th>
           <td class="cell">
             <div class="section prep" contenteditable data-key="day7-sub1-prep"></div>
             <div class="section review" contenteditable data-key="day7-sub1-review"></div>
@@ -386,6 +386,12 @@
   <div class="controls">
     <button id="resetButton">一週間をリセット</button>
   </div>
+
+  <!-- 一週間の振り返り欄 -->
+  <div class="weekly-summary-container" style="margin: 1rem;">
+    <h2 style="font-size:1rem; margin-bottom:0.5rem;">一週間の振り返り</h2>
+    <div id="weeklySummary" contenteditable style="border: 1px solid #ccc; padding: 0.5rem; min-height: 80px;"></div>
+  </div>
   <script>
     // 保存および読み込み
     document.addEventListener('DOMContentLoaded', function () {
@@ -398,24 +404,87 @@
           localStorage.setItem(key, cell.textContent);
         });
       });
-      // 各日付行ラベルの読み込み
-      document.querySelectorAll('tbody th.row-label').forEach(function (label) {
-        var key = 'daylabel-' + label.getAttribute('data-day');
-        var saved = localStorage.getItem(key);
-        if (saved) label.textContent = saved;
-        label.addEventListener('input', function () {
-          localStorage.setItem(key, label.textContent);
+      // 各行の日付を動的に設定します。週の開始日（月曜日）を求め、その週に含まれる7日分の日付を計算します。
+      const currentDate = new Date();
+      const currentDay = currentDate.getDay();
+      // JavaScriptでは日曜が0、月曜が1...土曜が6
+      const diffToMonday = (currentDay + 6) % 7;
+      const monday = new Date(currentDate);
+      monday.setDate(currentDate.getDate() - diffToMonday);
+      // グローバルに保存してリセット時に使う
+      window.currentWeekStartISO = monday.toISOString().split('T')[0];
+      // 2026年の日本の祝日一覧。赤字表示の対象となります。
+      const holidays2026 = new Set([
+        '2026-01-01', // 元日
+        '2026-01-12', // 成人の日
+        '2026-02-11', // 建国記念の日
+        '2026-02-23', // 天皇誕生日
+        '2026-03-20', // 春分の日
+        '2026-04-29', // 昭和の日
+        '2026-05-04', // みどりの日
+        '2026-05-05', // こどもの日
+        '2026-05-06', // 憲法記念日の振替休日
+        '2026-07-20', // 海の日
+        '2026-08-11', // 山の日
+        '2026-09-21', // 敬老の日
+        '2026-09-22', // 国民の休日（シルバーウィーク）
+        '2026-09-23', // 秋分の日
+        '2026-10-12', // スポーツの日
+        '2026-11-03', // 文化の日
+        '2026-11-23'  // 勤労感謝の日
+      ]);
+      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+      // 行ごとに処理
+      const rows = document.querySelectorAll('tbody tr');
+      rows.forEach(function (row, index) {
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + index);
+        const iso = date.toISOString().split('T')[0];
+        const display = (date.getMonth() + 1) + '/' + date.getDate();
+        const dayName = dayNames[date.getDay()];
+        const labelCell = row.querySelector('th.row-label');
+        // 日付の表示と曜日をリンクさせる
+        labelCell.textContent = dayName + ' ' + display;
+        // 色分け：日曜日または祝日は赤、土曜日は青、それ以外はデフォルト
+        if (date.getDay() === 0 || holidays2026.has(iso)) {
+          labelCell.style.color = 'red';
+        } else if (date.getDay() === 6) {
+          labelCell.style.color = 'blue';
+        } else {
+          labelCell.style.color = '';
+        }
+        // 各科目セルの data-key を日付ベースに更新
+        const cells = row.querySelectorAll('td.cell');
+        cells.forEach(function (cell, cellIndex) {
+          const subNum = cellIndex + 1;
+          const prepSection = cell.querySelector('.prep');
+          const reviewSection = cell.querySelector('.review');
+          prepSection.setAttribute('data-key', iso + '-sub' + subNum + '-prep');
+          reviewSection.setAttribute('data-key', iso + '-sub' + subNum + '-review');
         });
       });
       // セルの内容読み込み
       document.querySelectorAll('.section').forEach(function (section) {
+        // data-key は上で日付ベースに更新されているためここで取得
         var key = section.getAttribute('data-key');
         var saved = localStorage.getItem(key);
         if (saved) section.innerText = saved;
         section.addEventListener('input', function () {
-          localStorage.setItem(key, section.innerText);
+          // 常に現在の key で保存する
+          localStorage.setItem(section.getAttribute('data-key'), section.innerText);
         });
       });
+
+      // 一週間の振り返り欄の読み込みと保存
+      var weeklySummaryKey = 'weekly-summary-' + window.currentWeekStartISO;
+      var weeklySummaryEl = document.getElementById('weeklySummary');
+      if (weeklySummaryEl) {
+        var weeklySaved = localStorage.getItem(weeklySummaryKey);
+        if (weeklySaved) weeklySummaryEl.innerText = weeklySaved;
+        weeklySummaryEl.addEventListener('input', function () {
+          localStorage.setItem(weeklySummaryKey, weeklySummaryEl.innerText);
+        });
+      }
     });
     // リセットボタン
     document.getElementById('resetButton').addEventListener('click', function () {
@@ -438,13 +507,11 @@
             cell.textContent = '科目' + num;
           }
         });
-        document.querySelectorAll('tbody th.row-label').forEach(function (label) {
-          var key = 'daylabel-' + label.getAttribute('data-day');
-          localStorage.removeItem(key);
-          // デフォルトの曜日頭文字へ
-          var defaults = {day1:'月',day2:'火',day3:'水',day4:'木',day5:'金',day6:'土',day7:'日'};
-          label.textContent = defaults[label.getAttribute('data-day')];
-        });
+        // 一週間の振り返りの削除
+        var summaryKey = 'weekly-summary-' + window.currentWeekStartISO;
+        localStorage.removeItem(summaryKey);
+        var summaryEl = document.getElementById('weeklySummary');
+        if (summaryEl) summaryEl.innerText = '';
         alert('記録をリセットしました。');
       }
     });
