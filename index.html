@@ -395,12 +395,37 @@
     <ul id="materialsList" style="list-style:none; padding-left:0; margin-top:0.5rem;"></ul>
   </div>
 
+  <!-- 教材の詳細入力欄 -->
+  <div id="materialDetail" style="display:none; margin:1rem; padding:1rem; border:1px solid #ccc; border-radius:4px; background:#f9f9f9;">
+    <h3 id="materialNameDetail" style="font-size:1rem; margin-top:0;">教材詳細</h3>
+    <div style="margin-bottom:0.5rem;">
+      <label for="unitsInput">単位数（章数やページ数など）:</label><br/>
+      <input id="unitsInput" type="number" min="1" style="padding:0.3rem; width:60%; max-width:200px;" />
+    </div>
+    <div style="margin-bottom:0.5rem;">
+      <label for="targetDateInput">目標期日:</label><br/>
+      <input id="targetDateInput" type="date" style="padding:0.3rem; width:60%; max-width:200px;" />
+    </div>
+    <div style="margin-bottom:0.5rem;">
+      <label for="dailyGoalInput">一日あたりの目標単位数（任意）:</label><br/>
+      <input id="dailyGoalInput" type="number" min="1" style="padding:0.3rem; width:60%; max-width:200px;" />
+    </div>
+    <button id="saveDetailBtn" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">保存</button>
+    <button id="cancelDetailBtn" style="padding:0.4rem 0.8rem;">キャンセル</button>
+  </div>
+
   <!-- 一週間の振り返り欄 -->
   <div class="weekly-summary-container" style="margin: 1rem;">
     <h2 style="font-size:1rem; margin-bottom:0.5rem;">一週間の振り返り</h2>
     <div id="weeklySummary" contenteditable style="border: 1px solid #ccc; padding: 0.5rem; min-height: 80px;"></div>
   </div>
   <script>
+    // グローバル変数の定義
+    // 教材リストや詳細情報、現在選択中の教材インデックスはグローバルで管理します。
+    var materialsList = [];
+    var materialsDetails = [];
+    var currentMaterialIndex = null;
+
     // 保存および読み込み
     document.addEventListener('DOMContentLoaded', function () {
       // ヘッダー名の読み込み
@@ -413,8 +438,7 @@
         });
       });
 
-      // 教材リストの読み込みとUI更新
-      var materialsList = [];
+      // 教材リストおよび詳細情報はグローバル変数を使用します。
       function loadMaterials() {
         var saved = localStorage.getItem('materials-list');
         if (saved) {
@@ -423,7 +447,22 @@
           } catch (e) {
             materialsList = [];
           }
+        } else {
+          materialsList = [];
         }
+
+        // 詳細情報の読み込み
+        var detailSaved = localStorage.getItem('material-details');
+        if (detailSaved) {
+          try {
+            materialsDetails = JSON.parse(detailSaved);
+          } catch (e) {
+            materialsDetails = [];
+          }
+        } else {
+          materialsDetails = [];
+        }
+        // UIを更新
         updateMaterialsUI();
       }
       function updateMaterialsUI() {
@@ -442,7 +481,18 @@
           listEl.innerHTML = '';
           materialsList.forEach(function (mat, i) {
             var li = document.createElement('li');
-            li.textContent = (i + 1) + '. ' + mat;
+            // 番号と名前
+            var span = document.createElement('span');
+            span.textContent = (i + 1) + '. ' + mat + ' ';
+            li.appendChild(span);
+            // 詳細ボタン
+            var btn = document.createElement('button');
+            btn.textContent = '詳細';
+            btn.setAttribute('data-index', i);
+            btn.style.marginLeft = '0.5rem';
+            btn.style.padding = '0.3rem 0.6rem';
+            btn.style.fontSize = '0.8rem';
+            li.appendChild(btn);
             listEl.appendChild(li);
           });
         }
@@ -456,6 +506,8 @@
           var name = input.value.trim();
           if (!name) return;
           materialsList.push(name);
+          // 新しい教材の詳細を空で初期化（未設定の場合はnull）
+          materialsDetails.push(null);
           localStorage.setItem('materials-list', JSON.stringify(materialsList));
           updateMaterialsUI();
           input.value = '';
@@ -545,7 +597,133 @@
           localStorage.setItem(weeklySummaryKey, weeklySummaryEl.innerText);
         });
       }
+
+      // 教材リスト内の詳細ボタンをクリックしたときの処理（イベント委任）
+      var materialsListEl = document.getElementById('materialsList');
+      if (materialsListEl) {
+        materialsListEl.addEventListener('click', function (event) {
+          var target = event.target;
+          if (target.tagName.toLowerCase() === 'button' && target.hasAttribute('data-index')) {
+            var idx = parseInt(target.getAttribute('data-index'), 10);
+            openMaterialDetail(idx);
+          }
+        });
+      }
+
+      // 詳細保存ボタン
+      var saveDetailBtn = document.getElementById('saveDetailBtn');
+      if (saveDetailBtn) {
+        saveDetailBtn.addEventListener('click', function () {
+          saveMaterialDetail();
+        });
+      }
+      // 詳細キャンセルボタン
+      var cancelDetailBtn = document.getElementById('cancelDetailBtn');
+      if (cancelDetailBtn) {
+        cancelDetailBtn.addEventListener('click', function () {
+          var detailDiv = document.getElementById('materialDetail');
+          detailDiv.style.display = 'none';
+        });
+      }
     });
+
+    // 教材詳細を開く
+    function openMaterialDetail(idx) {
+      currentMaterialIndex = idx;
+      var detailDiv = document.getElementById('materialDetail');
+      var nameSpan = document.getElementById('materialNameDetail');
+      var unitsInput = document.getElementById('unitsInput');
+      var targetDateInput = document.getElementById('targetDateInput');
+      var dailyGoalInput = document.getElementById('dailyGoalInput');
+      // 名前表示
+      if (nameSpan) nameSpan.textContent = materialsList[idx];
+      // 詳細情報の読み込み
+      var detail = materialsDetails[idx] || {};
+      unitsInput.value = detail && detail.units ? detail.units : '';
+      targetDateInput.value = detail && detail.targetDate ? detail.targetDate : '';
+      dailyGoalInput.value = detail && detail.dailyGoal ? detail.dailyGoal : '';
+      detailDiv.style.display = 'block';
+    }
+
+    // 詳細保存処理
+    function saveMaterialDetail() {
+      if (currentMaterialIndex === null) return;
+      var unitsInput = document.getElementById('unitsInput');
+      var targetDateInput = document.getElementById('targetDateInput');
+      var dailyGoalInput = document.getElementById('dailyGoalInput');
+      var units = parseInt(unitsInput.value, 10);
+      var targetDate = targetDateInput.value;
+      var dailyGoal = parseInt(dailyGoalInput.value, 10);
+      if (!materialsDetails[currentMaterialIndex]) materialsDetails[currentMaterialIndex] = {};
+      materialsDetails[currentMaterialIndex] = {
+        units: isNaN(units) ? null : units,
+        targetDate: targetDate || null,
+        dailyGoal: isNaN(dailyGoal) ? null : dailyGoal
+      };
+      // 保存
+      localStorage.setItem('material-details', JSON.stringify(materialsDetails));
+      // スケジュール計算
+      scheduleMaterial(currentMaterialIndex);
+      // 詳細パネルを閉じる
+      var detailDiv = document.getElementById('materialDetail');
+      detailDiv.style.display = 'none';
+    }
+
+    // 教材のスケジュールを計算しカレンダーに追加
+    function scheduleMaterial(idx) {
+      var detail = materialsDetails[idx];
+      if (!detail) return;
+      var unitsTotal = parseInt(detail.units, 10);
+      var targetDateStr = detail.targetDate;
+      var dailyGoal = parseInt(detail.dailyGoal, 10);
+      if (!unitsTotal || !targetDateStr) return;
+      // 開始日: 今日（時間をゼロに）
+      var start = new Date();
+      start.setHours(0, 0, 0, 0);
+      // 目標日
+      var end = new Date(targetDateStr);
+      end.setHours(0, 0, 0, 0);
+      // 日数計算
+      var days = Math.floor((end - start) / 86400000) + 1;
+      if (days < 1) days = 1;
+      var unitsPerDay;
+      if (!isNaN(dailyGoal) && dailyGoal > 0) {
+        unitsPerDay = dailyGoal;
+      } else {
+        unitsPerDay = Math.ceil(unitsTotal / days);
+      }
+      var maxDays = Math.ceil(unitsTotal / unitsPerDay);
+      var unitsRemaining = unitsTotal;
+      // 教材が割り当てられた列（0ベース）
+      var colIndex = idx;
+      for (var i = 0; i < maxDays; i++) {
+        var current = new Date(start);
+        current.setDate(start.getDate() + i);
+        var iso = current.toISOString().split('T')[0];
+        var assign = (i < maxDays - 1) ? unitsPerDay : unitsRemaining;
+        unitsRemaining -= unitsPerDay;
+        if (assign <= 0) continue;
+        var key = iso + '-sub' + (colIndex + 1) + '-prep';
+        var existing = localStorage.getItem(key) || '';
+        var prefix = existing ? existing + '\n' : '';
+        localStorage.setItem(key, prefix + materialsList[idx] + ': ' + assign + '単位');
+      }
+      // 画面上のセルを更新
+      updateCellsForCurrentWeek();
+    }
+
+    // 現在週のセル内容を更新
+    function updateCellsForCurrentWeek() {
+      document.querySelectorAll('.section').forEach(function (section) {
+        var key = section.getAttribute('data-key');
+        var saved = localStorage.getItem(key);
+        if (saved) {
+          section.innerText = saved;
+        } else {
+          section.innerText = '';
+        }
+      });
+    }
     // リセットボタン
     document.getElementById('resetButton').addEventListener('click', function () {
       if (confirm('本当にこの週間の記録を削除しますか？')) {
@@ -569,9 +747,14 @@
         });
         // 教材リストの削除
         localStorage.removeItem('materials-list');
+        // 教材詳細の削除
+        localStorage.removeItem('material-details');
         // 教材リスト表示をクリア
         var listEl = document.getElementById('materialsList');
         if (listEl) listEl.innerHTML = '';
+        // 教材配列を初期化
+        materialsList = [];
+        materialsDetails = [];
         // 一週間の振り返りの削除
         var summaryKey = 'weekly-summary-' + window.currentWeekStartISO;
         localStorage.removeItem(summaryKey);
