@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- build trigger -->
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
@@ -549,39 +548,20 @@
 
       // ページ読み込み時に教材リストを読み込む
       loadMaterials();
-      // 各行の日付を動的に設定します。週の開始日（月曜日）を求め、その週に含まれる7日分の日付を計算します。
-      const currentDate = new Date();
-      const currentDay = currentDate.getDay();
-      // JavaScriptでは日曜が0、月曜が1...土曜が6
-      const diffToMonday = (currentDay + 6) % 7;
-      const monday = new Date(currentDate);
-      monday.setDate(currentDate.getDate() - diffToMonday);
-      // グローバルに保存してリセット時に使う
-      window.currentWeekStartISO = monday.toISOString().split('T')[0];
-      // 2026年の日本の祝日一覧。赤字表示の対象となります。
-      const holidays2026 = new Set([
-        '2026-01-01', // 元日
-        '2026-01-12', // 成人の日
-        '2026-02-11', // 建国記念の日
-        '2026-02-23', // 天皇誕生日
-        '2026-03-20', // 春分の日
-        '2026-04-29', // 昭和の日
-        '2026-05-04', // みどりの日
-        '2026-05-05', // こどもの日
-        '2026-05-06', // 憲法記念日の振替休日
-        '2026-07-20', // 海の日
-        '2026-08-11', // 山の日
-        '2026-09-21', // 敬老の日
-        '2026-09-22', // 国民の休日（シルバーウィーク）
-        '2026-09-23', // 秋分の日
-        '2026-10-12', // スポーツの日
-        '2026-11-03', // 文化の日
-        '2026-11-23'  // 勤労感謝の日
-      ]);
-      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-      // 初期週のUIおよびセル内容を更新
-      updateWeekUI();
-      updateCellsForCurrentWeek();
+      // ページ読み込み時: 現在の日付からその週の月曜日を計算し、
+      // window.currentWeekStartISO に保存します。週の表示は updateWeekUI() で行います。
+      (function initialiseWeek() {
+        const currentDate = new Date();
+        const currentDay = currentDate.getDay();
+        // JavaScriptでは日曜が0、月曜が1...土曜が6
+        const diffToMonday = (currentDay + 6) % 7;
+        const monday = new Date(currentDate);
+        monday.setDate(currentDate.getDate() - diffToMonday);
+        window.currentWeekStartISO = monday.toISOString().split('T')[0];
+        // 現在週のUIとセル内容を更新
+        updateWeekUI();
+        updateCellsForCurrentWeek();
+      })();
 
       // 教材リスト内の詳細リンクをクリックしたときの処理（イベント委任）
       var materialsListEl = document.getElementById('materialsList');
