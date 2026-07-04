@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>計画帳アプリ</title>
+  <style>
+    /* 全体のスタイル */
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #fdfdfd;
+      color: #333;
+    }
+    h1 {
+      margin: 0;
+      padding: 1rem;
+      font-size: 1.3rem;
+      background-color: #f0f8ff;
+      border-bottom: 1px solid #ccc;
+      text-align: center;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #ccc;
+    }
+    thead th {
+      background: #e8f4ff;
+      font-weight: bold;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    tbody th.row-label {
+      background: #f5f5f5;
+      text-align: center;
+      position: sticky;
+      left: 0;
+      z-index: 5;
+    }
+    /* セルのスタイル */
+    .cell {
+      height: 60px;
+      position: relative;
+      overflow: hidden;
+    }
+    .cell .section {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 50%;
+      padding: 2px;
+      box-sizing: border-box;
+      overflow: auto;
+      font-size: 0.75rem;
+    }
+    .cell .prep {
+      top: 0;
+      border-bottom: 1px solid #ccc;
+      background: #fff;
+    }
+    .cell .review {
+      bottom: 0;
+      background: #fafafa;
+    }
+    .cell .section:focus {
+      outline: 2px solid #1e90ff;
+    }
+    /* ヘッダー名編集のスタイル */
+    .header-cell {
+      background: #e8f4ff;
+    }
+    .header-cell[contenteditable] {
+      cursor: text;
+    }
+    .header-cell:focus {
+      outline: 2px solid #1e90ff;
+    }
+    /* ボタン */
+    .controls {
+      margin: 1rem;
+      text-align: center;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+      background: #1e90ff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0c78d5;
+    }
+    @media (max-width: 600px) {
+      .cell {
+        height: 80px;
+      }
+      .cell .section {
+        font-size: 0.65rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>一週間の計画帳</h1>
+  <!-- 説明文 -->
+  <p style="padding: 0 1rem 1rem 1rem; font-size:0.85rem; line-height:1.4;">
+    各セルは上半分が「予習欄」、下半分が「復習欄」です。<br />
+    ヘッダーの科目名はクリックして変更できます。記入内容はスマートフォンのブラウザに保存されるので、ページを再読み込みしても内容が残ります。<br />
+    「一週間をリセット」ボタンを押すと、このページに保存されたすべての記録が消去されます。
+  </p>
+  <div style="overflow-x: auto;">
+    <table id="planTable">
+      <thead>
+        <tr>
+          <th class="row-label">日付</th>
+          <!-- 8科目のヘッダー -->
+          <th class="header-cell" contenteditable data-header="sub1">科目1</th>
+          <th class="header-cell" contenteditable data-header="sub2">科目2</th>
+          <th class="header-cell" contenteditable data-header="sub3">科目3</th>
+          <th class="header-cell" contenteditable data-header="sub4">科目4</th>
+          <th class="header-cell" contenteditable data-header="sub5">科目5</th>
+          <th class="header-cell" contenteditable data-header="sub6">科目6</th>
+          <th class="header-cell" contenteditable data-header="sub7">科目7</th>
+          <th class="header-cell" contenteditable data-header="sub8">感想・振り返り</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- 7日間分の行を用意する。デフォルトでは月曜始まり。日付は自由に書き換え可能。 -->
+        <tr>
+          <th class="row-label" contenteditable data-day="day1">月</th>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day1-sub1-prep"></div>
+            <div class="section review" contenteditable data-key="day1-sub1-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day1-sub2-prep"></div>
+            <div class="section review" contenteditable data-key="day1-sub2-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day1-sub3-prep"></div>
+            <div class="section review" contenteditable data-key="day1-sub3-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day1-sub4-prep"></div>
+            <div class="section review" contenteditable data-key="day1-sub4-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day1-sub5-prep"></div>
+            <div class="section review" contenteditable data-key="day1-sub5-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day1-sub6-prep"></div>
+            <div class="section review" contenteditable data-key="day1-sub6-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day1-sub7-prep"></div>
+            <div class="section review" contenteditable data-key="day1-sub7-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day1-sub8-prep"></div>
+            <div class="section review" contenteditable data-key="day1-sub8-review"></div>
+          </td>
+        </tr>
+        <tr>
+          <th class="row-label" contenteditable data-day="day2">火</th>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day2-sub1-prep"></div>
+            <div class="section review" contenteditable data-key="day2-sub1-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day2-sub2-prep"></div>
+            <div class="section review" contenteditable data-key="day2-sub2-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day2-sub3-prep"></div>
+            <div class="section review" contenteditable data-key="day2-sub3-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day2-sub4-prep"></div>
+            <div class="section review" contenteditable data-key="day2-sub4-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day2-sub5-prep"></div>
+            <div class="section review" contenteditable data-key="day2-sub5-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day2-sub6-prep"></div>
+            <div class="section review" contenteditable data-key="day2-sub6-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day2-sub7-prep"></div>
+            <div class="section review" contenteditable data-key="day2-sub7-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day2-sub8-prep"></div>
+            <div class="section review" contenteditable data-key="day2-sub8-review"></div>
+          </td>
+        </tr>
+        <tr>
+          <th class="row-label" contenteditable data-day="day3">水</th>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day3-sub1-prep"></div>
+            <div class="section review" contenteditable data-key="day3-sub1-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day3-sub2-prep"></div>
+            <div class="section review" contenteditable data-key="day3-sub2-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day3-sub3-prep"></div>
+            <div class="section review" contenteditable data-key="day3-sub3-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day3-sub4-prep"></div>
+            <div class="section review" contenteditable data-key="day3-sub4-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day3-sub5-prep"></div>
+            <div class="section review" contenteditable data-key="day3-sub5-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day3-sub6-prep"></div>
+            <div class="section review" contenteditable data-key="day3-sub6-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day3-sub7-prep"></div>
+            <div class="section review" contenteditable data-key="day3-sub7-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day3-sub8-prep"></div>
+            <div class="section review" contenteditable data-key="day3-sub8-review"></div>
+          </td>
+        </tr>
+        <tr>
+          <th class="row-label" contenteditable data-day="day4">木</th>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day4-sub1-prep"></div>
+            <div class="section review" contenteditable data-key="day4-sub1-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day4-sub2-prep"></div>
+            <div class="section review" contenteditable data-key="day4-sub2-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day4-sub3-prep"></div>
+            <div class="section review" contenteditable data-key="day4-sub3-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day4-sub4-prep"></div>
+            <div class="section review" contenteditable data-key="day4-sub4-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day4-sub5-prep"></div>
+            <div class="section review" contenteditable data-key="day4-sub5-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day4-sub6-prep"></div>
+            <div class="section review" contenteditable data-key="day4-sub6-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day4-sub7-prep"></div>
+            <div class="section review" contenteditable data-key="day4-sub7-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day4-sub8-prep"></div>
+            <div class="section review" contenteditable data-key="day4-sub8-review"></div>
+          </td>
+        </tr>
+        <tr>
+          <th class="row-label" contenteditable data-day="day5">金</th>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day5-sub1-prep"></div>
+            <div class="section review" contenteditable data-key="day5-sub1-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day5-sub2-prep"></div>
+            <div class="section review" contenteditable data-key="day5-sub2-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day5-sub3-prep"></div>
+            <div class="section review" contenteditable data-key="day5-sub3-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day5-sub4-prep"></div>
+            <div class="section review" contenteditable data-key="day5-sub4-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day5-sub5-prep"></div>
+            <div class="section review" contenteditable data-key="day5-sub5-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day5-sub6-prep"></div>
+            <div class="section review" contenteditable data-key="day5-sub6-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day5-sub7-prep"></div>
+            <div class="section review" contenteditable data-key="day5-sub7-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day5-sub8-prep"></div>
+            <div class="section review" contenteditable data-key="day5-sub8-review"></div>
+          </td>
+        </tr>
+        <tr>
+          <th class="row-label" contenteditable data-day="day6">土</th>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day6-sub1-prep"></div>
+            <div class="section review" contenteditable data-key="day6-sub1-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day6-sub2-prep"></div>
+            <div class="section review" contenteditable data-key="day6-sub2-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day6-sub3-prep"></div>
+            <div class="section review" contenteditable data-key="day6-sub3-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day6-sub4-prep"></div>
+            <div class="section review" contenteditable data-key="day6-sub4-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day6-sub5-prep"></div>
+            <div class="section review" contenteditable data-key="day6-sub5-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day6-sub6-prep"></div>
+            <div class="section review" contenteditable data-key="day6-sub6-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day6-sub7-prep"></div>
+            <div class="section review" contenteditable data-key="day6-sub7-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day6-sub8-prep"></div>
+            <div class="section review" contenteditable data-key="day6-sub8-review"></div>
+          </td>
+        </tr>
+        <tr>
+          <th class="row-label" contenteditable data-day="day7">日</th>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day7-sub1-prep"></div>
+            <div class="section review" contenteditable data-key="day7-sub1-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day7-sub2-prep"></div>
+            <div class="section review" contenteditable data-key="day7-sub2-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day7-sub3-prep"></div>
+            <div class="section review" contenteditable data-key="day7-sub3-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day7-sub4-prep"></div>
+            <div class="section review" contenteditable data-key="day7-sub4-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day7-sub5-prep"></div>
+            <div class="section review" contenteditable data-key="day7-sub5-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day7-sub6-prep"></div>
+            <div class="section review" contenteditable data-key="day7-sub6-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day7-sub7-prep"></div>
+            <div class="section review" contenteditable data-key="day7-sub7-review"></div>
+          </td>
+          <td class="cell">
+            <div class="section prep" contenteditable data-key="day7-sub8-prep"></div>
+            <div class="section review" contenteditable data-key="day7-sub8-review"></div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="controls">
+    <button id="resetButton">一週間をリセット</button>
+  </div>
+  <script>
+    // 保存および読み込み
+    document.addEventListener('DOMContentLoaded', function () {
+      // ヘッダー名の読み込み
+      document.querySelectorAll('.header-cell').forEach(function (cell) {
+        var key = 'header-' + cell.getAttribute('data-header');
+        var saved = localStorage.getItem(key);
+        if (saved) cell.textContent = saved;
+        cell.addEventListener('input', function () {
+          localStorage.setItem(key, cell.textContent);
+        });
+      });
+      // 各日付行ラベルの読み込み
+      document.querySelectorAll('tbody th.row-label').forEach(function (label) {
+        var key = 'daylabel-' + label.getAttribute('data-day');
+        var saved = localStorage.getItem(key);
+        if (saved) label.textContent = saved;
+        label.addEventListener('input', function () {
+          localStorage.setItem(key, label.textContent);
+        });
+      });
+      // セルの内容読み込み
+      document.querySelectorAll('.section').forEach(function (section) {
+        var key = section.getAttribute('data-key');
+        var saved = localStorage.getItem(key);
+        if (saved) section.innerText = saved;
+        section.addEventListener('input', function () {
+          localStorage.setItem(key, section.innerText);
+        });
+      });
+    });
+    // リセットボタン
+    document.getElementById('resetButton').addEventListener('click', function () {
+      if (confirm('本当にこの週間の記録を削除しますか？')) {
+        // 全てのキーに対して削除
+        document.querySelectorAll('.section').forEach(function (section) {
+          var key = section.getAttribute('data-key');
+          localStorage.removeItem(key);
+          section.innerText = '';
+        });
+        document.querySelectorAll('.header-cell').forEach(function (cell) {
+          var key = 'header-' + cell.getAttribute('data-header');
+          localStorage.removeItem(key);
+          // 初期値に戻す
+          var idx = cell.getAttribute('data-header');
+          if (idx === 'sub8') {
+            cell.textContent = '感想・振り返り';
+          } else {
+            var num = idx.replace('sub', '');
+            cell.textContent = '科目' + num;
+          }
+        });
+        document.querySelectorAll('tbody th.row-label').forEach(function (label) {
+          var key = 'daylabel-' + label.getAttribute('data-day');
+          localStorage.removeItem(key);
+          // デフォルトの曜日頭文字へ
+          var defaults = {day1:'月',day2:'火',day3:'水',day4:'木',day5:'金',day6:'土',day7:'日'};
+          label.textContent = defaults[label.getAttribute('data-day')];
+        });
+        alert('記録をリセットしました。');
+      }
+    });
+  </script>
+</body>
+</html>
