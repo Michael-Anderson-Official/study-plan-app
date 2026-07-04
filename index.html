@@ -387,6 +387,14 @@
     <button id="resetButton">一週間をリセット</button>
   </div>
 
+  <!-- 教材追加欄 -->
+  <div class="materials-section" style="margin: 1rem;">
+    <h2 style="font-size:1rem; margin-bottom:0.5rem;">教材追加欄</h2>
+    <input id="materialInput" type="text" placeholder="教材名を入力" style="padding:0.4rem; width: 60%; max-width:280px;" />
+    <button id="addMaterialBtn" style="padding:0.4rem 0.8rem; margin-left:0.5rem;">追加</button>
+    <ul id="materialsList" style="list-style:none; padding-left:0; margin-top:0.5rem;"></ul>
+  </div>
+
   <!-- 一週間の振り返り欄 -->
   <div class="weekly-summary-container" style="margin: 1rem;">
     <h2 style="font-size:1rem; margin-bottom:0.5rem;">一週間の振り返り</h2>
@@ -404,6 +412,58 @@
           localStorage.setItem(key, cell.textContent);
         });
       });
+
+      // 教材リストの読み込みとUI更新
+      var materialsList = [];
+      function loadMaterials() {
+        var saved = localStorage.getItem('materials-list');
+        if (saved) {
+          try {
+            materialsList = JSON.parse(saved);
+          } catch (e) {
+            materialsList = [];
+          }
+        }
+        updateMaterialsUI();
+      }
+      function updateMaterialsUI() {
+        // ヘッダーセルの更新
+        document.querySelectorAll('.header-cell').forEach(function (cell) {
+          var idxStr = cell.getAttribute('data-header');
+          if (!idxStr) return;
+          var idx = parseInt(idxStr.replace('sub', ''), 10) - 1;
+          if (materialsList[idx]) {
+            cell.textContent = materialsList[idx];
+          }
+        });
+        // リスト表示の更新
+        var listEl = document.getElementById('materialsList');
+        if (listEl) {
+          listEl.innerHTML = '';
+          materialsList.forEach(function (mat, i) {
+            var li = document.createElement('li');
+            li.textContent = (i + 1) + '. ' + mat;
+            listEl.appendChild(li);
+          });
+        }
+      }
+      // 教材追加ボタンイベント
+      var addBtn = document.getElementById('addMaterialBtn');
+      if (addBtn) {
+        addBtn.addEventListener('click', function () {
+          var input = document.getElementById('materialInput');
+          if (!input) return;
+          var name = input.value.trim();
+          if (!name) return;
+          materialsList.push(name);
+          localStorage.setItem('materials-list', JSON.stringify(materialsList));
+          updateMaterialsUI();
+          input.value = '';
+        });
+      }
+
+      // ページ読み込み時に教材リストを読み込む
+      loadMaterials();
       // 各行の日付を動的に設定します。週の開始日（月曜日）を求め、その週に含まれる7日分の日付を計算します。
       const currentDate = new Date();
       const currentDay = currentDate.getDay();
@@ -507,6 +567,11 @@
             cell.textContent = '科目' + num;
           }
         });
+        // 教材リストの削除
+        localStorage.removeItem('materials-list');
+        // 教材リスト表示をクリア
+        var listEl = document.getElementById('materialsList');
+        if (listEl) listEl.innerHTML = '';
         // 一週間の振り返りの削除
         var summaryKey = 'weekly-summary-' + window.currentWeekStartISO;
         localStorage.removeItem(summaryKey);
