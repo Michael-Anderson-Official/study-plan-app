@@ -846,10 +846,23 @@
       if (detailDiv) detailDiv.style.display = 'none';
     }
 
+    // 指定した教材（列）の予習欄の記入を全て削除する。再スケジュール時に古い記入が残らないようにする。
+    function clearMaterialPrepCells(idx) {
+      var pattern = new RegExp('^\\d{4}-\\d{2}-\\d{2}-sub' + (idx + 1) + '-prep$');
+      var keysToRemove = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && pattern.test(k)) keysToRemove.push(k);
+      }
+      keysToRemove.forEach(function (k) { localStorage.removeItem(k); });
+    }
+
     // 教材のスケジュールを計算しカレンダーに追加
     function scheduleMaterial(idx) {
       var detail = materialsDetails[idx];
       if (!detail) return;
+      // 既存の割り当てを削除してから新しい内容で置き換える
+      clearMaterialPrepCells(idx);
       // もし目次リストが存在する場合は章タイトルごとにスケジュールする
       var tasks = detail.tocList;
       if (tasks && Array.isArray(tasks) && tasks.length > 0) {
@@ -880,9 +893,7 @@
             taskIndex += tasksPerDay;
             var content = subTasks.join('\n');
             var key = iso + '-sub' + (colIndex + 1) + '-prep';
-            var existing = localStorage.getItem(key) || '';
-            var prefix = existing ? existing + '\n' : '';
-            localStorage.setItem(key, prefix + content);
+            localStorage.setItem(key, content);
           }
         } else {
           // 期日がない場合は毎日順番に dailyGoal または1単位ずつ割り当て
@@ -898,9 +909,7 @@
             taskIdx += tasksPerDay2;
             var content2 = sub.join('\n');
             var key2 = iso2 + '-sub' + (colIndex + 1) + '-prep';
-            var existing2 = localStorage.getItem(key2) || '';
-            var prefix2 = existing2 ? existing2 + '\n' : '';
-            localStorage.setItem(key2, prefix2 + content2);
+            localStorage.setItem(key2, content2);
             dayOffset++;
           }
         }
@@ -948,9 +957,7 @@
         if (group.length === 0) break;
         var contentStr = group.join(', ');
         var key3 = isoDate + '-sub' + (idx + 1) + '-prep';
-        var existing3 = localStorage.getItem(key3) || '';
-        var prefix3 = existing3 ? existing3 + '\n' : '';
-        localStorage.setItem(key3, prefix3 + contentStr);
+        localStorage.setItem(key3, contentStr);
         dayIndex++;
       }
       // スケジュール後に表示を更新
@@ -1026,6 +1033,8 @@
     function scheduleMaterialDaily(idx) {
       var detail = materialsDetails[idx];
       if (!detail) return;
+      // 既存の割り当てを削除してから新しい内容で置き換える
+      clearMaterialPrepCells(idx);
       // 目次リストがある場合は章タイトルを日毎に割り当て
       var tasks = detail.tocList;
       if (tasks && Array.isArray(tasks) && tasks.length > 0) {
@@ -1044,9 +1053,7 @@
           taskIndex += tasksPerDay;
           var content = subTasks.join('\n');
           var key = iso + '-sub' + (colIdx + 1) + '-prep';
-          var existing = localStorage.getItem(key) || '';
-          var prefix = existing ? existing + '\n' : '';
-          localStorage.setItem(key, prefix + content);
+          localStorage.setItem(key, content);
           dayOffset += 1;
         }
         // 詳細パネルを閉じる
@@ -1082,9 +1089,7 @@
         if (group.length === 0) break;
         var contentStr = group.join(', ');
         var key = isoStr + '-sub' + (columnIndex + 1) + '-prep';
-        var existing = localStorage.getItem(key) || '';
-        var prefix = existing ? existing + '\n' : '';
-        localStorage.setItem(key, prefix + contentStr);
+        localStorage.setItem(key, contentStr);
         offset++;
       }
       var detDiv = document.getElementById('materialDetail');
