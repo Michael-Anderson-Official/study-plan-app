@@ -438,6 +438,7 @@
     </div>
     <button id="saveDetailBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">保存</button>
     <button id="dailyScheduleBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">毎日</button>
+    <button id="deleteMaterialBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem; background:#d9534f;">削除</button>
     <button id="cancelDetailBtn" type="button" style="padding:0.4rem 0.8rem;">キャンセル</button>
   </div>
 
@@ -547,6 +548,10 @@
           var idx = parseInt(idxStr.replace('sub', ''), 10) - 1;
           if (materialsList[idx]) {
             cell.textContent = materialsList[idx];
+          } else if (idxStr === 'sub8') {
+            cell.textContent = '感想・振り返り';
+          } else {
+            cell.textContent = '科目' + (idx + 1);
           }
         });
         // リスト表示の更新
@@ -640,6 +645,13 @@
       if (saveDetailBtn) {
         saveDetailBtn.addEventListener('click', function () {
           saveMaterialDetail();
+        });
+      }
+      // 教材削除ボタン
+      var deleteMaterialBtn = document.getElementById('deleteMaterialBtn');
+      if (deleteMaterialBtn) {
+        deleteMaterialBtn.addEventListener('click', function () {
+          deleteCurrentMaterial();
         });
       }
       // 詳細キャンセルボタン
@@ -815,6 +827,23 @@
       // 詳細パネルを閉じる
       var detailDiv = document.getElementById('materialDetail');
       detailDiv.style.display = 'none';
+    }
+
+    // 現在開いている教材をリストと詳細情報から削除する
+    function deleteCurrentMaterial() {
+      if (currentMaterialIndex === null) return;
+      var materialName = materialsList[currentMaterialIndex] || 'この教材';
+      if (!confirm(materialName + 'を削除しますか？\nカレンダーに記入済みの予定は残ります。')) {
+        return;
+      }
+      materialsList.splice(currentMaterialIndex, 1);
+      materialsDetails.splice(currentMaterialIndex, 1);
+      localStorage.setItem('materials-list', JSON.stringify(materialsList));
+      localStorage.setItem('material-details', JSON.stringify(materialsDetails));
+      currentMaterialIndex = null;
+      updateMaterialsUI();
+      var detailDiv = document.getElementById('materialDetail');
+      if (detailDiv) detailDiv.style.display = 'none';
     }
 
     // 教材のスケジュールを計算しカレンダーに追加
@@ -1071,11 +1100,6 @@
           localStorage.removeItem(key);
           section.innerText = '';
         });
-        // 一週間の振り返りの削除
-        var summaryKey = 'weekly-summary-' + window.currentWeekStartISO;
-        localStorage.removeItem(summaryKey);
-        var summaryEl = document.getElementById('weeklySummary');
-        if (summaryEl) summaryEl.innerText = '';
         alert('記録をリセットしました。');
       }
     });
