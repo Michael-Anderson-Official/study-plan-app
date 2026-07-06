@@ -85,9 +85,12 @@
       line-height: 1;
       cursor: pointer;
     }
-    .notify-section, .backup-section {
+    .weekstart-section, .notify-section, .backup-section {
       padding: 1rem 0;
       border-bottom: 1px solid #eee;
+    }
+    .weekstart-section {
+      padding-top: 0;
     }
     .backup-section {
       border-bottom: none;
@@ -199,6 +202,14 @@
     }
     button:hover {
       background: #0c78d5;
+    }
+    .btn-outline {
+      background: #fff;
+      color: #1e90ff;
+      border: 1px solid #1e90ff;
+    }
+    .btn-outline:hover {
+      background: #f0f8ff;
     }
     /* 表示切り替えタブ */
     .view-tabs {
@@ -511,21 +522,11 @@
     </table>
   </div>
     <div class="controls">
-      <!-- 各種操作ボタン -- アクションをフォーム送信扱いにしないため type="button" を指定 -->
-      <button id="resetButton" type="button">一週間をリセット</button>
-      <!-- 週送りボタン -->
-      <button id="prevWeekBtn" type="button" style="margin-left:0.5rem;">前週へ</button>
-      <button id="nextWeekBtn" type="button" style="margin-left:0.5rem;">次週へ</button>
+      <!-- 週送りボタン -- アクションをフォーム送信扱いにしないため type="button" を指定 -->
+      <button id="prevWeekBtn" type="button" class="btn-outline">前週へ</button>
+      <button id="nextWeekBtn" type="button" class="btn-outline" style="margin-left:0.5rem;">次週へ</button>
       <!-- 今週に戻るボタン -->
       <button id="currentWeekBtn" type="button" style="margin-left:0.5rem;">今週へ</button>
-      <!-- 週の始まり設定 -->
-      <label for="weekStartSelect" style="margin-left:0.5rem;">
-        週の始まり:
-        <select id="weekStartSelect" style="padding:0.3rem; margin-left:0.2rem;">
-          <option value="monday">月曜始まり</option>
-          <option value="sunday">日曜始まり</option>
-        </select>
-      </label>
     </div>
 
   <!-- 教材追加欄 -->
@@ -575,6 +576,21 @@
   <div id="settingsModal" class="settings-modal" style="display:none;">
     <div class="settings-panel">
       <button id="settingsCloseBtn" type="button" class="settings-close-btn" aria-label="閉じる">×</button>
+
+      <!-- 週の始まり設定 -->
+      <div class="weekstart-section">
+        <h2 style="font-size:1rem; margin-top:0; margin-bottom:0.5rem;">週の始まり</h2>
+        <label for="weekStartSelect">週の始まりの曜日:</label>
+        <select id="weekStartSelect" style="padding:0.3rem; margin-left:0.2rem;">
+          <option value="1">月曜始まり</option>
+          <option value="2">火曜始まり</option>
+          <option value="3">水曜始まり</option>
+          <option value="4">木曜始まり</option>
+          <option value="5">金曜始まり</option>
+          <option value="6">土曜始まり</option>
+          <option value="0">日曜始まり</option>
+        </select>
+      </div>
 
       <!-- 毎日の通知設定 -->
       <div class="notify-section">
@@ -689,6 +705,21 @@
       var m = parseInt(parts[1], 10) - 1;
       var d = parseInt(parts[2], 10);
       return new Date(y, m, d);
+    }
+
+    // 週の始まり設定を読み込む。Date.getDay() と同じく 0=日,1=月,...,6=土 の数値で返す。
+    // 古い 'monday'/'sunday' 形式が保存されていれば数値形式に移行する。
+    function getWeekStartDay() {
+      var saved = localStorage.getItem('weekStart');
+      if (saved === 'monday') {
+        saved = '1';
+        localStorage.setItem('weekStart', saved);
+      } else if (saved === 'sunday') {
+        saved = '0';
+        localStorage.setItem('weekStart', saved);
+      }
+      var day = parseInt(saved, 10);
+      return isNaN(day) ? 1 : day;
     }
 
     // 保存および読み込み
@@ -869,21 +900,16 @@
         // 00:00:00 に設定
         currentDate.setHours(0, 0, 0, 0);
         // 保存されている週の始まり設定を読み込み。デフォルトは月曜始まり。
-        var weekStartSetting = localStorage.getItem('weekStart') || 'monday';
+        var weekStartDay = getWeekStartDay();
         var dayOfWeek = currentDate.getDay();
-        var diff;
-        if (weekStartSetting === 'monday') {
-          diff = (dayOfWeek + 6) % 7;
-        } else {
-          diff = dayOfWeek;
-        }
+        var diff = (dayOfWeek - weekStartDay + 7) % 7;
         var startDate = new Date(currentDate);
         startDate.setDate(currentDate.getDate() - diff);
         window.currentWeekStartISO = toLocalISO(startDate);
         // セレクトボックスに週の始まり設定を反映
         var selectEl = document.getElementById('weekStartSelect');
         if (selectEl) {
-          selectEl.value = weekStartSetting;
+          selectEl.value = String(weekStartDay);
         }
         // UI を更新
         updateWeekUI();
@@ -955,9 +981,8 @@
           // 現在の日付から週の開始日を計算し currentWeekStartISO に設定
           var nowDate = new Date();
           nowDate.setHours(0, 0, 0, 0);
-          var weekStartSettingNow = localStorage.getItem('weekStart') || 'monday';
           var dowNow = nowDate.getDay();
-          var offsetNow = (weekStartSettingNow === 'monday') ? ((dowNow + 6) % 7) : dowNow;
+          var offsetNow = (dowNow - getWeekStartDay() + 7) % 7;
           var startOfWeekNow = new Date(nowDate);
           startOfWeekNow.setDate(nowDate.getDate() - offsetNow);
           window.currentWeekStartISO = toLocalISO(startOfWeekNow);
@@ -1038,12 +1063,7 @@
           // 現在の日付から新しい週の開始日を計算
           var nowDate = new Date();
           nowDate.setHours(0, 0, 0, 0);
-          var offset;
-          if (selected === 'monday') {
-            offset = (nowDate.getDay() + 6) % 7;
-          } else {
-            offset = nowDate.getDay();
-          }
+          var offset = (nowDate.getDay() - parseInt(selected, 10) + 7) % 7;
           var startOfWeek = new Date(nowDate);
           startOfWeek.setDate(nowDate.getDate() - offset);
           window.currentWeekStartISO = toLocalISO(startOfWeek);
@@ -1059,9 +1079,8 @@
         // 現在の日付を基に週の開始日を計算し currentWeekStartISO を設定
         var currentDateLoad = new Date();
         currentDateLoad.setHours(0, 0, 0, 0);
-        var weekStartSettingLoad = localStorage.getItem('weekStart') || 'monday';
         var dow = currentDateLoad.getDay();
-        var offsetLoad = (weekStartSettingLoad === 'monday') ? ((dow + 6) % 7) : dow;
+        var offsetLoad = (dow - getWeekStartDay() + 7) % 7;
         var startLoad = new Date(currentDateLoad);
         startLoad.setDate(currentDateLoad.getDate() - offsetLoad);
         window.currentWeekStartISO = toLocalISO(startLoad);
@@ -1557,28 +1576,6 @@
       if (detDiv) detDiv.style.display = 'none';
       updateCellsForCurrentWeek();
     }
-    // リセットボタン
-    document.getElementById('resetButton').addEventListener('click', function () {
-      if (confirm('本当にこの週間の記録を削除しますか？')) {
-        // 全てのキーに対して削除
-        document.querySelectorAll('.section').forEach(function (section) {
-          var key = section.getAttribute('data-key');
-          localStorage.removeItem(key);
-          section.innerText = '';
-        });
-        // 完了状況（○×）も現在週の分を削除
-        document.querySelectorAll('td.cell').forEach(function (cell) {
-          var section = cell.querySelector('.section');
-          if (!section) return;
-          var key = section.getAttribute('data-key') || '';
-          var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub(\d+)-content$/);
-          if (m) localStorage.removeItem(m[1] + '-sub' + m[2] + '-status');
-        });
-        refreshStatusRows();
-        alert('記録をリセットしました。');
-      }
-    });
-
     // 通知設定: 保存済みの時刻を反映
     (function () {
       var savedTime = localStorage.getItem('notify-time');
