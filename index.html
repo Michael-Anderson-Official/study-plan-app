@@ -515,7 +515,8 @@
         var saved = localStorage.getItem('materials-list');
         if (saved) {
           try {
-            materialsList = JSON.parse(saved);
+            var parsedMaterials = JSON.parse(saved);
+            materialsList = Array.isArray(parsedMaterials) ? parsedMaterials : [];
           } catch (e) {
             materialsList = [];
           }
@@ -527,7 +528,8 @@
         var detailSaved = localStorage.getItem('material-details');
         if (detailSaved) {
           try {
-            materialsDetails = JSON.parse(detailSaved);
+            var parsedDetails = JSON.parse(detailSaved);
+            materialsDetails = Array.isArray(parsedDetails) ? parsedDetails : [];
           } catch (e) {
             materialsDetails = [];
           }
@@ -584,6 +586,7 @@
           // 新しい教材の詳細を空で初期化（未設定の場合はnull）
           materialsDetails.push(null);
           localStorage.setItem('materials-list', JSON.stringify(materialsList));
+          localStorage.setItem('material-details', JSON.stringify(materialsDetails));
           updateMaterialsUI();
           input.value = '';
         });
