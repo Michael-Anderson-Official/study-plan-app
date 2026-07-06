@@ -1,0 +1,13 @@
+# Wrangler CLI を使ってデプロイする場合の設定例。
+# Cloudflareダッシュボードの「Quick Edit」だけで完結させる場合はこのファイルは不要。
+
+name = "keikakuchou-notify"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[[kv_namespaces]]
+binding = "NOTIFY_KV"
+id = "a9643ad25f174787b034e5ec184f431e"
+
+[triggers]
+crons = ["* * * * *"]

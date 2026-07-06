@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>計画帳アプリ</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="計画帳" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
   <style>
     /* 全体のスタイル */
     body {
@@ -481,12 +485,28 @@
     <div id="weeklySummary" contenteditable style="border: 1px solid #ccc; padding: 0.5rem; min-height: 80px;"></div>
   </div>
   </div>
+
+  <!-- 毎日の通知設定 -->
+  <div class="notify-section" style="margin: 1rem; padding: 1rem; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9;">
+    <h2 style="font-size:1rem; margin-top:0; margin-bottom:0.5rem;">毎日の通知設定</h2>
+    <p style="font-size:0.8rem; color:#666; margin-top:0;">
+      指定した時刻に「今日の成果を報告してください」という通知を送ります。iPhoneでは、あらかじめこのページを「ホーム画面に追加」してから設定してください。
+    </p>
+    <label for="notifyTimeInput">通知時刻:</label>
+    <input id="notifyTimeInput" type="time" value="21:00" style="padding:0.3rem; margin-left:0.3rem;" />
+    <button id="notifyEnableBtn" type="button" style="margin-left:0.5rem;">通知を有効にする</button>
+    <p id="notifyStatus" style="font-size:0.8rem; color:#666; margin-bottom:0;"></p>
+  </div>
   <script>
     // グローバル変数の定義
     // 教材リストや詳細情報、現在選択中の教材インデックスはグローバルで管理します。
     var materialsList = [];
     var materialsDetails = [];
     var currentMaterialIndex = null;
+
+    // 通知用の設定。
+    var NOTIFY_WORKER_URL = 'https://keikakuchou-notify.keikakuchou-app.workers.dev';
+    var VAPID_PUBLIC_KEY = 'BIiq4n3mytcp7ma9winH7y2KqPp701Tyi5-8kmK9KLbj-jnDyWc1wuypOH7saJaR0BDGvCyNevHT_M8ESTojqYU';
 
     // 2026年の日本の祝日一覧。赤字表示の対象となります。
     const holidays2026 = new Set([
@@ -1345,6 +1365,82 @@
         alert('記録をリセットしました。');
       }
     });
+
+    // 通知設定: 保存済みの時刻を反映
+    (function () {
+      var savedTime = localStorage.getItem('notify-time');
+      var timeInput = document.getElementById('notifyTimeInput');
+      if (savedTime && timeInput) timeInput.value = savedTime;
+    })();
+
+    // Service Worker の登録（プッシュ通知の受信・表示に必要）
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(function (err) {
+        console.error('Service Worker registration failed', err);
+      });
+    }
+
+    // VAPID公開鍵（base64url）を PushManager.subscribe に渡せる形式に変換する
+    function urlBase64ToUint8Array(base64String) {
+      var padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+      var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      var rawData = atob(base64);
+      var outputArray = new Uint8Array(rawData.length);
+      for (var i = 0; i < rawData.length; i++) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
+    // 通知有効化ボタン
+    var notifyEnableBtn = document.getElementById('notifyEnableBtn');
+    if (notifyEnableBtn) {
+      notifyEnableBtn.addEventListener('click', function () {
+        var statusEl = document.getElementById('notifyStatus');
+        var timeInput = document.getElementById('notifyTimeInput');
+        function setStatus(msg) {
+          if (statusEl) statusEl.textContent = msg;
+        }
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+          setStatus('この端末・ブラウザは通知に対応していません。');
+          return;
+        }
+        if (!timeInput || !timeInput.value) {
+          setStatus('通知時刻を指定してください。');
+          return;
+        }
+        var parts = timeInput.value.split(':');
+        var hour = parseInt(parts[0], 10);
+        var minute = parseInt(parts[1], 10);
+
+        setStatus('設定中...');
+        Notification.requestPermission().then(function (permission) {
+          if (permission !== 'granted') {
+            setStatus('通知が許可されませんでした。');
+            return;
+          }
+          navigator.serviceWorker.ready.then(function (registration) {
+            registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+            }).then(function (subscription) {
+              return fetch(NOTIFY_WORKER_URL + '/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscription: subscription, hour: hour, minute: minute })
+              });
+            }).then(function (res) {
+              if (!res.ok) throw new Error('save failed');
+              localStorage.setItem('notify-time', timeInput.value);
+              setStatus('通知を設定しました（毎日 ' + timeInput.value + '）。');
+            }).catch(function (err) {
+              console.error(err);
+              setStatus('設定に失敗しました。通信環境を確認してもう一度お試しください。');
+            });
+          });
+        });
+      });
+    }
   </script>
 </body>
 </html>
