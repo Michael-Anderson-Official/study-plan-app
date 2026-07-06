@@ -45,50 +45,51 @@
       z-index: 5;
     }
     /* セルのスタイル */
-    /* td 自体に display:flex を指定すると Safari(iOS) でテーブルの行・列構造が崩れるため、
-       セル内部にラッパー div (.cell-body) を挟んでそちらを flex コンテナにする */
     .cell {
-      height: 76px;
+      height: 60px;
       position: relative;
       overflow: hidden;
     }
-    .cell .cell-body {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-    /* 完了状況（○×）の表示専用行。1週間タブのセルに常時表示される */
-    .cell .status-row {
-      flex: 0 0 auto;
-      height: 18px;
-      line-height: 18px;
-      text-align: center;
-      font-size: 0.8rem;
-      font-weight: bold;
-      background: #f5f5f5;
-      border-bottom: 1px solid #ccc;
-    }
-    .cell .status-row.status-circle {
-      color: #2e8b57;
-    }
-    .cell .status-row.status-cross {
-      color: #d9534f;
-    }
     .cell .section {
-      flex: 1 1 0;
-      min-height: 0;
+      position: absolute;
+      left: 0;
       width: 100%;
+      height: 50%;
       padding: 2px;
       box-sizing: border-box;
       overflow: auto;
       font-size: 0.75rem;
     }
     .cell .prep {
+      top: 0;
       border-bottom: 1px solid #ccc;
       background: #fff;
     }
     .cell .review {
+      bottom: 0;
       background: #fafafa;
+    }
+    /* 完了状況（○×）を予習・復習それぞれの右上に重ねて表示する（contenteditableの外側の要素なので入力内容には影響しない） */
+    .cell .status-badge {
+      position: absolute;
+      right: 2px;
+      font-size: 0.7rem;
+      font-weight: bold;
+      line-height: 1;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .cell .status-badge.prep-badge {
+      top: 1px;
+    }
+    .cell .status-badge.review-badge {
+      bottom: 1px;
+    }
+    .cell .status-badge.status-circle {
+      color: #2e8b57;
+    }
+    .cell .status-badge.status-cross {
+      color: #d9534f;
     }
     /* 予習・復習欄であることが分かるようにラベルを表示する（編集内容には含まれない） */
     .cell .prep::before {
@@ -209,7 +210,7 @@
     }
     @media (max-width: 600px) {
       .cell {
-        height: 98px;
+        height: 80px;
       }
       .cell .section {
         font-size: 0.65rem;
@@ -634,18 +635,14 @@
         });
       });
 
-      // 各セルの中身を .cell-body でラップし、その先頭に完了状況（○×）表示用の行を追加します。
-      // td 自体を flex コンテナにすると Safari(iOS) でテーブル構造が崩れるため、内部の div で flex を扱う。
+      // 各セルに、完了状況（○×）を予習・復習それぞれの右上に表示するバッジを追加します。
       document.querySelectorAll('td.cell').forEach(function (cell) {
-        var body = document.createElement('div');
-        body.className = 'cell-body';
-        while (cell.firstChild) {
-          body.appendChild(cell.firstChild);
-        }
-        var statusRow = document.createElement('div');
-        statusRow.className = 'status-row';
-        body.insertBefore(statusRow, body.firstChild);
-        cell.appendChild(body);
+        var prepBadge = document.createElement('span');
+        prepBadge.className = 'status-badge prep-badge';
+        cell.appendChild(prepBadge);
+        var reviewBadge = document.createElement('span');
+        reviewBadge.className = 'status-badge review-badge';
+        cell.appendChild(reviewBadge);
       });
 
       // 教材リストおよび詳細情報はグローバル変数を使用します。
@@ -1188,18 +1185,23 @@
       refreshStatusRows();
     }
 
-    // 各セルの完了状況（○×）表示を、保存済みの状態に合わせて更新します。
+    // 各セルの完了状況（○×）表示を、予習・復習それぞれの右上バッジに反映します。
     function refreshStatusRows() {
       document.querySelectorAll('td.cell').forEach(function (cell) {
         var prep = cell.querySelector('.prep');
-        var statusRow = cell.querySelector('.status-row');
-        if (!prep || !statusRow) return;
+        var prepBadge = cell.querySelector('.prep-badge');
+        var reviewBadge = cell.querySelector('.review-badge');
+        if (!prep || !prepBadge || !reviewBadge) return;
         var key = prep.getAttribute('data-key') || '';
         var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub(\d+)-prep$/);
         if (!m) return;
         var status = localStorage.getItem(m[1] + '-sub' + m[2] + '-status');
-        statusRow.textContent = status === 'circle' ? '○' : status === 'cross' ? '✕' : '';
-        statusRow.className = 'status-row' + (status ? ' status-' + status : '');
+        var symbol = status === 'circle' ? '○' : status === 'cross' ? '✕' : '';
+        var extraClass = status ? ' status-' + status : '';
+        prepBadge.textContent = symbol;
+        prepBadge.className = 'status-badge prep-badge' + extraClass;
+        reviewBadge.textContent = symbol;
+        reviewBadge.className = 'status-badge review-badge' + extraClass;
       });
     }
 
