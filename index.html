@@ -118,8 +118,8 @@
       left: 0;
       z-index: 5;
     }
-    /* 今日以外の行を折りたたんで表示範囲を減らす。タップで一時的に展開できる */
-    th.row-label:not(.today) {
+    /* 全ての行を折りたたんで表示範囲を減らす。タップで一時的に展開できる */
+    th.row-label {
       cursor: pointer;
       touch-action: manipulation;
     }
@@ -799,12 +799,12 @@
         cell.appendChild(badge);
       });
 
-      // 今日以外の行はタップで一時的に展開・折りたたみできるようにする
+      // 各行はタップで一時的に展開・折りたたみできるようにする（今日の行も含む）
       var planTableBody = document.querySelector('#planTable tbody');
       if (planTableBody) {
         planTableBody.addEventListener('click', function (event) {
           var label = event.target.closest('th.row-label');
-          if (!label || label.classList.contains('today')) return;
+          if (!label) return;
           var row = label.closest('tr');
           if (row) row.classList.toggle('row-collapsed');
         });
@@ -1321,14 +1321,13 @@
         var labelCell = row.querySelector('th.row-label');
         if (labelCell) {
           labelCell.textContent = dayName + ' ' + display;
-          // 今日の日付行の場合はクラスを追加して強調
+          // 今日の日付行の場合はハイライト用クラスを追加する（サイズは他の行と同じく折りたたむ）
           if (iso === todayISO) {
             labelCell.classList.add('today');
-            row.classList.remove('row-collapsed');
           } else {
             labelCell.classList.remove('today');
-            row.classList.add('row-collapsed');
           }
+          row.classList.add('row-collapsed');
           if (date.getDay() === 0 || holidays2026.has(iso)) {
             labelCell.style.color = 'red';
           } else if (date.getDay() === 6) {
