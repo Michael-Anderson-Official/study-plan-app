@@ -32,6 +32,66 @@
       font-style: italic;
       color: #1e6fbf;
     }
+    /* 設定アイコン・設定モーダル */
+    .settings-icon-btn {
+      position: fixed;
+      top: 0.6rem;
+      left: 0.6rem;
+      z-index: 30;
+      width: 2.4rem;
+      height: 2.4rem;
+      padding: 0;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 50%;
+      font-size: 1.2rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .settings-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 40;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow-y: auto;
+      padding: 3rem 1rem;
+      box-sizing: border-box;
+    }
+    .settings-panel {
+      position: relative;
+      background: #fff;
+      border-radius: 8px;
+      padding: 1.2rem;
+      width: 100%;
+      max-width: 420px;
+    }
+    .settings-close-btn {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.4rem;
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      background: none;
+      border: none;
+      color: #666;
+      font-size: 1.3rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .notify-section, .backup-section {
+      padding: 1rem 0;
+      border-bottom: 1px solid #eee;
+    }
+    .backup-section {
+      border-bottom: none;
+    }
     table {
       border-collapse: collapse;
       width: 100%;
@@ -210,6 +270,7 @@
   </style>
 </head>
 <body>
+  <button id="settingsBtn" type="button" class="settings-icon-btn" aria-label="設定">⚙️</button>
   <h1>一週間の計画帳</h1>
   <p id="motivationQuote" class="motivation-quote"></p>
   <!-- 表示切り替えタブ -->
@@ -494,28 +555,35 @@
   </div>
   </div>
 
-  <!-- 毎日の通知設定 -->
-  <div class="notify-section" style="margin: 1rem; padding: 1rem; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9;">
-    <h2 style="font-size:1rem; margin-top:0; margin-bottom:0.5rem;">毎日の通知設定</h2>
-    <p style="font-size:0.8rem; color:#666; margin-top:0;">
-      指定した時刻に「今日の成果を報告してください」という通知を送ります。iPhoneでは、あらかじめこのページを「ホーム画面に追加」してから設定してください。
-    </p>
-    <label for="notifyTimeInput">通知時刻:</label>
-    <input id="notifyTimeInput" type="time" value="21:00" style="padding:0.3rem; margin-left:0.3rem;" />
-    <button id="notifyEnableBtn" type="button" style="margin-left:0.5rem;">通知を有効にする</button>
-    <p id="notifyStatus" style="font-size:0.8rem; color:#666; margin-bottom:0;"></p>
-  </div>
+  <!-- 設定モーダル -->
+  <div id="settingsModal" class="settings-modal" style="display:none;">
+    <div class="settings-panel">
+      <button id="settingsCloseBtn" type="button" class="settings-close-btn" aria-label="閉じる">×</button>
 
-  <!-- データのバックアップ・復元 -->
-  <div class="backup-section" style="margin: 1rem; padding: 1rem; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9;">
-    <h2 style="font-size:1rem; margin-top:0; margin-bottom:0.5rem;">データのバックアップ・復元</h2>
-    <p style="font-size:0.8rem; color:#666; margin-top:0;">
-      iPhoneでホーム画面のアイコンを削除・再追加すると、記録が消えてしまうことがあります。操作の前に「データを保存」でファイルに書き出しておくと安心です。
-    </p>
-    <button id="backupExportBtn" type="button">データを保存</button>
-    <input id="backupImportInput" type="file" accept="application/json" style="display:none;" />
-    <button id="backupImportBtn" type="button" style="margin-left:0.5rem;">ファイルから復元</button>
-    <p id="backupStatus" style="font-size:0.8rem; color:#666; margin-bottom:0;"></p>
+      <!-- 毎日の通知設定 -->
+      <div class="notify-section">
+        <h2 style="font-size:1rem; margin-top:0; margin-bottom:0.5rem;">毎日の通知設定</h2>
+        <p style="font-size:0.8rem; color:#666; margin-top:0;">
+          指定した時刻に「今日の成果を報告してください」という通知を送ります。iPhoneでは、あらかじめこのページを「ホーム画面に追加」してから設定してください。
+        </p>
+        <label for="notifyTimeInput">通知時刻:</label>
+        <input id="notifyTimeInput" type="time" value="21:00" style="padding:0.3rem; margin-left:0.3rem;" />
+        <button id="notifyEnableBtn" type="button" style="margin-left:0.5rem;">通知を有効にする</button>
+        <p id="notifyStatus" style="font-size:0.8rem; color:#666; margin-bottom:0;"></p>
+      </div>
+
+      <!-- データのバックアップ・復元 -->
+      <div class="backup-section">
+        <h2 style="font-size:1rem; margin-top:0; margin-bottom:0.5rem;">データのバックアップ・復元</h2>
+        <p style="font-size:0.8rem; color:#666; margin-top:0;">
+          iPhoneでホーム画面のアイコンを削除・再追加すると、記録が消えてしまうことがあります。操作の前に「データを保存」でファイルに書き出しておくと安心です。
+        </p>
+        <button id="backupExportBtn" type="button">データを保存</button>
+        <input id="backupImportInput" type="file" accept="application/json" style="display:none;" />
+        <button id="backupImportBtn" type="button" style="margin-left:0.5rem;">ファイルから復元</button>
+        <p id="backupStatus" style="font-size:0.8rem; color:#666; margin-bottom:0;"></p>
+      </div>
+    </div>
   </div>
   <script>
     // グローバル変数の定義
@@ -889,6 +957,26 @@
           todayTabBtn.classList.add('active');
           weekTabBtn.classList.remove('active');
           updateTodayView();
+        });
+      }
+
+      // 設定アイコン・設定モーダルの開閉
+      var settingsBtn = document.getElementById('settingsBtn');
+      var settingsModal = document.getElementById('settingsModal');
+      var settingsCloseBtn = document.getElementById('settingsCloseBtn');
+      if (settingsBtn && settingsModal) {
+        settingsBtn.addEventListener('click', function () {
+          settingsModal.style.display = 'flex';
+        });
+        if (settingsCloseBtn) {
+          settingsCloseBtn.addEventListener('click', function () {
+            settingsModal.style.display = 'none';
+          });
+        }
+        settingsModal.addEventListener('click', function (event) {
+          if (event.target === settingsModal) {
+            settingsModal.style.display = 'none';
+          }
         });
       }
 
