@@ -82,6 +82,11 @@
     .header-cell:focus {
       outline: 2px solid #1e90ff;
     }
+    /* 今日の日付行の強調表示 */
+    .row-label.today {
+      background-color: #fff8c6; /* 薄い黄色でハイライト */
+      font-weight: bold;
+    }
     /* ボタン */
     .controls {
       margin: 1rem;
@@ -388,6 +393,14 @@
     <!-- 週送りボタン -->
     <button id="prevWeekBtn" style="margin-left:0.5rem;">前週へ</button>
     <button id="nextWeekBtn" style="margin-left:0.5rem;">次週へ</button>
+    <!-- 週の始まり設定 -->
+    <label for="weekStartSelect" style="margin-left:0.5rem;">
+      週の始まり:
+      <select id="weekStartSelect" style="padding:0.3rem; margin-left:0.2rem;">
+        <option value="monday">月曜始まり</option>
+        <option value="sunday">日曜始まり</option>
+      </select>
+    </label>
   </div>
 
   <!-- 教材追加欄 -->
@@ -557,14 +570,27 @@
       // ページ読み込み時: 現在の日付からその週の月曜日を計算し、
       // window.currentWeekStartISO に保存します。週の表示は updateWeekUI() で行います。
       (function initialiseWeek() {
-        const currentDate = new Date();
-        const currentDay = currentDate.getDay();
-        // JavaScriptでは日曜が0、月曜が1...土曜が6
-        const diffToMonday = (currentDay + 6) % 7;
-        const monday = new Date(currentDate);
-        monday.setDate(currentDate.getDate() - diffToMonday);
-        window.currentWeekStartISO = monday.toISOString().split('T')[0];
-        // 現在週のUIとセル内容を更新
+        var currentDate = new Date();
+        // 00:00:00 に設定
+        currentDate.setHours(0, 0, 0, 0);
+        // 保存されている週の始まり設定を読み込み。デフォルトは月曜始まり。
+        var weekStartSetting = localStorage.getItem('weekStart') || 'monday';
+        var dayOfWeek = currentDate.getDay();
+        var diff;
+        if (weekStartSetting === 'monday') {
+          diff = (dayOfWeek + 6) % 7;
+        } else {
+          diff = dayOfWeek;
+        }
+        var startDate = new Date(currentDate);
+        startDate.setDate(currentDate.getDate() - diff);
+        window.currentWeekStartISO = startDate.toISOString().split('T')[0];
+        // セレクトボックスに週の始まり設定を反映
+        var selectEl = document.getElementById('weekStartSelect');
+        if (selectEl) {
+          selectEl.value = weekStartSetting;
+        }
+        // UI を更新
         updateWeekUI();
         updateCellsForCurrentWeek();
       })();
@@ -638,6 +664,30 @@
           };
           localStorage.setItem('material-details', JSON.stringify(materialsDetails));
           scheduleMaterialDaily(currentMaterialIndex);
+        });
+      }
+
+      // 週の始まり設定セレクトボックスの変更処理
+      var weekStartSelect = document.getElementById('weekStartSelect');
+      if (weekStartSelect) {
+        weekStartSelect.addEventListener('change', function () {
+          var selected = weekStartSelect.value;
+          // 選択された設定を保存
+          localStorage.setItem('weekStart', selected);
+          // 現在の日付から新しい週の開始日を計算
+          var nowDate = new Date();
+          nowDate.setHours(0, 0, 0, 0);
+          var offset;
+          if (selected === 'monday') {
+            offset = (nowDate.getDay() + 6) % 7;
+          } else {
+            offset = nowDate.getDay();
+          }
+          var startOfWeek = new Date(nowDate);
+          startOfWeek.setDate(nowDate.getDate() - offset);
+          window.currentWeekStartISO = startOfWeek.toISOString().split('T')[0];
+          updateWeekUI();
+          updateCellsForCurrentWeek();
         });
       }
     // DOMContentLoaded 用のクロージャを削除したため閉じカッコは不要になりました。
@@ -829,6 +879,10 @@
     // 週の表示を更新する関数。現在の週開始日 (window.currentWeekStartISO) を基準にラベルや data-key を更新します。
     function updateWeekUI() {
       var startDate = new Date(window.currentWeekStartISO);
+      // 今日の日付を取得し、ISO形式文字列にしておく
+      var todayDate = new Date();
+      todayDate.setHours(0, 0, 0, 0);
+      var todayISO = todayDate.toISOString().split('T')[0];
       rows.forEach(function (row, idx) {
         var date = new Date(startDate);
         date.setDate(startDate.getDate() + idx);
@@ -838,6 +892,12 @@
         var labelCell = row.querySelector('th.row-label');
         if (labelCell) {
           labelCell.textContent = dayName + ' ' + display;
+          // 今日の日付行の場合はクラスを追加して強調
+          if (iso === todayISO) {
+            labelCell.classList.add('today');
+          } else {
+            labelCell.classList.remove('today');
+          }
           if (date.getDay() === 0 || holidays2026.has(iso)) {
             labelCell.style.color = 'red';
           } else if (date.getDay() === 6) {
