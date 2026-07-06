@@ -1071,28 +1071,6 @@
           localStorage.removeItem(key);
           section.innerText = '';
         });
-        document.querySelectorAll('.header-cell').forEach(function (cell) {
-          var key = 'header-' + cell.getAttribute('data-header');
-          localStorage.removeItem(key);
-          // 初期値に戻す
-          var idx = cell.getAttribute('data-header');
-          if (idx === 'sub8') {
-            cell.textContent = '感想・振り返り';
-          } else {
-            var num = idx.replace('sub', '');
-            cell.textContent = '科目' + num;
-          }
-        });
-        // 教材リストの削除
-        localStorage.removeItem('materials-list');
-        // 教材詳細の削除
-        localStorage.removeItem('material-details');
-        // 教材リスト表示をクリア
-        var listEl = document.getElementById('materialsList');
-        if (listEl) listEl.innerHTML = '';
-        // 教材配列を初期化
-        materialsList = [];
-        materialsDetails = [];
         // 一週間の振り返りの削除
         var summaryKey = 'weekly-summary-' + window.currentWeekStartISO;
         localStorage.removeItem(summaryKey);
