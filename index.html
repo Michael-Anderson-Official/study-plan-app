@@ -46,27 +46,43 @@
     }
     /* セルのスタイル */
     .cell {
-      height: 60px;
+      height: 76px;
       position: relative;
       overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    /* 完了状況（○×）の表示専用行。1週間タブのセルに常時表示される */
+    .cell .status-row {
+      flex: 0 0 auto;
+      height: 18px;
+      line-height: 18px;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: bold;
+      background: #f5f5f5;
+      border-bottom: 1px solid #ccc;
+    }
+    .cell .status-row.status-circle {
+      color: #2e8b57;
+    }
+    .cell .status-row.status-cross {
+      color: #d9534f;
     }
     .cell .section {
-      position: absolute;
-      left: 0;
+      flex: 1 1 0;
+      min-height: 0;
       width: 100%;
-      height: 50%;
       padding: 2px;
       box-sizing: border-box;
       overflow: auto;
       font-size: 0.75rem;
     }
     .cell .prep {
-      top: 0;
       border-bottom: 1px solid #ccc;
       background: #fff;
     }
     .cell .review {
-      bottom: 0;
       background: #fafafa;
     }
     /* 予習・復習欄であることが分かるようにラベルを表示する（編集内容には含まれない） */
@@ -142,9 +158,53 @@
       background: #1e90ff;
       color: #fff;
     }
+    /* 今日やることタブ: 教材リストと○×ボタン */
+    #todayTaskList {
+      list-style: none;
+      padding: 0;
+      max-width: 480px;
+      margin: 0 auto;
+      text-align: left;
+    }
+    #todayTaskList li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.6rem 0.4rem;
+      border-bottom: 1px solid #eee;
+    }
+    #todayTaskList li.today-empty {
+      justify-content: center;
+      color: #888;
+    }
+    .today-task-text {
+      flex: 1;
+    }
+    .status-btn {
+      width: 2rem;
+      height: 2rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      color: #333;
+      cursor: pointer;
+      padding: 0;
+    }
+    .status-btn.circle.selected {
+      background: #2e8b57;
+      border-color: #2e8b57;
+      color: #fff;
+    }
+    .status-btn.cross.selected {
+      background: #d9534f;
+      border-color: #d9534f;
+      color: #fff;
+    }
     @media (max-width: 600px) {
       .cell {
-        height: 80px;
+        height: 98px;
       }
       .cell .section {
         font-size: 0.65rem;
@@ -166,8 +226,9 @@
     <button id="todayTabBtn" type="button" class="tab-btn">今日やること</button>
   </div>
   <!-- 今日やることビュー -->
-  <div id="todayView" style="display:none; margin:1.5rem 1rem; text-align:center; font-size:1.05rem; line-height:1.6;">
-    <p id="todayTaskSummary"></p>
+  <div id="todayView" style="display:none; margin:1.5rem 1rem;">
+    <p id="todayDateLabel" style="text-align:center; font-weight:bold; font-size:1.1rem; margin-bottom:1rem;"></p>
+    <ul id="todayTaskList"></ul>
   </div>
   <div id="weekView">
   <div style="overflow-x: auto;">
@@ -566,6 +627,13 @@
           var key = section.getAttribute('data-key');
           if (key) localStorage.setItem(key, section.innerText);
         });
+      });
+
+      // 各セルの先頭に、完了状況（○×）を表示する専用行を追加します。
+      document.querySelectorAll('td.cell').forEach(function (cell) {
+        var statusRow = document.createElement('div');
+        statusRow.className = 'status-row';
+        cell.insertBefore(statusRow, cell.firstChild);
       });
 
       // 教材リストおよび詳細情報はグローバル変数を使用します。
@@ -1105,32 +1173,83 @@
           localStorage.setItem(summaryKey, weeklySummaryEl.innerText);
         };
       }
+      refreshStatusRows();
+    }
+
+    // 各セルの完了状況（○×）表示を、保存済みの状態に合わせて更新します。
+    function refreshStatusRows() {
+      document.querySelectorAll('td.cell').forEach(function (cell) {
+        var prep = cell.querySelector('.prep');
+        var statusRow = cell.querySelector('.status-row');
+        if (!prep || !statusRow) return;
+        var key = prep.getAttribute('data-key') || '';
+        var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub(\d+)-prep$/);
+        if (!m) return;
+        var status = localStorage.getItem(m[1] + '-sub' + m[2] + '-status');
+        statusRow.textContent = status === 'circle' ? '○' : status === 'cross' ? '✕' : '';
+        statusRow.className = 'status-row' + (status ? ' status-' + status : '');
+      });
     }
 
     // 「今日やること」タブの表示内容を更新します。
     function updateTodayView() {
-      var el = document.getElementById('todayTaskSummary');
-      if (!el) return;
+      var dateLabelEl = document.getElementById('todayDateLabel');
+      var listEl = document.getElementById('todayTaskList');
+      if (!listEl) return;
       var today = new Date();
       today.setHours(0, 0, 0, 0);
       var todayISO = toLocalISO(today);
       var monthDay = (today.getMonth() + 1) + '月' + today.getDate() + '日';
       var youbi = dayNames[today.getDay()] + '曜日';
-      // 科目1〜7の予習欄から、今日の内容が入っているものを集める（8列目は感想・振り返り欄のため対象外）
-      var tasks = [];
-      for (var n = 1; n <= 7; n++) {
+      if (dateLabelEl) dateLabelEl.textContent = monthDay + youbi + 'の今日やること';
+
+      listEl.innerHTML = '';
+      var hasTask = false;
+      // 科目1〜7の予習欄から、今日の内容が入っているものをリスト表示する（8列目は感想・振り返り欄のため対象外）
+      for (let n = 1; n <= 7; n++) {
         var headerCell = document.querySelector('.header-cell[data-header="sub' + n + '"]');
         var label = headerCell ? headerCell.textContent.trim() : ('科目' + n);
         var content = localStorage.getItem(todayISO + '-sub' + n + '-prep');
-        if (content && content.trim()) {
-          var oneLine = content.trim().split(/\n+/).join('、');
-          tasks.push(label + '：' + oneLine);
-        }
+        if (!content || !content.trim()) continue;
+        hasTask = true;
+        var oneLine = content.trim().split(/\n+/).join('、');
+        let statusKey = todayISO + '-sub' + n + '-status';
+        let currentStatus = localStorage.getItem(statusKey);
+
+        var li = document.createElement('li');
+        var textSpan = document.createElement('span');
+        textSpan.className = 'today-task-text';
+        textSpan.textContent = label + '：' + oneLine;
+        li.appendChild(textSpan);
+
+        var btnGroup = document.createElement('span');
+        btnGroup.className = 'today-task-buttons';
+        ['circle', 'cross'].forEach(function (statusVal) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = statusVal === 'circle' ? '○' : '✕';
+          btn.className = 'status-btn ' + statusVal + (currentStatus === statusVal ? ' selected' : '');
+          btn.addEventListener('click', function () {
+            var existing = localStorage.getItem(statusKey);
+            if (existing === statusVal) {
+              localStorage.removeItem(statusKey);
+            } else {
+              localStorage.setItem(statusKey, statusVal);
+            }
+            updateTodayView();
+            refreshStatusRows();
+          });
+          btnGroup.appendChild(btn);
+        });
+        li.appendChild(btnGroup);
+        listEl.appendChild(li);
       }
-      var summaryText = tasks.length > 0
-        ? monthDay + youbi + '、今日やることは' + tasks.join('、') + 'です。'
-        : monthDay + youbi + '、今日やることは特にありません。';
-      el.textContent = summaryText;
+      if (!hasTask) {
+        var emptyLi = document.createElement('li');
+        emptyLi.className = 'today-empty';
+        emptyLi.textContent = '今日やることは特にありません。';
+        listEl.appendChild(emptyLi);
+      }
     }
 
     // 教材を日単位でスケジュールします。dailyGoalがなければ1単位とみなします。
@@ -1209,6 +1328,15 @@
           localStorage.removeItem(key);
           section.innerText = '';
         });
+        // 完了状況（○×）も現在週の分を削除
+        document.querySelectorAll('td.cell').forEach(function (cell) {
+          var prep = cell.querySelector('.prep');
+          if (!prep) return;
+          var key = prep.getAttribute('data-key') || '';
+          var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub(\d+)-prep$/);
+          if (m) localStorage.removeItem(m[1] + '-sub' + m[2] + '-status');
+        });
+        refreshStatusRows();
         alert('記録をリセットしました。');
       }
     });
