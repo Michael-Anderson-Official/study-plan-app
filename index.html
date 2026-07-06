@@ -69,6 +69,12 @@
       bottom: 0;
       background: #fafafa;
     }
+    /* 感想・振り返り欄は日記として使うため、予習・復習に分割せず1つのセルにする */
+    .cell.diary-cell .section.diary {
+      top: 0;
+      height: 100%;
+      background: #fff;
+    }
     /* 完了状況（○×）を予習・復習それぞれの右上に重ねて表示する（contenteditableの外側の要素なので入力内容には影響しない） */
     .cell .status-badge {
       position: absolute;
@@ -293,9 +299,8 @@
             <div class="section prep" contenteditable data-key="day1-sub7-prep"></div>
             <div class="section review" contenteditable data-key="day1-sub7-review"></div>
           </td>
-          <td class="cell">
-            <div class="section prep" contenteditable data-key="day1-sub8-prep"></div>
-            <div class="section review" contenteditable data-key="day1-sub8-review"></div>
+          <td class="cell diary-cell">
+            <div class="section diary" contenteditable data-key="day1-sub8-diary"></div>
           </td>
         </tr>
         <tr>
@@ -328,9 +333,8 @@
             <div class="section prep" contenteditable data-key="day2-sub7-prep"></div>
             <div class="section review" contenteditable data-key="day2-sub7-review"></div>
           </td>
-          <td class="cell">
-            <div class="section prep" contenteditable data-key="day2-sub8-prep"></div>
-            <div class="section review" contenteditable data-key="day2-sub8-review"></div>
+          <td class="cell diary-cell">
+            <div class="section diary" contenteditable data-key="day2-sub8-diary"></div>
           </td>
         </tr>
         <tr>
@@ -363,9 +367,8 @@
             <div class="section prep" contenteditable data-key="day3-sub7-prep"></div>
             <div class="section review" contenteditable data-key="day3-sub7-review"></div>
           </td>
-          <td class="cell">
-            <div class="section prep" contenteditable data-key="day3-sub8-prep"></div>
-            <div class="section review" contenteditable data-key="day3-sub8-review"></div>
+          <td class="cell diary-cell">
+            <div class="section diary" contenteditable data-key="day3-sub8-diary"></div>
           </td>
         </tr>
         <tr>
@@ -398,9 +401,8 @@
             <div class="section prep" contenteditable data-key="day4-sub7-prep"></div>
             <div class="section review" contenteditable data-key="day4-sub7-review"></div>
           </td>
-          <td class="cell">
-            <div class="section prep" contenteditable data-key="day4-sub8-prep"></div>
-            <div class="section review" contenteditable data-key="day4-sub8-review"></div>
+          <td class="cell diary-cell">
+            <div class="section diary" contenteditable data-key="day4-sub8-diary"></div>
           </td>
         </tr>
         <tr>
@@ -433,9 +435,8 @@
             <div class="section prep" contenteditable data-key="day5-sub7-prep"></div>
             <div class="section review" contenteditable data-key="day5-sub7-review"></div>
           </td>
-          <td class="cell">
-            <div class="section prep" contenteditable data-key="day5-sub8-prep"></div>
-            <div class="section review" contenteditable data-key="day5-sub8-review"></div>
+          <td class="cell diary-cell">
+            <div class="section diary" contenteditable data-key="day5-sub8-diary"></div>
           </td>
         </tr>
         <tr>
@@ -468,9 +469,8 @@
             <div class="section prep" contenteditable data-key="day6-sub7-prep"></div>
             <div class="section review" contenteditable data-key="day6-sub7-review"></div>
           </td>
-          <td class="cell">
-            <div class="section prep" contenteditable data-key="day6-sub8-prep"></div>
-            <div class="section review" contenteditable data-key="day6-sub8-review"></div>
+          <td class="cell diary-cell">
+            <div class="section diary" contenteditable data-key="day6-sub8-diary"></div>
           </td>
         </tr>
         <tr>
@@ -503,9 +503,8 @@
             <div class="section prep" contenteditable data-key="day7-sub7-prep"></div>
             <div class="section review" contenteditable data-key="day7-sub7-review"></div>
           </td>
-          <td class="cell">
-            <div class="section prep" contenteditable data-key="day7-sub8-prep"></div>
-            <div class="section review" contenteditable data-key="day7-sub8-review"></div>
+          <td class="cell diary-cell">
+            <div class="section diary" contenteditable data-key="day7-sub8-diary"></div>
           </td>
         </tr>
       </tbody>
@@ -659,8 +658,31 @@
         });
       })();
 
-      // 各セルに、完了状況（○×）を予習・復習それぞれの右上に表示するバッジを追加します。
+      // 感想・振り返り欄（8列目）の移行: 予習・復習に分かれていた内容を1つの日記欄にまとめます。
+      (function migrateDiaryCells() {
+        var isoSet = {};
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          var m = k && k.match(/^(\d{4}-\d{2}-\d{2})-sub8-(prep|review)$/);
+          if (m) isoSet[m[1]] = true;
+        }
+        Object.keys(isoSet).forEach(function (iso) {
+          var prepVal = localStorage.getItem(iso + '-sub8-prep') || '';
+          var reviewVal = localStorage.getItem(iso + '-sub8-review') || '';
+          var combined = [prepVal, reviewVal].filter(function (s) { return s.trim() !== ''; }).join('\n');
+          if (combined) {
+            var diaryKey = iso + '-sub8-diary';
+            var existingDiary = localStorage.getItem(diaryKey);
+            localStorage.setItem(diaryKey, existingDiary ? existingDiary + '\n' + combined : combined);
+          }
+          localStorage.removeItem(iso + '-sub8-prep');
+          localStorage.removeItem(iso + '-sub8-review');
+        });
+      })();
+
+      // 各セルに、完了状況（○×）を予習・復習それぞれの右上に表示するバッジを追加します（日記欄には付けません）。
       document.querySelectorAll('td.cell').forEach(function (cell) {
+        if (!cell.querySelector('.prep') || !cell.querySelector('.review')) return;
         var prepBadge = document.createElement('span');
         prepBadge.className = 'status-badge prep-badge';
         cell.appendChild(prepBadge);
@@ -1192,8 +1214,10 @@
           var subNum = cellIdx + 1;
           var prepSection = cell.querySelector('.prep');
           var reviewSection = cell.querySelector('.review');
+          var diarySection = cell.querySelector('.diary');
           if (prepSection) prepSection.setAttribute('data-key', iso + '-sub' + subNum + '-prep');
           if (reviewSection) reviewSection.setAttribute('data-key', iso + '-sub' + subNum + '-review');
+          if (diarySection) diarySection.setAttribute('data-key', iso + '-sub' + subNum + '-diary');
         });
       });
       // 一週間の振り返り欄の読み込みと保存イベントの更新
