@@ -174,18 +174,32 @@
     }
     #todayTaskList li {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
       gap: 0.5rem;
       padding: 0.6rem 0.4rem;
       border-bottom: 1px solid #eee;
     }
     #todayTaskList li.today-empty {
-      justify-content: center;
+      align-items: center;
       color: #888;
     }
     .today-task-text {
-      flex: 1;
+      font-weight: bold;
+    }
+    .today-task-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .today-task-group {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .today-task-group-label {
+      font-size: 0.8rem;
+      color: #666;
+      margin-right: 0.1rem;
     }
     .status-btn {
       width: 2rem;
@@ -634,6 +648,22 @@
           if (key) localStorage.setItem(key, section.innerText);
         });
       });
+
+      // 完了状況キーの移行: 以前は予習・復習で共通のキーだったため、独立したキーに移行します。
+      (function migrateStatusKeys() {
+        var keysToMigrate = [];
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && /^\d{4}-\d{2}-\d{2}-sub\d+-status$/.test(k)) {
+            keysToMigrate.push(k);
+          }
+        }
+        keysToMigrate.forEach(function (k) {
+          var value = localStorage.getItem(k);
+          localStorage.setItem(k.replace(/-status$/, '-prep-status'), value);
+          localStorage.removeItem(k);
+        });
+      })();
 
       // 各セルに、完了状況（○×）を予習・復習それぞれの右上に表示するバッジを追加します。
       document.querySelectorAll('td.cell').forEach(function (cell) {
@@ -1195,13 +1225,12 @@
         var key = prep.getAttribute('data-key') || '';
         var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub(\d+)-prep$/);
         if (!m) return;
-        var status = localStorage.getItem(m[1] + '-sub' + m[2] + '-status');
-        var symbol = status === 'circle' ? '○' : status === 'cross' ? '✕' : '';
-        var extraClass = status ? ' status-' + status : '';
-        prepBadge.textContent = symbol;
-        prepBadge.className = 'status-badge prep-badge' + extraClass;
-        reviewBadge.textContent = symbol;
-        reviewBadge.className = 'status-badge review-badge' + extraClass;
+        var prepStatus = localStorage.getItem(m[1] + '-sub' + m[2] + '-prep-status');
+        var reviewStatus = localStorage.getItem(m[1] + '-sub' + m[2] + '-review-status');
+        prepBadge.textContent = prepStatus === 'circle' ? '○' : prepStatus === 'cross' ? '✕' : '';
+        prepBadge.className = 'status-badge prep-badge' + (prepStatus ? ' status-' + prepStatus : '');
+        reviewBadge.textContent = reviewStatus === 'circle' ? '○' : reviewStatus === 'cross' ? '✕' : '';
+        reviewBadge.className = 'status-badge review-badge' + (reviewStatus ? ' status-' + reviewStatus : '');
       });
     }
 
@@ -1227,35 +1256,19 @@
         if (!content || !content.trim()) continue;
         hasTask = true;
         var oneLine = content.trim().split(/\n+/).join('、');
-        let statusKey = todayISO + '-sub' + n + '-status';
-        let currentStatus = localStorage.getItem(statusKey);
 
         var li = document.createElement('li');
-        var textSpan = document.createElement('span');
-        textSpan.className = 'today-task-text';
-        textSpan.textContent = label + '：' + oneLine;
-        li.appendChild(textSpan);
+        var textDiv = document.createElement('div');
+        textDiv.className = 'today-task-text';
+        textDiv.textContent = label + '：' + oneLine;
+        li.appendChild(textDiv);
 
-        var btnGroup = document.createElement('span');
-        btnGroup.className = 'today-task-buttons';
-        ['circle', 'cross'].forEach(function (statusVal) {
-          var btn = document.createElement('button');
-          btn.type = 'button';
-          btn.textContent = statusVal === 'circle' ? '○' : '✕';
-          btn.className = 'status-btn ' + statusVal + (currentStatus === statusVal ? ' selected' : '');
-          btn.addEventListener('click', function () {
-            var existing = localStorage.getItem(statusKey);
-            if (existing === statusVal) {
-              localStorage.removeItem(statusKey);
-            } else {
-              localStorage.setItem(statusKey, statusVal);
-            }
-            updateTodayView();
-            refreshStatusRows();
-          });
-          btnGroup.appendChild(btn);
-        });
-        li.appendChild(btnGroup);
+        var controls = document.createElement('div');
+        controls.className = 'today-task-controls';
+        controls.appendChild(buildTodayStatusGroup('予習', todayISO + '-sub' + n + '-prep-status'));
+        controls.appendChild(buildTodayStatusGroup('復習', todayISO + '-sub' + n + '-review-status'));
+        li.appendChild(controls);
+
         listEl.appendChild(li);
       }
       if (!hasTask) {
@@ -1264,6 +1277,35 @@
         emptyLi.textContent = '今日やることは特にありません。';
         listEl.appendChild(emptyLi);
       }
+    }
+
+    // 「今日やること」タブ内の○×ボタン一式（ラベル＋2ボタン）を1組作ります。
+    function buildTodayStatusGroup(labelText, statusKey) {
+      var group = document.createElement('span');
+      group.className = 'today-task-group';
+      var labelSpan = document.createElement('span');
+      labelSpan.className = 'today-task-group-label';
+      labelSpan.textContent = labelText;
+      group.appendChild(labelSpan);
+      var currentStatus = localStorage.getItem(statusKey);
+      ['circle', 'cross'].forEach(function (statusVal) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = statusVal === 'circle' ? '○' : '✕';
+        btn.className = 'status-btn ' + statusVal + (currentStatus === statusVal ? ' selected' : '');
+        btn.addEventListener('click', function () {
+          var existing = localStorage.getItem(statusKey);
+          if (existing === statusVal) {
+            localStorage.removeItem(statusKey);
+          } else {
+            localStorage.setItem(statusKey, statusVal);
+          }
+          updateTodayView();
+          refreshStatusRows();
+        });
+        group.appendChild(btn);
+      });
+      return group;
     }
 
     // 教材を日単位でスケジュールします。dailyGoalがなければ1単位とみなします。
@@ -1348,7 +1390,10 @@
           if (!prep) return;
           var key = prep.getAttribute('data-key') || '';
           var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub(\d+)-prep$/);
-          if (m) localStorage.removeItem(m[1] + '-sub' + m[2] + '-status');
+          if (m) {
+            localStorage.removeItem(m[1] + '-sub' + m[2] + '-prep-status');
+            localStorage.removeItem(m[1] + '-sub' + m[2] + '-review-status');
+          }
         });
         refreshStatusRows();
         alert('記録をリセットしました。');
