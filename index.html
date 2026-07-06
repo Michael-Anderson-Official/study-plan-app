@@ -482,6 +482,18 @@
       return y + '-' + m + '-' + d;
     }
 
+    // YYYY-MM-DD 形式の ISO 日付文字列をローカルタイムゾーンの日付オブジェクトに変換するヘルパー
+    // 文字列を Date() に直接渡すと UTC とみなされ日付がずれてしまうことがあるため、
+    // 分割して year/month/day を指定して生成する
+    function parseISOToDate(iso) {
+      if (!iso) return new Date();
+      var parts = iso.split('-');
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) - 1;
+      var d = parseInt(parts[2], 10);
+      return new Date(y, m, d);
+    }
+
     // 保存および読み込み
     // DOMContentLoaded イベントを待たずに即時実行します。
       // ヘッダー名の読み込み
@@ -636,7 +648,7 @@
       var prevBtn = document.getElementById('prevWeekBtn');
       if (prevBtn) {
         prevBtn.addEventListener('click', function () {
-          var start = new Date(window.currentWeekStartISO);
+          var start = parseISOToDate(window.currentWeekStartISO);
           start.setDate(start.getDate() - 7);
           window.currentWeekStartISO = toLocalISO(start);
           updateWeekUI();
@@ -646,7 +658,7 @@
       var nextBtn = document.getElementById('nextWeekBtn');
       if (nextBtn) {
         nextBtn.addEventListener('click', function () {
-          var start = new Date(window.currentWeekStartISO);
+          var start = parseISOToDate(window.currentWeekStartISO);
           start.setDate(start.getDate() + 7);
           window.currentWeekStartISO = toLocalISO(start);
           updateWeekUI();
@@ -698,6 +710,26 @@
           updateCellsForCurrentWeek();
         });
       }
+      // ページ全体が読み込まれた後に初期化を行います。これによりデスクトップブラウザでも
+      // イベント処理と今日のハイライトが正しく機能するようになります。
+      window.addEventListener('load', function () {
+        // 教材リストを読み込み直す
+        loadMaterials();
+        // 現在の日付を基に週の開始日を計算し currentWeekStartISO を設定
+        var currentDateLoad = new Date();
+        currentDateLoad.setHours(0, 0, 0, 0);
+        var weekStartSettingLoad = localStorage.getItem('weekStart') || 'monday';
+        var dow = currentDateLoad.getDay();
+        var offsetLoad = (weekStartSettingLoad === 'monday') ? ((dow + 6) % 7) : dow;
+        var startLoad = new Date(currentDateLoad);
+        startLoad.setDate(currentDateLoad.getDate() - offsetLoad);
+        window.currentWeekStartISO = toLocalISO(startLoad);
+        // UI 更新
+        updateWeekUI();
+        updateCellsForCurrentWeek();
+        // 教材リストを画面に反映
+        updateMaterialsUI();
+      });
     // DOMContentLoaded 用のクロージャを削除したため閉じカッコは不要になりました。
 
     // 教材詳細を開く
@@ -886,7 +918,7 @@
 
     // 週の表示を更新する関数。現在の週開始日 (window.currentWeekStartISO) を基準にラベルや data-key を更新します。
     function updateWeekUI() {
-      var startDate = new Date(window.currentWeekStartISO);
+      var startDate = parseISOToDate(window.currentWeekStartISO);
       // 今日の日付を取得し、ISO形式文字列にしておく
       var todayDate = new Date();
       todayDate.setHours(0, 0, 0, 0);
