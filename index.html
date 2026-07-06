@@ -25,6 +25,13 @@
       border-bottom: 1px solid #ccc;
       text-align: center;
     }
+    .motivation-quote {
+      margin: 0.8rem 1rem 0;
+      text-align: center;
+      font-size: 0.9rem;
+      font-style: italic;
+      color: #1e6fbf;
+    }
     table {
       border-collapse: collapse;
       width: 100%;
@@ -204,6 +211,7 @@
 </head>
 <body>
   <h1>一週間の計画帳</h1>
+  <p id="motivationQuote" class="motivation-quote"></p>
   <!-- 表示切り替えタブ -->
   <div class="view-tabs">
     <button id="weekTabBtn" type="button" class="tab-btn active">1週間</button>
@@ -544,6 +552,40 @@
     const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
     // テーブル行要素をキャッシュ
     const rows = document.querySelectorAll('tbody tr');
+
+    // モチベーション用の一言。日替わりで1つ表示する。
+    const motivationQuotes = [
+      '今日の1ページが、未来の自分を助ける。',
+      '続けることが、いちばんの近道。',
+      'できた分だけ、確実に前に進んでいる。',
+      '完璧じゃなくていい、まずは手をつけよう。',
+      '昨日の自分より、少しだけ前へ。',
+      '小さな積み重ねが、大きな差になる。',
+      '迷ったら、とりあえず1問だけ解いてみよう。',
+      'やる気は、始めてからついてくる。',
+      '今日できなかった分は、明日でいい。焦らず。',
+      '休むことも、計画のうち。',
+      '合格した自分を、想像してみよう。',
+      '今この瞬間が、いちばん若い。',
+      'コツコツが、結局いちばん強い。',
+      '誰かと比べず、自分のペースで。',
+      '今日の努力は、裏切らない。',
+      '始めるのに、やる気は要らない。',
+      '一歩ずつでいい、止まらないことが大事。',
+      '今日の自分を、褒めてあげよう。',
+      '苦手なところこそ、伸びしろがある。',
+      '目標は遠くても、道は今日から。'
+    ];
+    function pickDailyQuote() {
+      var todayIso = toLocalISO(new Date());
+      var seed = 0;
+      for (var i = 0; i < todayIso.length; i++) seed += todayIso.charCodeAt(i);
+      return motivationQuotes[seed % motivationQuotes.length];
+    }
+    (function () {
+      var quoteEl = document.getElementById('motivationQuote');
+      if (quoteEl) quoteEl.textContent = pickDailyQuote();
+    })();
 
     // 指定した日時をローカルタイムゾーンの ISO YYYY-MM-DD 形式に変換するヘルパー
     function toLocalISO(date) {
