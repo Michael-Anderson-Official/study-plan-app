@@ -79,11 +79,13 @@ async function checkAndSend(env) {
   const currentMinutes = hour * 60 + minute;
 
   const lastSent = await env.NOTIFY_KV.get('lastSentDate');
+  console.log('checkAndSend: now=' + hour + ':' + minute + ' target=' + stored.hour + ':' + stored.minute + ' lastSent=' + lastSent + ' today=' + todayStr);
   if (currentMinutes >= targetMinutes && lastSent !== todayStr) {
     try {
       await sendWebPush(stored.subscription, { title: '計画帳', body: '今日の成果を報告してください。' }, env);
+      console.log('push send succeeded');
     } catch (e) {
-      console.log('push send failed', e && e.message);
+      console.log('push send failed: ' + (e && (e.stack || e.message)));
     }
     await env.NOTIFY_KV.put('lastSentDate', todayStr);
   }
@@ -100,6 +102,7 @@ async function sendWebPush(subscription, payloadObj, env) {
   const encryptedBody = await encryptPayload(payloadBytes, subscription.keys.p256dh, subscription.keys.auth);
   const vapidAuthHeader = await buildVapidHeader(subscription.endpoint, env);
 
+  console.log('sending to endpoint: ' + subscription.endpoint);
   const res = await fetch(subscription.endpoint, {
     method: 'POST',
     headers: {
@@ -110,6 +113,7 @@ async function sendWebPush(subscription, payloadObj, env) {
     },
     body: encryptedBody
   });
+  console.log('push endpoint response status: ' + res.status);
   if (!res.ok) {
     const text = await res.text().catch(function () { return ''; });
     throw new Error('push endpoint responded ' + res.status + ' ' + text);
