@@ -69,6 +69,23 @@
       bottom: 0;
       background: #fafafa;
     }
+    /* 予習・復習欄であることが分かるようにラベルを表示する（編集内容には含まれない） */
+    .cell .prep::before {
+      content: "予習";
+      display: block;
+      font-size: 0.6rem;
+      font-weight: bold;
+      color: #1e90ff;
+      line-height: 1.2;
+    }
+    .cell .review::before {
+      content: "復習";
+      display: block;
+      font-size: 0.6rem;
+      font-weight: bold;
+      color: #888;
+      line-height: 1.2;
+    }
     .cell .section:focus {
       outline: 2px solid #1e90ff;
     }
@@ -104,6 +121,27 @@
     button:hover {
       background: #0c78d5;
     }
+    /* 表示切り替えタブ */
+    .view-tabs {
+      text-align: center;
+      padding: 0.6rem 0;
+      background: #f0f8ff;
+      border-bottom: 1px solid #ccc;
+    }
+    .tab-btn {
+      background: #fff;
+      color: #1e90ff;
+      border: 1px solid #1e90ff;
+      border-radius: 4px;
+      padding: 0.5rem 1.2rem;
+      margin: 0 0.3rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #1e90ff;
+      color: #fff;
+    }
     @media (max-width: 600px) {
       .cell {
         height: 80px;
@@ -122,6 +160,16 @@
     ヘッダーの科目名はクリックして変更できます。記入内容はスマートフォンのブラウザに保存されるので、ページを再読み込みしても内容が残ります。<br />
     「一週間をリセット」ボタンを押すと、このページに保存されたすべての記録が消去されます。
   </p>
+  <!-- 表示切り替えタブ -->
+  <div class="view-tabs">
+    <button id="weekTabBtn" type="button" class="tab-btn active">1週間</button>
+    <button id="todayTabBtn" type="button" class="tab-btn">今日やること</button>
+  </div>
+  <!-- 今日やることビュー -->
+  <div id="todayView" style="display:none; margin:1.5rem 1rem; text-align:center; font-size:1.05rem; line-height:1.6;">
+    <p id="todayTaskSummary"></p>
+  </div>
+  <div id="weekView">
   <div style="overflow-x: auto;">
     <table id="planTable">
       <thead>
@@ -447,6 +495,7 @@
     <h2 style="font-size:1rem; margin-bottom:0.5rem;">一週間の振り返り</h2>
     <div id="weeklySummary" contenteditable style="border: 1px solid #ccc; padding: 0.5rem; min-height: 80px;"></div>
   </div>
+  </div>
   <script>
     // グローバル変数の定義
     // 教材リストや詳細情報、現在選択中の教材インデックスはグローバルで管理します。
@@ -508,6 +557,14 @@
         if (saved) cell.textContent = saved;
         cell.addEventListener('input', function () {
           localStorage.setItem(key, cell.textContent);
+        });
+      });
+
+      // 予習・復習セルの入力内容を保存します。
+      document.querySelectorAll('.section').forEach(function (section) {
+        section.addEventListener('input', function () {
+          var key = section.getAttribute('data-key');
+          if (key) localStorage.setItem(key, section.innerText);
         });
       });
 
@@ -700,6 +757,27 @@
           window.currentWeekStartISO = toLocalISO(startOfWeekNow);
           updateWeekUI();
           updateCellsForCurrentWeek();
+        });
+      }
+
+      // 表示切り替えタブのクリック処理
+      var weekTabBtn = document.getElementById('weekTabBtn');
+      var todayTabBtn = document.getElementById('todayTabBtn');
+      var weekView = document.getElementById('weekView');
+      var todayView = document.getElementById('todayView');
+      if (weekTabBtn && todayTabBtn && weekView && todayView) {
+        weekTabBtn.addEventListener('click', function () {
+          weekView.style.display = '';
+          todayView.style.display = 'none';
+          weekTabBtn.classList.add('active');
+          todayTabBtn.classList.remove('active');
+        });
+        todayTabBtn.addEventListener('click', function () {
+          weekView.style.display = 'none';
+          todayView.style.display = '';
+          todayTabBtn.classList.add('active');
+          weekTabBtn.classList.remove('active');
+          updateTodayView();
         });
       }
 
@@ -1027,6 +1105,32 @@
           localStorage.setItem(summaryKey, weeklySummaryEl.innerText);
         };
       }
+    }
+
+    // 「今日やること」タブの表示内容を更新します。
+    function updateTodayView() {
+      var el = document.getElementById('todayTaskSummary');
+      if (!el) return;
+      var today = new Date();
+      today.setHours(0, 0, 0, 0);
+      var todayISO = toLocalISO(today);
+      var monthDay = (today.getMonth() + 1) + '月' + today.getDate() + '日';
+      var youbi = dayNames[today.getDay()] + '曜日';
+      // 科目1〜7の予習欄から、今日の内容が入っているものを集める（8列目は感想・振り返り欄のため対象外）
+      var tasks = [];
+      for (var n = 1; n <= 7; n++) {
+        var headerCell = document.querySelector('.header-cell[data-header="sub' + n + '"]');
+        var label = headerCell ? headerCell.textContent.trim() : ('科目' + n);
+        var content = localStorage.getItem(todayISO + '-sub' + n + '-prep');
+        if (content && content.trim()) {
+          var oneLine = content.trim().split(/\n+/).join('、');
+          tasks.push(label + '：' + oneLine);
+        }
+      }
+      var summaryText = tasks.length > 0
+        ? monthDay + youbi + '、今日やることは' + tasks.join('、') + 'です。'
+        : monthDay + youbi + '、今日やることは特にありません。';
+      el.textContent = summaryText;
     }
 
     // 教材を日単位でスケジュールします。dailyGoalがなければ1単位とみなします。
