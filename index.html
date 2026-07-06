@@ -115,6 +115,21 @@
       left: 0;
       z-index: 5;
     }
+    /* 今日以外の行を折りたたんで表示範囲を減らす。タップで一時的に展開できる */
+    th.row-label:not(.today) {
+      cursor: pointer;
+    }
+    tbody tr.row-collapsed td.cell {
+      height: 1.2rem;
+    }
+    tbody tr.row-collapsed td.cell .section,
+    tbody tr.row-collapsed td.cell .status-badge {
+      display: none;
+    }
+    tbody tr.row-collapsed th.row-label {
+      padding: 0.3rem 0.2rem;
+      font-size: 0.7rem;
+    }
     /* セルのスタイル */
     .cell {
       height: 60px;
@@ -280,7 +295,8 @@
   </div>
   <!-- 今日やることビュー -->
   <div id="todayView" style="display:none; margin:1.5rem 1rem;">
-    <p id="todayDateLabel" style="text-align:center; font-weight:bold; font-size:1.1rem; margin-bottom:1rem;"></p>
+    <p id="todayDateLabel" style="text-align:center; font-weight:bold; font-size:1.1rem; margin-bottom:0.3rem;"></p>
+    <p id="todayTrivia" style="text-align:center; font-size:0.8rem; color:#666; margin-top:0; margin-bottom:1rem;"></p>
     <ul id="todayTaskList"></ul>
   </div>
   <div id="weekView">
@@ -746,6 +762,17 @@
         badge.className = 'status-badge';
         cell.appendChild(badge);
       });
+
+      // 今日以外の行はタップで一時的に展開・折りたたみできるようにする
+      var planTableBody = document.querySelector('#planTable tbody');
+      if (planTableBody) {
+        planTableBody.addEventListener('click', function (event) {
+          var label = event.target.closest('th.row-label');
+          if (!label || label.classList.contains('today')) return;
+          var row = label.closest('tr');
+          if (row) row.classList.toggle('row-collapsed');
+        });
+      }
 
       // 教材リストおよび詳細情報はグローバル変数を使用します。
       function loadMaterials() {
@@ -1273,8 +1300,10 @@
           // 今日の日付行の場合はクラスを追加して強調
           if (iso === todayISO) {
             labelCell.classList.add('today');
+            row.classList.remove('row-collapsed');
           } else {
             labelCell.classList.remove('today');
+            row.classList.add('row-collapsed');
           }
           if (date.getDay() === 0 || holidays2026.has(iso)) {
             labelCell.style.color = 'red';
@@ -1331,6 +1360,7 @@
       var monthDay = (today.getMonth() + 1) + '月' + today.getDate() + '日';
       var youbi = dayNames[today.getDay()] + '曜日';
       if (dateLabelEl) dateLabelEl.textContent = monthDay + youbi + 'の今日やること';
+      loadTodayTrivia();
 
       listEl.innerHTML = '';
       var hasTask = false;
@@ -1364,6 +1394,47 @@
         emptyLi.textContent = '今日やることは特にありません。';
         listEl.appendChild(emptyLi);
       }
+    }
+
+    // 「今日は何の日」を日本語版Wikipediaの「M月D日」記事から取得して表示します。
+    // 同じ日付の分は localStorage にキャッシュし、同日中は再取得しません。
+    function loadTodayTrivia() {
+      var el = document.getElementById('todayTrivia');
+      if (!el) return;
+      var now = new Date();
+      var todayIso = toLocalISO(now);
+      var cacheKey = 'today-trivia-' + todayIso;
+      var cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        el.textContent = cached;
+        return;
+      }
+      // 日本語版Wikipediaの「M月D日」記事の「できごと」節（先頭の節）を取得する。
+      var pageTitle = (now.getMonth() + 1) + '月' + now.getDate() + '日';
+      var apiUrl = 'https://ja.wikipedia.org/w/api.php?action=parse&page='
+        + encodeURIComponent(pageTitle) + '&section=1&prop=text&format=json&origin=*';
+      fetch(apiUrl)
+        .then(function (res) {
+          if (!res.ok) throw new Error('fetch failed');
+          return res.json();
+        })
+        .then(function (data) {
+          var html = data && data.parse && data.parse.text && data.parse.text['*'];
+          if (!html) throw new Error('no html');
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          var items = doc.querySelectorAll('ul li');
+          if (!items.length) throw new Error('no items');
+          var item = items[Math.floor(Math.random() * items.length)];
+          item.querySelectorAll('sup.reference').forEach(function (sup) { sup.remove(); });
+          var text = item.textContent.trim();
+          if (!text) throw new Error('empty text');
+          var full = '【今日は何の日】' + text;
+          localStorage.setItem(cacheKey, full);
+          el.textContent = full;
+        })
+        .catch(function () {
+          // 取得できない場合は何も表示しない
+        });
     }
 
     // 「今日やること」タブ内の○×ボタン一式（2ボタン）を作ります。
