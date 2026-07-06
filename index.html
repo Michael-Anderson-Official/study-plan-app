@@ -853,7 +853,7 @@
             var key = iso + '-sub' + (colIndex + 1) + '-prep';
             var existing = localStorage.getItem(key) || '';
             var prefix = existing ? existing + '\n' : '';
-            localStorage.setItem(key, prefix + materialsList[idx] + ': ' + content);
+            localStorage.setItem(key, prefix + content);
           }
         } else {
           // 期日がない場合は毎日順番に dailyGoal または1単位ずつ割り当て
@@ -871,7 +871,7 @@
             var key2 = iso2 + '-sub' + (colIndex + 1) + '-prep';
             var existing2 = localStorage.getItem(key2) || '';
             var prefix2 = existing2 ? existing2 + '\n' : '';
-            localStorage.setItem(key2, prefix2 + materialsList[idx] + ': ' + content2);
+            localStorage.setItem(key2, prefix2 + content2);
             dayOffset++;
           }
         }
@@ -921,7 +921,7 @@
         var key3 = isoDate + '-sub' + (idx + 1) + '-prep';
         var existing3 = localStorage.getItem(key3) || '';
         var prefix3 = existing3 ? existing3 + '\n' : '';
-        localStorage.setItem(key3, prefix3 + materialsList[idx] + ': ' + contentStr);
+        localStorage.setItem(key3, prefix3 + contentStr);
         dayIndex++;
       }
       // スケジュール後に表示を更新
@@ -1017,7 +1017,7 @@
           var key = iso + '-sub' + (colIdx + 1) + '-prep';
           var existing = localStorage.getItem(key) || '';
           var prefix = existing ? existing + '\n' : '';
-          localStorage.setItem(key, prefix + materialsList[idx] + ': ' + content);
+          localStorage.setItem(key, prefix + content);
           dayOffset += 1;
         }
         // 詳細パネルを閉じる
@@ -1055,7 +1055,7 @@
         var key = isoStr + '-sub' + (columnIndex + 1) + '-prep';
         var existing = localStorage.getItem(key) || '';
         var prefix = existing ? existing + '\n' : '';
-        localStorage.setItem(key, prefix + materialsList[idx] + ': ' + contentStr);
+        localStorage.setItem(key, prefix + contentStr);
         offset++;
       }
       var detDiv = document.getElementById('materialDetail');
