@@ -53,31 +53,19 @@
     .cell .section {
       position: absolute;
       left: 0;
+      top: 0;
       width: 100%;
-      height: 50%;
+      height: 100%;
       padding: 2px;
       box-sizing: border-box;
       overflow: auto;
       font-size: 0.75rem;
-    }
-    .cell .prep {
-      top: 0;
-      border-bottom: 1px solid #ccc;
       background: #fff;
     }
-    .cell .review {
-      bottom: 0;
-      background: #fafafa;
-    }
-    /* 感想・振り返り欄は日記として使うため、予習・復習に分割せず1つのセルにする */
-    .cell.diary-cell .section.diary {
-      top: 0;
-      height: 100%;
-      background: #fff;
-    }
-    /* 完了状況（○×）を予習・復習それぞれの右上に重ねて表示する（contenteditableの外側の要素なので入力内容には影響しない） */
+    /* 完了状況（○×）をセル右上に重ねて表示する（contenteditableの外側の要素なので入力内容には影響しない） */
     .cell .status-badge {
       position: absolute;
+      top: 1px;
       right: 2px;
       font-size: 0.7rem;
       font-weight: bold;
@@ -85,34 +73,11 @@
       pointer-events: none;
       z-index: 2;
     }
-    .cell .status-badge.prep-badge {
-      top: 1px;
-    }
-    .cell .status-badge.review-badge {
-      bottom: 1px;
-    }
     .cell .status-badge.status-circle {
       color: #2e8b57;
     }
     .cell .status-badge.status-cross {
       color: #d9534f;
-    }
-    /* 予習・復習欄であることが分かるようにラベルを表示する（編集内容には含まれない） */
-    .cell .prep::before {
-      content: "予習";
-      display: block;
-      font-size: 0.6rem;
-      font-weight: bold;
-      color: #1e90ff;
-      line-height: 1.2;
-    }
-    .cell .review::before {
-      content: "復習";
-      display: block;
-      font-size: 0.6rem;
-      font-weight: bold;
-      color: #888;
-      line-height: 1.2;
     }
     .cell .section:focus {
       outline: 2px solid #1e90ff;
@@ -202,11 +167,6 @@
       align-items: center;
       gap: 0.3rem;
     }
-    .today-task-group-label {
-      font-size: 0.8rem;
-      color: #666;
-      margin-right: 0.1rem;
-    }
     .status-btn {
       width: 2rem;
       height: 2rem;
@@ -272,239 +232,190 @@
         <tr>
           <th class="row-label" data-day="day1">月</th>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day1-sub1-prep"></div>
-            <div class="section review" contenteditable data-key="day1-sub1-review"></div>
+            <div class="section" contenteditable data-key="day1-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day1-sub2-prep"></div>
-            <div class="section review" contenteditable data-key="day1-sub2-review"></div>
+            <div class="section" contenteditable data-key="day1-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day1-sub3-prep"></div>
-            <div class="section review" contenteditable data-key="day1-sub3-review"></div>
+            <div class="section" contenteditable data-key="day1-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day1-sub4-prep"></div>
-            <div class="section review" contenteditable data-key="day1-sub4-review"></div>
+            <div class="section" contenteditable data-key="day1-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day1-sub5-prep"></div>
-            <div class="section review" contenteditable data-key="day1-sub5-review"></div>
+            <div class="section" contenteditable data-key="day1-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day1-sub6-prep"></div>
-            <div class="section review" contenteditable data-key="day1-sub6-review"></div>
+            <div class="section" contenteditable data-key="day1-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day1-sub7-prep"></div>
-            <div class="section review" contenteditable data-key="day1-sub7-review"></div>
+            <div class="section" contenteditable data-key="day1-sub7-content"></div>
           </td>
-          <td class="cell diary-cell">
-            <div class="section diary" contenteditable data-key="day1-sub8-diary"></div>
+          <td class="cell">
+            <div class="section" contenteditable data-key="day1-sub8-content"></div>
           </td>
         </tr>
         <tr>
           <th class="row-label" data-day="day2">火</th>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day2-sub1-prep"></div>
-            <div class="section review" contenteditable data-key="day2-sub1-review"></div>
+            <div class="section" contenteditable data-key="day2-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day2-sub2-prep"></div>
-            <div class="section review" contenteditable data-key="day2-sub2-review"></div>
+            <div class="section" contenteditable data-key="day2-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day2-sub3-prep"></div>
-            <div class="section review" contenteditable data-key="day2-sub3-review"></div>
+            <div class="section" contenteditable data-key="day2-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day2-sub4-prep"></div>
-            <div class="section review" contenteditable data-key="day2-sub4-review"></div>
+            <div class="section" contenteditable data-key="day2-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day2-sub5-prep"></div>
-            <div class="section review" contenteditable data-key="day2-sub5-review"></div>
+            <div class="section" contenteditable data-key="day2-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day2-sub6-prep"></div>
-            <div class="section review" contenteditable data-key="day2-sub6-review"></div>
+            <div class="section" contenteditable data-key="day2-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day2-sub7-prep"></div>
-            <div class="section review" contenteditable data-key="day2-sub7-review"></div>
+            <div class="section" contenteditable data-key="day2-sub7-content"></div>
           </td>
-          <td class="cell diary-cell">
-            <div class="section diary" contenteditable data-key="day2-sub8-diary"></div>
+          <td class="cell">
+            <div class="section" contenteditable data-key="day2-sub8-content"></div>
           </td>
         </tr>
         <tr>
           <th class="row-label" data-day="day3">水</th>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day3-sub1-prep"></div>
-            <div class="section review" contenteditable data-key="day3-sub1-review"></div>
+            <div class="section" contenteditable data-key="day3-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day3-sub2-prep"></div>
-            <div class="section review" contenteditable data-key="day3-sub2-review"></div>
+            <div class="section" contenteditable data-key="day3-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day3-sub3-prep"></div>
-            <div class="section review" contenteditable data-key="day3-sub3-review"></div>
+            <div class="section" contenteditable data-key="day3-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day3-sub4-prep"></div>
-            <div class="section review" contenteditable data-key="day3-sub4-review"></div>
+            <div class="section" contenteditable data-key="day3-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day3-sub5-prep"></div>
-            <div class="section review" contenteditable data-key="day3-sub5-review"></div>
+            <div class="section" contenteditable data-key="day3-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day3-sub6-prep"></div>
-            <div class="section review" contenteditable data-key="day3-sub6-review"></div>
+            <div class="section" contenteditable data-key="day3-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day3-sub7-prep"></div>
-            <div class="section review" contenteditable data-key="day3-sub7-review"></div>
+            <div class="section" contenteditable data-key="day3-sub7-content"></div>
           </td>
-          <td class="cell diary-cell">
-            <div class="section diary" contenteditable data-key="day3-sub8-diary"></div>
+          <td class="cell">
+            <div class="section" contenteditable data-key="day3-sub8-content"></div>
           </td>
         </tr>
         <tr>
           <th class="row-label" data-day="day4">木</th>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day4-sub1-prep"></div>
-            <div class="section review" contenteditable data-key="day4-sub1-review"></div>
+            <div class="section" contenteditable data-key="day4-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day4-sub2-prep"></div>
-            <div class="section review" contenteditable data-key="day4-sub2-review"></div>
+            <div class="section" contenteditable data-key="day4-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day4-sub3-prep"></div>
-            <div class="section review" contenteditable data-key="day4-sub3-review"></div>
+            <div class="section" contenteditable data-key="day4-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day4-sub4-prep"></div>
-            <div class="section review" contenteditable data-key="day4-sub4-review"></div>
+            <div class="section" contenteditable data-key="day4-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day4-sub5-prep"></div>
-            <div class="section review" contenteditable data-key="day4-sub5-review"></div>
+            <div class="section" contenteditable data-key="day4-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day4-sub6-prep"></div>
-            <div class="section review" contenteditable data-key="day4-sub6-review"></div>
+            <div class="section" contenteditable data-key="day4-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day4-sub7-prep"></div>
-            <div class="section review" contenteditable data-key="day4-sub7-review"></div>
+            <div class="section" contenteditable data-key="day4-sub7-content"></div>
           </td>
-          <td class="cell diary-cell">
-            <div class="section diary" contenteditable data-key="day4-sub8-diary"></div>
+          <td class="cell">
+            <div class="section" contenteditable data-key="day4-sub8-content"></div>
           </td>
         </tr>
         <tr>
           <th class="row-label" data-day="day5">金</th>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day5-sub1-prep"></div>
-            <div class="section review" contenteditable data-key="day5-sub1-review"></div>
+            <div class="section" contenteditable data-key="day5-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day5-sub2-prep"></div>
-            <div class="section review" contenteditable data-key="day5-sub2-review"></div>
+            <div class="section" contenteditable data-key="day5-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day5-sub3-prep"></div>
-            <div class="section review" contenteditable data-key="day5-sub3-review"></div>
+            <div class="section" contenteditable data-key="day5-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day5-sub4-prep"></div>
-            <div class="section review" contenteditable data-key="day5-sub4-review"></div>
+            <div class="section" contenteditable data-key="day5-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day5-sub5-prep"></div>
-            <div class="section review" contenteditable data-key="day5-sub5-review"></div>
+            <div class="section" contenteditable data-key="day5-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day5-sub6-prep"></div>
-            <div class="section review" contenteditable data-key="day5-sub6-review"></div>
+            <div class="section" contenteditable data-key="day5-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day5-sub7-prep"></div>
-            <div class="section review" contenteditable data-key="day5-sub7-review"></div>
+            <div class="section" contenteditable data-key="day5-sub7-content"></div>
           </td>
-          <td class="cell diary-cell">
-            <div class="section diary" contenteditable data-key="day5-sub8-diary"></div>
+          <td class="cell">
+            <div class="section" contenteditable data-key="day5-sub8-content"></div>
           </td>
         </tr>
         <tr>
           <th class="row-label" data-day="day6">土</th>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day6-sub1-prep"></div>
-            <div class="section review" contenteditable data-key="day6-sub1-review"></div>
+            <div class="section" contenteditable data-key="day6-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day6-sub2-prep"></div>
-            <div class="section review" contenteditable data-key="day6-sub2-review"></div>
+            <div class="section" contenteditable data-key="day6-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day6-sub3-prep"></div>
-            <div class="section review" contenteditable data-key="day6-sub3-review"></div>
+            <div class="section" contenteditable data-key="day6-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day6-sub4-prep"></div>
-            <div class="section review" contenteditable data-key="day6-sub4-review"></div>
+            <div class="section" contenteditable data-key="day6-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day6-sub5-prep"></div>
-            <div class="section review" contenteditable data-key="day6-sub5-review"></div>
+            <div class="section" contenteditable data-key="day6-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day6-sub6-prep"></div>
-            <div class="section review" contenteditable data-key="day6-sub6-review"></div>
+            <div class="section" contenteditable data-key="day6-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day6-sub7-prep"></div>
-            <div class="section review" contenteditable data-key="day6-sub7-review"></div>
+            <div class="section" contenteditable data-key="day6-sub7-content"></div>
           </td>
-          <td class="cell diary-cell">
-            <div class="section diary" contenteditable data-key="day6-sub8-diary"></div>
+          <td class="cell">
+            <div class="section" contenteditable data-key="day6-sub8-content"></div>
           </td>
         </tr>
         <tr>
           <th class="row-label" data-day="day7">日</th>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day7-sub1-prep"></div>
-            <div class="section review" contenteditable data-key="day7-sub1-review"></div>
+            <div class="section" contenteditable data-key="day7-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day7-sub2-prep"></div>
-            <div class="section review" contenteditable data-key="day7-sub2-review"></div>
+            <div class="section" contenteditable data-key="day7-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day7-sub3-prep"></div>
-            <div class="section review" contenteditable data-key="day7-sub3-review"></div>
+            <div class="section" contenteditable data-key="day7-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day7-sub4-prep"></div>
-            <div class="section review" contenteditable data-key="day7-sub4-review"></div>
+            <div class="section" contenteditable data-key="day7-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day7-sub5-prep"></div>
-            <div class="section review" contenteditable data-key="day7-sub5-review"></div>
+            <div class="section" contenteditable data-key="day7-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day7-sub6-prep"></div>
-            <div class="section review" contenteditable data-key="day7-sub6-review"></div>
+            <div class="section" contenteditable data-key="day7-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section prep" contenteditable data-key="day7-sub7-prep"></div>
-            <div class="section review" contenteditable data-key="day7-sub7-review"></div>
+            <div class="section" contenteditable data-key="day7-sub7-content"></div>
           </td>
-          <td class="cell diary-cell">
-            <div class="section diary" contenteditable data-key="day7-sub8-diary"></div>
+          <td class="cell">
+            <div class="section" contenteditable data-key="day7-sub8-content"></div>
           </td>
         </tr>
       </tbody>
@@ -642,53 +553,56 @@
         });
       });
 
-      // 完了状況キーの移行: 以前は予習・復習で共通のキーだったため、独立したキーに移行します。
-      (function migrateStatusKeys() {
-        var keysToMigrate = [];
+      // セル内容の移行: 予習・復習・日記に分かれていた内容を1つの欄（content）にまとめます。
+      (function migrateContentCells() {
+        var prefixSet = {};
         for (var i = 0; i < localStorage.length; i++) {
           var k = localStorage.key(i);
-          if (k && /^\d{4}-\d{2}-\d{2}-sub\d+-status$/.test(k)) {
-            keysToMigrate.push(k);
-          }
+          var m = k && k.match(/^(\d{4}-\d{2}-\d{2}-sub\d+)-(prep|review|diary)$/);
+          if (m) prefixSet[m[1]] = true;
         }
-        keysToMigrate.forEach(function (k) {
-          var value = localStorage.getItem(k);
-          localStorage.setItem(k.replace(/-status$/, '-prep-status'), value);
-          localStorage.removeItem(k);
-        });
-      })();
-
-      // 感想・振り返り欄（8列目）の移行: 予習・復習に分かれていた内容を1つの日記欄にまとめます。
-      (function migrateDiaryCells() {
-        var isoSet = {};
-        for (var i = 0; i < localStorage.length; i++) {
-          var k = localStorage.key(i);
-          var m = k && k.match(/^(\d{4}-\d{2}-\d{2})-sub8-(prep|review)$/);
-          if (m) isoSet[m[1]] = true;
-        }
-        Object.keys(isoSet).forEach(function (iso) {
-          var prepVal = localStorage.getItem(iso + '-sub8-prep') || '';
-          var reviewVal = localStorage.getItem(iso + '-sub8-review') || '';
-          var combined = [prepVal, reviewVal].filter(function (s) { return s.trim() !== ''; }).join('\n');
+        Object.keys(prefixSet).forEach(function (prefix) {
+          var prepVal = localStorage.getItem(prefix + '-prep') || '';
+          var reviewVal = localStorage.getItem(prefix + '-review') || '';
+          var diaryVal = localStorage.getItem(prefix + '-diary') || '';
+          var combined = [prepVal, reviewVal, diaryVal].filter(function (s) { return s.trim() !== ''; }).join('\n');
           if (combined) {
-            var diaryKey = iso + '-sub8-diary';
-            var existingDiary = localStorage.getItem(diaryKey);
-            localStorage.setItem(diaryKey, existingDiary ? existingDiary + '\n' + combined : combined);
+            var contentKey = prefix + '-content';
+            var existing = localStorage.getItem(contentKey);
+            localStorage.setItem(contentKey, existing ? existing + '\n' + combined : combined);
           }
-          localStorage.removeItem(iso + '-sub8-prep');
-          localStorage.removeItem(iso + '-sub8-review');
+          localStorage.removeItem(prefix + '-prep');
+          localStorage.removeItem(prefix + '-review');
+          localStorage.removeItem(prefix + '-diary');
         });
       })();
 
-      // 各セルに、完了状況（○×）を予習・復習それぞれの右上に表示するバッジを追加します（日記欄には付けません）。
+      // 完了状況キーの移行: 予習用・復習用に分かれていたキーを1つ（status）にまとめます。prep優先、なければreview。
+      (function migrateStatusKeys() {
+        var prefixSet = {};
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          var m = k && k.match(/^(\d{4}-\d{2}-\d{2}-sub\d+)-(prep|review)-status$/);
+          if (m) prefixSet[m[1]] = true;
+        }
+        Object.keys(prefixSet).forEach(function (prefix) {
+          var prepStatus = localStorage.getItem(prefix + '-prep-status');
+          var reviewStatus = localStorage.getItem(prefix + '-review-status');
+          var unified = prepStatus || reviewStatus;
+          if (unified) localStorage.setItem(prefix + '-status', unified);
+          localStorage.removeItem(prefix + '-prep-status');
+          localStorage.removeItem(prefix + '-review-status');
+        });
+      })();
+
+      // 各セルに、完了状況（○×）をセル右上に表示するバッジを追加します（感想・振り返り列には付けません）。
       document.querySelectorAll('td.cell').forEach(function (cell) {
-        if (!cell.querySelector('.prep') || !cell.querySelector('.review')) return;
-        var prepBadge = document.createElement('span');
-        prepBadge.className = 'status-badge prep-badge';
-        cell.appendChild(prepBadge);
-        var reviewBadge = document.createElement('span');
-        reviewBadge.className = 'status-badge review-badge';
-        cell.appendChild(reviewBadge);
+        var section = cell.querySelector('.section');
+        var key = section ? (section.getAttribute('data-key') || '') : '';
+        if (/-sub8-content$/.test(key)) return;
+        var badge = document.createElement('span');
+        badge.className = 'status-badge';
+        cell.appendChild(badge);
       });
 
       // 教材リストおよび詳細情報はグローバル変数を使用します。
@@ -1047,9 +961,9 @@
       if (detailDiv) detailDiv.style.display = 'none';
     }
 
-    // 指定した教材（列）の予習欄の記入を全て削除する。再スケジュール時に古い記入が残らないようにする。
-    function clearMaterialPrepCells(idx) {
-      var pattern = new RegExp('^\\d{4}-\\d{2}-\\d{2}-sub' + (idx + 1) + '-prep$');
+    // 指定した教材（列）のセル内容を全て削除する。再スケジュール時に古い記入が残らないようにする。
+    function clearMaterialContentCells(idx) {
+      var pattern = new RegExp('^\\d{4}-\\d{2}-\\d{2}-sub' + (idx + 1) + '-content$');
       var keysToRemove = [];
       for (var i = 0; i < localStorage.length; i++) {
         var k = localStorage.key(i);
@@ -1063,7 +977,7 @@
       var detail = materialsDetails[idx];
       if (!detail) return;
       // 既存の割り当てを削除してから新しい内容で置き換える
-      clearMaterialPrepCells(idx);
+      clearMaterialContentCells(idx);
       // もし目次リストが存在する場合は章タイトルごとにスケジュールする
       var tasks = detail.tocList;
       if (tasks && Array.isArray(tasks) && tasks.length > 0) {
@@ -1093,7 +1007,7 @@
             var subTasks = tasks.slice(taskIndex, taskIndex + tasksPerDay);
             taskIndex += tasksPerDay;
             var content = subTasks.join('\n');
-            var key = iso + '-sub' + (colIndex + 1) + '-prep';
+            var key = iso + '-sub' + (colIndex + 1) + '-content';
             localStorage.setItem(key, content);
           }
         } else {
@@ -1109,7 +1023,7 @@
             var sub = tasks.slice(taskIdx, taskIdx + tasksPerDay2);
             taskIdx += tasksPerDay2;
             var content2 = sub.join('\n');
-            var key2 = iso2 + '-sub' + (colIndex + 1) + '-prep';
+            var key2 = iso2 + '-sub' + (colIndex + 1) + '-content';
             localStorage.setItem(key2, content2);
             dayOffset++;
           }
@@ -1157,7 +1071,7 @@
         var group = tasksArray.slice(startIdx, startIdx + tasksPerDay);
         if (group.length === 0) break;
         var contentStr = group.join(', ');
-        var key3 = isoDate + '-sub' + (idx + 1) + '-prep';
+        var key3 = isoDate + '-sub' + (idx + 1) + '-content';
         localStorage.setItem(key3, contentStr);
         dayIndex++;
       }
@@ -1212,12 +1126,8 @@
         var cells = row.querySelectorAll('td.cell');
         cells.forEach(function (cell, cellIdx) {
           var subNum = cellIdx + 1;
-          var prepSection = cell.querySelector('.prep');
-          var reviewSection = cell.querySelector('.review');
-          var diarySection = cell.querySelector('.diary');
-          if (prepSection) prepSection.setAttribute('data-key', iso + '-sub' + subNum + '-prep');
-          if (reviewSection) reviewSection.setAttribute('data-key', iso + '-sub' + subNum + '-review');
-          if (diarySection) diarySection.setAttribute('data-key', iso + '-sub' + subNum + '-diary');
+          var section = cell.querySelector('.section');
+          if (section) section.setAttribute('data-key', iso + '-sub' + subNum + '-content');
         });
       });
       // 一週間の振り返り欄の読み込みと保存イベントの更新
@@ -1233,22 +1143,18 @@
       refreshStatusRows();
     }
 
-    // 各セルの完了状況（○×）表示を、予習・復習それぞれの右上バッジに反映します。
+    // 各セルの完了状況（○×）表示を、右上バッジに反映します。
     function refreshStatusRows() {
       document.querySelectorAll('td.cell').forEach(function (cell) {
-        var prep = cell.querySelector('.prep');
-        var prepBadge = cell.querySelector('.prep-badge');
-        var reviewBadge = cell.querySelector('.review-badge');
-        if (!prep || !prepBadge || !reviewBadge) return;
-        var key = prep.getAttribute('data-key') || '';
-        var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub(\d+)-prep$/);
+        var section = cell.querySelector('.section');
+        var badge = cell.querySelector('.status-badge');
+        if (!section || !badge) return;
+        var key = section.getAttribute('data-key') || '';
+        var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub(\d+)-content$/);
         if (!m) return;
-        var prepStatus = localStorage.getItem(m[1] + '-sub' + m[2] + '-prep-status');
-        var reviewStatus = localStorage.getItem(m[1] + '-sub' + m[2] + '-review-status');
-        prepBadge.textContent = prepStatus === 'circle' ? '○' : prepStatus === 'cross' ? '✕' : '';
-        prepBadge.className = 'status-badge prep-badge' + (prepStatus ? ' status-' + prepStatus : '');
-        reviewBadge.textContent = reviewStatus === 'circle' ? '○' : reviewStatus === 'cross' ? '✕' : '';
-        reviewBadge.className = 'status-badge review-badge' + (reviewStatus ? ' status-' + reviewStatus : '');
+        var status = localStorage.getItem(m[1] + '-sub' + m[2] + '-status');
+        badge.textContent = status === 'circle' ? '○' : status === 'cross' ? '✕' : '';
+        badge.className = 'status-badge' + (status ? ' status-' + status : '');
       });
     }
 
@@ -1266,11 +1172,11 @@
 
       listEl.innerHTML = '';
       var hasTask = false;
-      // 科目1〜7の予習欄から、今日の内容が入っているものをリスト表示する（8列目は感想・振り返り欄のため対象外）
+      // 科目1〜7の内容欄から、今日の内容が入っているものをリスト表示する（8列目は感想・振り返り欄のため対象外）
       for (let n = 1; n <= 7; n++) {
         var headerCell = document.querySelector('.header-cell[data-header="sub' + n + '"]');
         var label = headerCell ? headerCell.textContent.trim() : ('科目' + n);
-        var content = localStorage.getItem(todayISO + '-sub' + n + '-prep');
+        var content = localStorage.getItem(todayISO + '-sub' + n + '-content');
         if (!content || !content.trim()) continue;
         hasTask = true;
         var oneLine = content.trim().split(/\n+/).join('、');
@@ -1283,10 +1189,9 @@
 
         var controls = document.createElement('div');
         controls.className = 'today-task-controls';
-        controls.appendChild(buildTodayStatusGroup('予習', todayISO + '-sub' + n + '-prep-status', function () {
+        controls.appendChild(buildTodayStatusGroup(todayISO + '-sub' + n + '-status', function () {
           rescheduleAfterMiss(todayISO, n);
         }));
-        controls.appendChild(buildTodayStatusGroup('復習', todayISO + '-sub' + n + '-review-status'));
         li.appendChild(controls);
 
         listEl.appendChild(li);
@@ -1299,15 +1204,11 @@
       }
     }
 
-    // 「今日やること」タブ内の○×ボタン一式（ラベル＋2ボタン）を1組作ります。
+    // 「今日やること」タブ内の○×ボタン一式（2ボタン）を作ります。
     // onCross を渡すと、未選択→✕への変化（新たに✕を付けた瞬間）にだけ呼び出されます。
-    function buildTodayStatusGroup(labelText, statusKey, onCross) {
+    function buildTodayStatusGroup(statusKey, onCross) {
       var group = document.createElement('span');
       group.className = 'today-task-group';
-      var labelSpan = document.createElement('span');
-      labelSpan.className = 'today-task-group-label';
-      labelSpan.textContent = labelText;
-      group.appendChild(labelSpan);
       var currentStatus = localStorage.getItem(statusKey);
       ['circle', 'cross'].forEach(function (statusVal) {
         var btn = document.createElement('button');
@@ -1334,14 +1235,14 @@
       return group;
     }
 
-    // ✕が付いた日の予習内容を翌日に送り、それ以降に予定済みの内容も1日ずつ後ろ倒しにします。
+    // ✕が付いた日の内容を翌日に送り、それ以降に予定済みの内容も1日ずつ後ろ倒しにします。
     // ✕を付けた当日の内容自体はそのまま残します（「その日はできなかった」記録として）。
     function rescheduleAfterMiss(dateISO, subNum) {
       var days = [];
       var cursor = parseISOToDate(dateISO);
       for (var count = 0; count < 730; count++) {
         var iso = toLocalISO(cursor);
-        var content = localStorage.getItem(iso + '-sub' + subNum + '-prep');
+        var content = localStorage.getItem(iso + '-sub' + subNum + '-content');
         if (!content || !content.trim()) break;
         days.push({ iso: iso, content: content });
         cursor.setDate(cursor.getDate() + 1);
@@ -1352,7 +1253,7 @@
       var afterLastISO = toLocalISO(afterLast);
       for (var i = days.length - 1; i >= 0; i--) {
         var targetISO = (i === days.length - 1) ? afterLastISO : days[i + 1].iso;
-        localStorage.setItem(targetISO + '-sub' + subNum + '-prep', days[i].content);
+        localStorage.setItem(targetISO + '-sub' + subNum + '-content', days[i].content);
       }
     }
 
@@ -1361,7 +1262,7 @@
       var detail = materialsDetails[idx];
       if (!detail) return;
       // 既存の割り当てを削除してから新しい内容で置き換える
-      clearMaterialPrepCells(idx);
+      clearMaterialContentCells(idx);
       // 目次リストがある場合は章タイトルを日毎に割り当て
       var tasks = detail.tocList;
       if (tasks && Array.isArray(tasks) && tasks.length > 0) {
@@ -1379,7 +1280,7 @@
           var subTasks = tasks.slice(taskIndex, taskIndex + tasksPerDay);
           taskIndex += tasksPerDay;
           var content = subTasks.join('\n');
-          var key = iso + '-sub' + (colIdx + 1) + '-prep';
+          var key = iso + '-sub' + (colIdx + 1) + '-content';
           localStorage.setItem(key, content);
           dayOffset += 1;
         }
@@ -1415,7 +1316,7 @@
         var group = tasksArray.slice(s, s + dailyGoal);
         if (group.length === 0) break;
         var contentStr = group.join(', ');
-        var key = isoStr + '-sub' + (columnIndex + 1) + '-prep';
+        var key = isoStr + '-sub' + (columnIndex + 1) + '-content';
         localStorage.setItem(key, contentStr);
         offset++;
       }
@@ -1434,14 +1335,11 @@
         });
         // 完了状況（○×）も現在週の分を削除
         document.querySelectorAll('td.cell').forEach(function (cell) {
-          var prep = cell.querySelector('.prep');
-          if (!prep) return;
-          var key = prep.getAttribute('data-key') || '';
-          var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub(\d+)-prep$/);
-          if (m) {
-            localStorage.removeItem(m[1] + '-sub' + m[2] + '-prep-status');
-            localStorage.removeItem(m[1] + '-sub' + m[2] + '-review-status');
-          }
+          var section = cell.querySelector('.section');
+          if (!section) return;
+          var key = section.getAttribute('data-key') || '';
+          var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub(\d+)-content$/);
+          if (m) localStorage.removeItem(m[1] + '-sub' + m[2] + '-status');
         });
         refreshStatusRows();
         alert('記録をリセットしました。');
