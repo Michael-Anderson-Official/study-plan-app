@@ -388,26 +388,30 @@
       </tbody>
     </table>
   </div>
-  <div class="controls">
-    <button id="resetButton">一週間をリセット</button>
-    <!-- 週送りボタン -->
-    <button id="prevWeekBtn" style="margin-left:0.5rem;">前週へ</button>
-    <button id="nextWeekBtn" style="margin-left:0.5rem;">次週へ</button>
-    <!-- 週の始まり設定 -->
-    <label for="weekStartSelect" style="margin-left:0.5rem;">
-      週の始まり:
-      <select id="weekStartSelect" style="padding:0.3rem; margin-left:0.2rem;">
-        <option value="monday">月曜始まり</option>
-        <option value="sunday">日曜始まり</option>
-      </select>
-    </label>
-  </div>
+    <div class="controls">
+      <!-- 各種操作ボタン -- アクションをフォーム送信扱いにしないため type="button" を指定 -->
+      <button id="resetButton" type="button">一週間をリセット</button>
+      <!-- 週送りボタン -->
+      <button id="prevWeekBtn" type="button" style="margin-left:0.5rem;">前週へ</button>
+      <button id="nextWeekBtn" type="button" style="margin-left:0.5rem;">次週へ</button>
+      <!-- 今週に戻るボタン -->
+      <button id="currentWeekBtn" type="button" style="margin-left:0.5rem;">今週へ</button>
+      <!-- 週の始まり設定 -->
+      <label for="weekStartSelect" style="margin-left:0.5rem;">
+        週の始まり:
+        <select id="weekStartSelect" style="padding:0.3rem; margin-left:0.2rem;">
+          <option value="monday">月曜始まり</option>
+          <option value="sunday">日曜始まり</option>
+        </select>
+      </label>
+    </div>
 
   <!-- 教材追加欄 -->
   <div class="materials-section" style="margin: 1rem;">
     <h2 style="font-size:1rem; margin-bottom:0.5rem;">教材追加欄</h2>
     <input id="materialInput" type="text" placeholder="教材名を入力" style="padding:0.4rem; width: 60%; max-width:280px;" />
-    <button id="addMaterialBtn" style="padding:0.4rem 0.8rem; margin-left:0.5rem;">追加</button>
+    <!-- type="button" を明示してフォーム送信を防ぐ -->
+    <button id="addMaterialBtn" type="button" style="padding:0.4rem 0.8rem; margin-left:0.5rem;">追加</button>
     <ul id="materialsList" style="list-style:none; padding-left:0; margin-top:0.5rem;"></ul>
   </div>
 
@@ -432,9 +436,9 @@
       <label for="tocInput">目次／単位リスト（各行に1項目）:</label><br/>
       <textarea id="tocInput" rows="5" style="padding:0.3rem; width:90%; max-width:400px;"></textarea>
     </div>
-    <button id="saveDetailBtn" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">保存</button>
-    <button id="dailyScheduleBtn" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">毎日</button>
-    <button id="cancelDetailBtn" style="padding:0.4rem 0.8rem;">キャンセル</button>
+    <button id="saveDetailBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">保存</button>
+    <button id="dailyScheduleBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">毎日</button>
+    <button id="cancelDetailBtn" type="button" style="padding:0.4rem 0.8rem;">キャンセル</button>
   </div>
 
   <!-- 一週間の振り返り欄 -->
@@ -661,6 +665,24 @@
           var start = parseISOToDate(window.currentWeekStartISO);
           start.setDate(start.getDate() + 7);
           window.currentWeekStartISO = toLocalISO(start);
+          updateWeekUI();
+          updateCellsForCurrentWeek();
+        });
+      }
+
+      // 今週に戻るボタンのクリック処理
+      var currentWeekBtn = document.getElementById('currentWeekBtn');
+      if (currentWeekBtn) {
+        currentWeekBtn.addEventListener('click', function () {
+          // 現在の日付から週の開始日を計算し currentWeekStartISO に設定
+          var nowDate = new Date();
+          nowDate.setHours(0, 0, 0, 0);
+          var weekStartSettingNow = localStorage.getItem('weekStart') || 'monday';
+          var dowNow = nowDate.getDay();
+          var offsetNow = (weekStartSettingNow === 'monday') ? ((dowNow + 6) % 7) : dowNow;
+          var startOfWeekNow = new Date(nowDate);
+          startOfWeekNow.setDate(nowDate.getDate() - offsetNow);
+          window.currentWeekStartISO = toLocalISO(startOfWeekNow);
           updateWeekUI();
           updateCellsForCurrentWeek();
         });
