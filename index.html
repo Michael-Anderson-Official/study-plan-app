@@ -1265,7 +1265,9 @@
 
         var controls = document.createElement('div');
         controls.className = 'today-task-controls';
-        controls.appendChild(buildTodayStatusGroup('予習', todayISO + '-sub' + n + '-prep-status'));
+        controls.appendChild(buildTodayStatusGroup('予習', todayISO + '-sub' + n + '-prep-status', function () {
+          rescheduleAfterMiss(todayISO, n);
+        }));
         controls.appendChild(buildTodayStatusGroup('復習', todayISO + '-sub' + n + '-review-status'));
         li.appendChild(controls);
 
@@ -1280,7 +1282,8 @@
     }
 
     // 「今日やること」タブ内の○×ボタン一式（ラベル＋2ボタン）を1組作ります。
-    function buildTodayStatusGroup(labelText, statusKey) {
+    // onCross を渡すと、未選択→✕への変化（新たに✕を付けた瞬間）にだけ呼び出されます。
+    function buildTodayStatusGroup(labelText, statusKey, onCross) {
       var group = document.createElement('span');
       group.className = 'today-task-group';
       var labelSpan = document.createElement('span');
@@ -1295,17 +1298,44 @@
         btn.className = 'status-btn ' + statusVal + (currentStatus === statusVal ? ' selected' : '');
         btn.addEventListener('click', function () {
           var existing = localStorage.getItem(statusKey);
+          var wasCross = existing === 'cross';
           if (existing === statusVal) {
             localStorage.removeItem(statusKey);
           } else {
             localStorage.setItem(statusKey, statusVal);
           }
+          if (statusVal === 'cross' && !wasCross && onCross) {
+            onCross();
+          }
           updateTodayView();
           refreshStatusRows();
+          updateCellsForCurrentWeek();
         });
         group.appendChild(btn);
       });
       return group;
+    }
+
+    // ✕が付いた日の予習内容を翌日に送り、それ以降に予定済みの内容も1日ずつ後ろ倒しにします。
+    // ✕を付けた当日の内容自体はそのまま残します（「その日はできなかった」記録として）。
+    function rescheduleAfterMiss(dateISO, subNum) {
+      var days = [];
+      var cursor = parseISOToDate(dateISO);
+      for (var count = 0; count < 730; count++) {
+        var iso = toLocalISO(cursor);
+        var content = localStorage.getItem(iso + '-sub' + subNum + '-prep');
+        if (!content || !content.trim()) break;
+        days.push({ iso: iso, content: content });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      if (days.length === 0) return;
+      var afterLast = parseISOToDate(days[days.length - 1].iso);
+      afterLast.setDate(afterLast.getDate() + 1);
+      var afterLastISO = toLocalISO(afterLast);
+      for (var i = days.length - 1; i >= 0; i--) {
+        var targetISO = (i === days.length - 1) ? afterLastISO : days[i + 1].iso;
+        localStorage.setItem(targetISO + '-sub' + subNum + '-prep', days[i].content);
+      }
     }
 
     // 教材を日単位でスケジュールします。dailyGoalがなければ1単位とみなします。
