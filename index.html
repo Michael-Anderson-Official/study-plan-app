@@ -45,12 +45,17 @@
       z-index: 5;
     }
     /* セルのスタイル */
+    /* td 自体に display:flex を指定すると Safari(iOS) でテーブルの行・列構造が崩れるため、
+       セル内部にラッパー div (.cell-body) を挟んでそちらを flex コンテナにする */
     .cell {
       height: 76px;
       position: relative;
       overflow: hidden;
+    }
+    .cell .cell-body {
       display: flex;
       flex-direction: column;
+      height: 100%;
     }
     /* 完了状況（○×）の表示専用行。1週間タブのセルに常時表示される */
     .cell .status-row {
@@ -629,11 +634,18 @@
         });
       });
 
-      // 各セルの先頭に、完了状況（○×）を表示する専用行を追加します。
+      // 各セルの中身を .cell-body でラップし、その先頭に完了状況（○×）表示用の行を追加します。
+      // td 自体を flex コンテナにすると Safari(iOS) でテーブル構造が崩れるため、内部の div で flex を扱う。
       document.querySelectorAll('td.cell').forEach(function (cell) {
+        var body = document.createElement('div');
+        body.className = 'cell-body';
+        while (cell.firstChild) {
+          body.appendChild(cell.firstChild);
+        }
         var statusRow = document.createElement('div');
         statusRow.className = 'status-row';
-        cell.insertBefore(statusRow, cell.firstChild);
+        body.insertBefore(statusRow, body.firstChild);
+        cell.appendChild(body);
       });
 
       // 教材リストおよび詳細情報はグローバル変数を使用します。
