@@ -474,6 +474,14 @@
     // テーブル行要素をキャッシュ
     const rows = document.querySelectorAll('tbody tr');
 
+    // 指定した日時をローカルタイムゾーンの ISO YYYY-MM-DD 形式に変換するヘルパー
+    function toLocalISO(date) {
+      var y = date.getFullYear();
+      var m = (date.getMonth() + 1).toString().padStart(2, '0');
+      var d = date.getDate().toString().padStart(2, '0');
+      return y + '-' + m + '-' + d;
+    }
+
     // 保存および読み込み
     // DOMContentLoaded イベントを待たずに即時実行します。
       // ヘッダー名の読み込み
@@ -584,7 +592,7 @@
         }
         var startDate = new Date(currentDate);
         startDate.setDate(currentDate.getDate() - diff);
-        window.currentWeekStartISO = startDate.toISOString().split('T')[0];
+        window.currentWeekStartISO = toLocalISO(startDate);
         // セレクトボックスに週の始まり設定を反映
         var selectEl = document.getElementById('weekStartSelect');
         if (selectEl) {
@@ -630,7 +638,7 @@
         prevBtn.addEventListener('click', function () {
           var start = new Date(window.currentWeekStartISO);
           start.setDate(start.getDate() - 7);
-          window.currentWeekStartISO = start.toISOString().split('T')[0];
+          window.currentWeekStartISO = toLocalISO(start);
           updateWeekUI();
           updateCellsForCurrentWeek();
         });
@@ -640,7 +648,7 @@
         nextBtn.addEventListener('click', function () {
           var start = new Date(window.currentWeekStartISO);
           start.setDate(start.getDate() + 7);
-          window.currentWeekStartISO = start.toISOString().split('T')[0];
+          window.currentWeekStartISO = toLocalISO(start);
           updateWeekUI();
           updateCellsForCurrentWeek();
         });
@@ -685,7 +693,7 @@
           }
           var startOfWeek = new Date(nowDate);
           startOfWeek.setDate(nowDate.getDate() - offset);
-          window.currentWeekStartISO = startOfWeek.toISOString().split('T')[0];
+          window.currentWeekStartISO = toLocalISO(startOfWeek);
           updateWeekUI();
           updateCellsForCurrentWeek();
         });
@@ -781,7 +789,7 @@
           for (var day = 0; day < days && taskIndex < tasks.length; day++) {
             var current = new Date(start);
             current.setDate(start.getDate() + day);
-            var iso = current.toISOString().split('T')[0];
+            var iso = toLocalISO(current);
             var subTasks = tasks.slice(taskIndex, taskIndex + tasksPerDay);
             taskIndex += tasksPerDay;
             var content = subTasks.join('\n');
@@ -799,7 +807,7 @@
           while (taskIdx < tasks.length) {
             var currentDay = new Date(start);
             currentDay.setDate(start.getDate() + dayOffset);
-            var iso2 = currentDay.toISOString().split('T')[0];
+            var iso2 = toLocalISO(currentDay);
             var sub = tasks.slice(taskIdx, taskIdx + tasksPerDay2);
             taskIdx += tasksPerDay2;
             var content2 = sub.join('\n');
@@ -848,7 +856,7 @@
       for (var startIdx = 0; startIdx < tasksArray.length; startIdx += tasksPerDay) {
         var currDate = new Date(startDate);
         currDate.setDate(startDate.getDate() + dayIndex);
-        var isoDate = currDate.toISOString().split('T')[0];
+        var isoDate = toLocalISO(currDate);
         // 当日のタスクグループ
         var group = tasksArray.slice(startIdx, startIdx + tasksPerDay);
         if (group.length === 0) break;
@@ -882,11 +890,11 @@
       // 今日の日付を取得し、ISO形式文字列にしておく
       var todayDate = new Date();
       todayDate.setHours(0, 0, 0, 0);
-      var todayISO = todayDate.toISOString().split('T')[0];
+      var todayISO = toLocalISO(todayDate);
       rows.forEach(function (row, idx) {
         var date = new Date(startDate);
         date.setDate(startDate.getDate() + idx);
-        var iso = date.toISOString().split('T')[0];
+        var iso = toLocalISO(date);
         var display = (date.getMonth() + 1) + '/' + date.getDate();
         var dayName = dayNames[date.getDay()];
         var labelCell = row.querySelector('th.row-label');
@@ -945,7 +953,7 @@
         while (taskIndex < tasks.length) {
           var current = new Date(start);
           current.setDate(start.getDate() + dayOffset);
-          var iso = current.toISOString().split('T')[0];
+          var iso = toLocalISO(current);
           var subTasks = tasks.slice(taskIndex, taskIndex + tasksPerDay);
           taskIndex += tasksPerDay;
           var content = subTasks.join('\n');
@@ -983,7 +991,7 @@
       for (var s = 0; s < tasksArray.length; s += dailyGoal) {
         var currentDate = new Date(startDate);
         currentDate.setDate(startDate.getDate() + offset);
-        var isoStr = currentDate.toISOString().split('T')[0];
+        var isoStr = toLocalISO(currentDate);
         var group = tasksArray.slice(s, s + dailyGoal);
         if (group.length === 0) break;
         var contentStr = group.join(', ');
