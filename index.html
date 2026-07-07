@@ -932,7 +932,7 @@
         <p style="font-size:0.8rem; color:#666; margin-top:0;">
           Googleでサインインすると、複数の端末でデータが同期されます。サインインしなくても今まで通り使えます。
         </p>
-        <button id="accountSignInBtn" type="button">Googleでサインイン</button>
+        <div id="accountSignInContainer"></div>
         <div id="accountSignedInInfo" style="display:none;">
           <p id="accountEmailLabel" style="font-size:0.85rem; margin:0 0 0.3rem;"></p>
           <button id="accountSignOutBtn" type="button">サインアウト</button>
@@ -1131,16 +1131,16 @@
     }
 
     function updateAccountSectionUI(user) {
-      var signInBtn = document.getElementById('accountSignInBtn');
+      var signInContainer = document.getElementById('accountSignInContainer');
       var signedInInfo = document.getElementById('accountSignedInInfo');
       var emailLabel = document.getElementById('accountEmailLabel');
-      if (!signInBtn || !signedInInfo) return;
+      if (!signInContainer || !signedInInfo) return;
       if (user) {
-        signInBtn.style.display = 'none';
+        signInContainer.style.display = 'none';
         signedInInfo.style.display = 'block';
         if (emailLabel) emailLabel.textContent = 'サインイン中: ' + (user.email || user.uid);
       } else {
-        signInBtn.style.display = '';
+        signInContainer.style.display = '';
         signedInInfo.style.display = 'none';
       }
     }
@@ -1770,6 +1770,7 @@
       if (settingsBtn && settingsModal) {
         settingsBtn.addEventListener('click', function () {
           settingsModal.style.display = 'flex';
+          renderGoogleSignInButton();
         });
         if (settingsCloseBtn) {
           settingsCloseBtn.addEventListener('click', function () {
@@ -2994,21 +2995,36 @@
     }
 
     // アカウント同期（Googleサインイン/サインアウト）
-    var accountSignInBtn = document.getElementById('accountSignInBtn');
-    if (accountSignInBtn) {
-      accountSignInBtn.addEventListener('click', function () {
-        if (!window.appAuth) {
-          setAccountSyncStatus('アカウント機能を準備中です。少し待ってからもう一度お試しください。', true);
-          return;
-        }
-        setAccountSyncStatus('サインインしています...');
-        window.appAuth.signIn().catch(function (e) {
-          console.error('サインインに失敗しました', e);
-          var detail = e && (e.code || e.message) ? (e.code || e.message) : '不明なエラー';
-          setAccountSyncStatus('サインインに失敗しました（' + detail + '）', true);
-        });
+    // Firebaseのsignin用にGoogleカレンダー連携と同じGoogle Identity Servicesの
+    // 「サインインボタン」を描画し、取得したIDトークンでFirebaseにサインインする。
+    var googleSignInButtonRendered = false;
+    function renderGoogleSignInButton() {
+      if (googleSignInButtonRendered) return;
+      var container = document.getElementById('accountSignInContainer');
+      if (!container || !window.google || !google.accounts || !google.accounts.id) return;
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleIdCredential
+      });
+      google.accounts.id.renderButton(container, { theme: 'outline', size: 'large', text: 'signin_with' });
+      googleSignInButtonRendered = true;
+    }
+    function handleGoogleIdCredential(response) {
+      if (!window.appAuth) {
+        setAccountSyncStatus('アカウント機能を準備中です。少し待ってからもう一度お試しください。', true);
+        return;
+      }
+      setAccountSyncStatus('サインインしています...');
+      window.appAuth.signInWithIdToken(response.credential).catch(function (e) {
+        console.error('サインインに失敗しました', e);
+        var detail = e && (e.code || e.message) ? (e.code || e.message) : '不明なエラー';
+        setAccountSyncStatus('サインインに失敗しました（' + detail + '）', true);
       });
     }
+    // ページ読み込み時点でGISがすでに使える場合はすぐ描画する。間に合わなければ
+    // 設定モーダルを開いたタイミング（下の settingsBtn ハンドラ）で再試行する。
+    renderGoogleSignInButton();
+
     var accountSignOutBtn = document.getElementById('accountSignOutBtn');
     if (accountSignOutBtn) {
       accountSignOutBtn.addEventListener('click', function () {
@@ -3566,7 +3582,7 @@
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
     import {
-      getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+      getAuth, GoogleAuthProvider, signInWithCredential, signOut, onAuthStateChanged
     } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
     import {
       getFirestore, doc, getDoc, setDoc, collection, getDocs
@@ -3583,9 +3599,14 @@
       console.error('Firebase初期化に失敗しました。アカウント同期は無効化されます。', e);
     }
 
-    function signIn() {
+    // Google Identity Services（Googleカレンダー連携と同じ仕組み）で取得したIDトークンを使って
+    // Firebaseにサインインする。signInWithPopup/signInWithRedirectはSafariのストレージ分離
+    // (ITP)でfirebaseapp.comとの間のセッション情報受け渡しが失敗することがあるため、
+    // 別ドメインへの遷移が不要なこの方式に統一した。
+    function signInWithIdToken(idToken) {
       if (!firebaseAuthInstance) return Promise.reject(new Error('Firebase未初期化'));
-      return signInWithPopup(firebaseAuthInstance, new GoogleAuthProvider());
+      var credential = GoogleAuthProvider.credential(idToken);
+      return signInWithCredential(firebaseAuthInstance, credential);
     }
 
     function signOutUser() {
@@ -3647,7 +3668,7 @@
       });
     }
 
-    window.appAuth = { signIn: signIn, signOut: signOutUser, getUser: getUser };
+    window.appAuth = { signInWithIdToken: signInWithIdToken, signOut: signOutUser, getUser: getUser };
     window.appDb = {
       pullAll: pullAll,
       pushSettings: pushSettings,
