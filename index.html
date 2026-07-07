@@ -103,13 +103,21 @@
     th, td {
       border: 1px solid #ccc;
     }
-    thead th {
+    thead tr:first-child th {
       background: #e8f4ff;
       font-weight: bold;
       text-align: center;
       position: sticky;
       top: 0;
       z-index: 10;
+    }
+    .week-year-row {
+      background: #fff;
+      text-align: center;
+      font-weight: bold;
+      font-size: 0.85rem;
+      padding: 0.3rem;
+      border-bottom: 1px solid #ccc;
     }
     tbody th.row-label {
       background: #f5f5f5;
@@ -330,6 +338,9 @@
           <th class="header-cell" contenteditable data-header="sub6">科目6</th>
           <th class="header-cell" contenteditable data-header="sub7">科目7</th>
           <th class="header-cell" contenteditable data-header="sub8">感想・振り返り</th>
+        </tr>
+        <tr>
+          <th id="weekYearLabel" class="week-year-row" colspan="9"></th>
         </tr>
       </thead>
       <tbody>
@@ -1312,6 +1323,15 @@
       var todayDate = new Date();
       todayDate.setHours(0, 0, 0, 0);
       var todayISO = toLocalISO(todayDate);
+      // 表示中の週の西暦をヘッダー直下に表示する（年をまたぐ週は両方表示する）
+      var weekYearEl = document.getElementById('weekYearLabel');
+      if (weekYearEl) {
+        var endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        weekYearEl.textContent = (startDate.getFullYear() === endDate.getFullYear())
+          ? startDate.getFullYear() + '年'
+          : startDate.getFullYear() + '年〜' + endDate.getFullYear() + '年';
+      }
       rows.forEach(function (row, idx) {
         var date = new Date(startDate);
         date.setDate(startDate.getDate() + idx);
