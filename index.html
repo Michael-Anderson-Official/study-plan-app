@@ -378,6 +378,10 @@
         <input id="googleEventTitle" type="text" style="width:100%; box-sizing:border-box; padding:0.3rem;" />
       </div>
       <div style="margin-bottom:0.5rem;">
+        <label for="googleEventLocation">場所（任意）:</label><br />
+        <input id="googleEventLocation" type="text" placeholder="例: 渋谷駅" style="width:100%; box-sizing:border-box; padding:0.3rem;" />
+      </div>
+      <div style="margin-bottom:0.5rem;">
         <label for="googleEventDate">日付:</label><br />
         <input id="googleEventDate" type="date" style="padding:0.3rem;" />
       </div>
@@ -2023,6 +2027,16 @@
       var titleSpan = document.createElement('span');
       titleSpan.className = 'google-event-title';
       titleSpan.textContent = ev.summary || '(タイトルなし)';
+      // 場所があればタイトルの下に表示し、タップでGoogleマップ検索を開く
+      if (ev.location) {
+        var locationLink = document.createElement('a');
+        locationLink.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(ev.location);
+        locationLink.target = '_blank';
+        locationLink.rel = 'noopener';
+        locationLink.textContent = '📍' + ev.location;
+        locationLink.style.cssText = 'display:block; font-size:0.75rem; color:#1e6fbf; text-decoration:none; margin-top:0.1rem;';
+        titleSpan.appendChild(locationLink);
+      }
       item.appendChild(titleSpan);
 
       var editBtn = document.createElement('button');
@@ -2086,9 +2100,11 @@
         }
       }
 
+      var locationInput = document.getElementById('googleEventLocation');
       if (ev) {
         idInput.value = ev.id;
         titleInput.value = ev.summary || '';
+        if (locationInput) locationInput.value = ev.location || '';
         if (ev.start && ev.start.dateTime) {
           var st = new Date(ev.start.dateTime);
           var et = (ev.end && ev.end.dateTime) ? new Date(ev.end.dateTime) : st;
@@ -2106,6 +2122,7 @@
       } else {
         idInput.value = '';
         titleInput.value = '';
+        if (locationInput) locationInput.value = '';
         dateInput.value = toLocalISO(new Date());
         allDayInput.checked = false;
         startInput.value = '09:00';
@@ -2168,6 +2185,8 @@
         return;
       }
       var body = { summary: title };
+      var locationVal = (document.getElementById('googleEventLocation') || {}).value || '';
+      body.location = locationVal.trim();
       if (allDay) {
         var nextDate = parseISOToDate(dateVal);
         nextDate.setDate(nextDate.getDate() + 1);
