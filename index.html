@@ -10,28 +10,68 @@
   <link rel="apple-touch-icon" href="icon-192.png" />
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
+    /* テーマ変数（二十四節気ごとにJSから上書きされる）。デフォルトは従来の青系。 */
+    :root {
+      --theme-accent: #1e90ff;       /* 主要ボタン・強調色 */
+      --theme-accent-dark: #0c78d5;  /* ボタンhover */
+      --theme-accent-text: #1e6fbf;  /* 引用文など */
+      --theme-header-bg: #f0f8ff;    /* タイトル・タブ帯の背景 */
+      --theme-table-head: #f7fbff;   /* テーブルヘッダー */
+      --theme-page-bg: #fdfdfd;      /* ページ背景（グラデーション可） */
+      --theme-today-bg: #fff8c6;     /* 今日ハイライト */
+    }
     /* 全体のスタイル */
     body {
       font-family: system-ui, -apple-system, sans-serif;
       margin: 0;
       padding: 0;
-      background: #fdfdfd;
+      background: var(--theme-page-bg);
       color: #333;
+      min-height: 100vh;
     }
     h1 {
       margin: 0;
       padding: 1rem;
       font-size: 1.3rem;
-      background-color: #f0f8ff;
+      background-color: var(--theme-header-bg);
       border-bottom: 1px solid #ccc;
       text-align: center;
     }
+    /* 現在の節気の表示 */
+    .sekki-label {
+      margin: 0.6rem 1rem 0;
+      text-align: center;
+      font-size: 0.8rem;
+      color: #666;
+    }
+    .sekki-label .sekki-name {
+      font-weight: bold;
+      font-size: 0.95rem;
+      color: var(--theme-accent-text);
+      margin-right: 0.4rem;
+    }
     .motivation-quote {
-      margin: 0.8rem 1rem 0;
+      margin: 0.4rem 1rem 0;
       text-align: center;
       font-size: 0.9rem;
       font-style: italic;
-      color: #1e6fbf;
+      color: var(--theme-accent-text);
+    }
+    /* 季節モチーフの背景装飾レイヤー。z-index:-1 で通常コンテンツの背面に固定表示する
+       （他要素のposition/z-indexを一切変更せずに済むよう、負のz-indexだけで背面に回す）。 */
+    #seasonDecoration {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+      overflow: hidden;
+    }
+    #seasonDecoration svg {
+      position: absolute;
+      opacity: 0.35;
     }
     /* 設定アイコン・設定モーダル */
     .settings-icon-btn {
@@ -204,7 +244,7 @@
       width: 12rem;
     }
     thead th {
-      background: #f7fbff;
+      background: var(--theme-table-head);
       font-weight: bold;
       text-align: center;
       position: sticky;
@@ -333,11 +373,11 @@
       color: #b13d4a;
     }
     .cell .section:focus {
-      outline: 2px solid #1e90ff;
+      outline: 2px solid var(--theme-accent);
     }
     /* ヘッダー名編集のスタイル */
     .header-cell {
-      background: #f7fbff;
+      background: var(--theme-table-head);
       color: #1f5793;
       font-size: 0.72rem;
       word-break: keep-all;
@@ -358,11 +398,11 @@
       cursor: text;
     }
     .header-cell:focus {
-      outline: 2px solid #1e90ff;
+      outline: 2px solid var(--theme-accent);
     }
     /* 今日の日付行の強調表示 */
     .row-label.today {
-      background-color: #fff8c6; /* 薄い黄色でハイライト */
+      background-color: var(--theme-today-bg);
       font-weight: bold;
     }
     /* ボタン */
@@ -373,7 +413,7 @@
     button {
       padding: 0.5rem 1rem;
       font-size: 0.9rem;
-      background: #1e90ff;
+      background: var(--theme-accent);
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -381,27 +421,27 @@
       touch-action: manipulation;
     }
     button:hover {
-      background: #0c78d5;
+      background: var(--theme-accent-dark);
     }
     .btn-outline {
       background: #fff;
-      color: #1e90ff;
-      border: 1px solid #1e90ff;
+      color: var(--theme-accent);
+      border: 1px solid var(--theme-accent);
     }
     .btn-outline:hover {
-      background: #f0f8ff;
+      background: var(--theme-header-bg);
     }
     /* 表示切り替えタブ */
     .view-tabs {
       text-align: center;
       padding: 0.6rem 0;
-      background: #f0f8ff;
+      background: var(--theme-header-bg);
       border-bottom: 1px solid #ccc;
     }
     .tab-btn {
       background: #fff;
-      color: #1e90ff;
-      border: 1px solid #1e90ff;
+      color: var(--theme-accent);
+      border: 1px solid var(--theme-accent);
       border-radius: 4px;
       padding: 0.5rem 1.2rem;
       margin: 0 0.3rem;
@@ -409,7 +449,7 @@
       cursor: pointer;
     }
     .tab-btn.active {
-      background: #1e90ff;
+      background: var(--theme-accent);
       color: #fff;
     }
     /* 今日やることタブ: 教材リストと○×ボタン */
@@ -476,8 +516,10 @@
   </style>
 </head>
 <body>
+  <div id="seasonDecoration" aria-hidden="true"></div>
   <button id="settingsBtn" type="button" class="settings-icon-btn" aria-label="設定">⚙️</button>
   <h1>一週間の計画帳</h1>
+  <p id="sekkiLabel" class="sekki-label"></p>
   <p id="motivationQuote" class="motivation-quote"></p>
   <!-- 表示切り替えタブ -->
   <div class="view-tabs">
@@ -1005,6 +1047,125 @@
       var quoteEl = document.getElementById('motivationQuote');
       if (quoteEl) quoteEl.textContent = pickRandomQuote();
     })();
+
+    // ---- 二十四節気テーマ ----
+    // 各節気のおおよその開始日（月, 日）。年によって±1日ずれるが、テーマ切り替え用途では十分な精度。
+    // theme: [ページ背景, ヘッダー背景, テーブルヘッダー, アクセント, アクセント濃, アクセント文字, 今日ハイライト]
+    // motif: 背景に散りばめる季節モチーフの種類
+    var SEKKI_TABLE = [
+      { m: 1,  d: 5,  name: '小寒', desc: '寒さが本格化するころ', motif: 'snow',    theme: ['linear-gradient(180deg,#f4f7fb,#e8eef7)', '#e3ebf5', '#d8e4f2', '#5b7fa6', '#48688c', '#4a6b91', '#eef3fa'] },
+      { m: 1,  d: 20, name: '大寒', desc: '一年で最も寒いころ',   motif: 'snow',    theme: ['linear-gradient(180deg,#f2f5fa,#e2e9f3)', '#dde7f2', '#d1deee', '#4f7196', '#3e5b7d', '#426083', '#eaf1f9'] },
+      { m: 2,  d: 4,  name: '立春', desc: '暦の上で春が始まるころ', motif: 'plum',  theme: ['linear-gradient(180deg,#fdf6f8,#f9e9ee)', '#f8e7ed', '#f4dce4', '#c96f8e', '#b25a79', '#b05e7d', '#fdf0f4'] },
+      { m: 2,  d: 19, name: '雨水', desc: '雪が雨に変わり氷がとけるころ', motif: 'rain', theme: ['linear-gradient(180deg,#f5f8f8,#e9f1f1)', '#e6f0f0', '#daeaea', '#5f9494', '#4c7d7d', '#518383', '#eff6f6'] },
+      { m: 3,  d: 6,  name: '啓蟄', desc: '土の中の虫が動き出すころ', motif: 'sprout', theme: ['linear-gradient(180deg,#f7faf3,#edf4e4)', '#ecf3e1', '#e2eed3', '#7d9c53', '#66823f', '#6c8a47', '#f3f8ec'] },
+      { m: 3,  d: 21, name: '春分', desc: '昼と夜の長さがほぼ同じになるころ', motif: 'sakura', theme: ['linear-gradient(180deg,#fdf5f7,#fbe8ee)', '#fae7ee', '#f7dbe6', '#d4738f', '#bc5e7a', '#c0627e', '#fdeff4'] },
+      { m: 4,  d: 5,  name: '清明', desc: '万物が清らかで生き生きするころ', motif: 'sakura', theme: ['linear-gradient(180deg,#fcf7f4,#f8ecea)', '#f9ebe9', '#f5e0dd', '#cd7d72', '#b5675c', '#b96b60', '#fcf1ef'] },
+      { m: 4,  d: 20, name: '穀雨', desc: '穀物をうるおす春の雨が降るころ', motif: 'rain', theme: ['linear-gradient(180deg,#f4f8f6,#e7f1ec)', '#e5f0ea', '#d8eae1', '#5e9b7f', '#4b8368', '#50896d', '#eef5f1'] },
+      { m: 5,  d: 6,  name: '立夏', desc: '暦の上で夏が始まるころ', motif: 'leaf',  theme: ['linear-gradient(180deg,#f5faf5,#e8f4e6)', '#e7f3e4', '#daedd6', '#5d9e58', '#4a8546', '#4f8b4b', '#eff7ed'] },
+      { m: 5,  d: 21, name: '小満', desc: '草木が茂り天地に満ち始めるころ', motif: 'leaf', theme: ['linear-gradient(180deg,#f3f9f2,#e4f2e1)', '#e3f1df', '#d5ebd0', '#4f9a4e', '#3e813d', '#438741', '#ecf6ea'] },
+      { m: 6,  d: 6,  name: '芒種', desc: '稲や麦など穂の出る作物を植えるころ', motif: 'rice', theme: ['linear-gradient(180deg,#f7f9ef,#eef3dd)', '#edf2db', '#e4ecca', '#8a9a3d', '#727f30', '#788534', '#f3f6e6'] },
+      { m: 6,  d: 21, name: '夏至', desc: '一年で昼が最も長いころ', motif: 'sun',   theme: ['linear-gradient(180deg,#fbf8ee,#f6efd8)', '#f7efd6', '#f2e7c2', '#c09b3a', '#a5822c', '#ab8830', '#faf4e2'] },
+      { m: 7,  d: 7,  name: '小暑', desc: '梅雨が明け暑さが本番に向かうころ', motif: 'sun', theme: ['linear-gradient(180deg,#fdf8ec,#fbefd3)', '#fbefd2', '#f8e7bc', '#cf9a2c', '#b48320', '#ba8924', '#fdf4dd'] },
+      { m: 7,  d: 23, name: '大暑', desc: '一年で最も暑いころ',   motif: 'wave',   theme: ['linear-gradient(180deg,#f0f8fc,#ddeff8)', '#dcedf7', '#cce5f3', '#3d8fbe', '#3078a3', '#3480ab', '#e7f3fa'] },
+      { m: 8,  d: 8,  name: '立秋', desc: '暦の上で秋が始まるころ', motif: 'wind',  theme: ['linear-gradient(180deg,#f9f7f2,#f2ede1)', '#f2ece0', '#ece4d1', '#a08349', '#87703c', '#8d7540', '#f6f1e7'] },
+      { m: 8,  d: 23, name: '処暑', desc: '暑さが峠を越えて和らぐころ', motif: 'wind', theme: ['linear-gradient(180deg,#f8f6f0,#efeadd)', '#efe9db', '#e8dfcb', '#997c42', '#816836', '#876d3a', '#f4efe3'] },
+      { m: 9,  d: 8,  name: '白露', desc: '草花に朝露が宿り始めるころ', motif: 'grass', theme: ['linear-gradient(180deg,#f4f8f7,#e6efee)', '#e5eeec', '#d7e7e5', '#548e88', '#437672', '#487c77', '#edf4f3'] },
+      { m: 9,  d: 23, name: '秋分', desc: '昼と夜の長さがほぼ同じになるころ', motif: 'higanbana', theme: ['linear-gradient(180deg,#fbf4f2,#f6e6e1)', '#f7e6e1', '#f2dad2', '#c26a51', '#a85641', '#ae5a45', '#faece7'] },
+      { m: 10, d: 8,  name: '寒露', desc: '朝晩の冷え込みが増すころ', motif: 'moon', theme: ['linear-gradient(180deg,#f5f5f9,#e9e9f2)', '#e8e8f1', '#dcdcea', '#6f6fa3', '#5a5a8a', '#5f5f8f', '#f0f0f6'] },
+      { m: 10, d: 23, name: '霜降', desc: '朝霜が降り始めるころ', motif: 'momiji', theme: ['linear-gradient(180deg,#fbf4ee,#f6e6d8)', '#f7e6d7', '#f2dac6', '#c07940', '#a56331', '#ab6935', '#faecd9'] },
+      { m: 11, d: 7,  name: '立冬', desc: '暦の上で冬が始まるころ', motif: 'momiji', theme: ['linear-gradient(180deg,#f8f4f0,#efe7dd)', '#f0e7dc', '#e9dcc9', '#9c7040', '#836034', '#896638', '#f5eee4'] },
+      { m: 11, d: 22, name: '小雪', desc: 'わずかに雪が降り始めるころ', motif: 'snow', theme: ['linear-gradient(180deg,#f6f8fa,#e9eef4)', '#e8edf3', '#dce4ee', '#6b83a0', '#566d88', '#5b728d', '#f0f4f8'] },
+      { m: 12, d: 7,  name: '大雪', desc: '本格的に雪が降り出すころ', motif: 'snow', theme: ['linear-gradient(180deg,#f3f6fa,#e4ebf4)', '#e3eaf3', '#d6e1ee', '#54749b', '#425e81', '#476386', '#ecf1f8'] },
+      { m: 12, d: 22, name: '冬至', desc: '一年で夜が最も長いころ', motif: 'moon',  theme: ['linear-gradient(180deg,#f4f4f8,#e6e6ef)', '#e6e6ef', '#d9d9e7', '#63639b', '#4f4f82', '#545487', '#eeeef5'] }
+    ];
+
+    // 今日がどの節気に当たるかを返す
+    function getCurrentSekki() {
+      var now = new Date();
+      var m = now.getMonth() + 1;
+      var d = now.getDate();
+      var current = SEKKI_TABLE[SEKKI_TABLE.length - 1]; // 年始（1/1〜1/4）は前年の冬至扱い
+      for (var i = 0; i < SEKKI_TABLE.length; i++) {
+        var s = SEKKI_TABLE[i];
+        if (m > s.m || (m === s.m && d >= s.d)) current = s;
+      }
+      return current;
+    }
+
+    // 節気テーマを画面に適用する
+    function applySekkiTheme() {
+      var sekki = getCurrentSekki();
+      var t = sekki.theme;
+      var root = document.documentElement;
+      root.style.setProperty('--theme-page-bg', t[0]);
+      root.style.setProperty('--theme-header-bg', t[1]);
+      root.style.setProperty('--theme-table-head', t[2]);
+      root.style.setProperty('--theme-accent', t[3]);
+      root.style.setProperty('--theme-accent-dark', t[4]);
+      root.style.setProperty('--theme-accent-text', t[5]);
+      root.style.setProperty('--theme-today-bg', t[6]);
+      var labelEl = document.getElementById('sekkiLabel');
+      if (labelEl) {
+        labelEl.innerHTML = '';
+        var nameSpan = document.createElement('span');
+        nameSpan.className = 'sekki-name';
+        nameSpan.textContent = sekki.name;
+        labelEl.appendChild(nameSpan);
+        labelEl.appendChild(document.createTextNode(sekki.desc));
+      }
+      renderSeasonDecoration(sekki.motif);
+    }
+
+    // 季節モチーフのSVGパス定義。viewBox 0 0 24 24 で描く簡易アイコン。
+    var MOTIF_SVGS = {
+      sakura: '<path d="M12 2c1.5 2 1.2 4-.2 5.4C13.4 6.2 15.4 6 17 7.5c-2 .8-3 2.4-2.7 4.4 1.7-1 3.7-.8 5 .8-2.2.4-3.5 1.8-3.6 3.8-1.5-1.3-3.4-1.5-5-.3.7 1.9.1 3.8-1.7 5-.3-2.2-1.6-3.6-3.6-4 1.3-1.6 1.4-3.5.3-5.2 2-.3 3.3-1.5 3.8-3.5.9 1.8 2.5 2.7 4.5 2.4C12.6 8.5 11.6 6.7 12 4.6c0 0 0-2.6 0-2.6z" fill="currentColor" opacity=".8"/><circle cx="12" cy="12" r="2" fill="currentColor"/>',
+      plum: '<circle cx="12" cy="7" r="3" fill="currentColor"/><circle cx="7" cy="11" r="3" fill="currentColor"/><circle cx="17" cy="11" r="3" fill="currentColor"/><circle cx="9" cy="16" r="3" fill="currentColor"/><circle cx="15" cy="16" r="3" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="#fff"/>',
+      snow: '<path d="M12 2v20M4 6l16 12M20 6L4 18M12 6l-2-2M12 6l2-2M12 18l-2 2M12 18l2 2M7 8l-2.7-.7M7 16l-2.7.7M17 8l2.7-.7M17 16l2.7.7" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/>',
+      rain: '<path d="M8 2v4M12 4v4M16 2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M6 14c0-3 2.5-4.5 6-4.5s6 1.5 6 4.5-2.5 5-6 5-6-2-6-5z" fill="currentColor" opacity=".6"/>',
+      sprout: '<path d="M12 22V10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 12C12 7 9 5 4 5c0 5 3 7 8 7zM12 9c0-4 2.5-6 7-6 0 4.5-2.5 6.5-7 6.5z" fill="currentColor" opacity=".8"/>',
+      leaf: '<path d="M20 4C10 4 5 9 4 20c11-1 16-6 16-16z" fill="currentColor" opacity=".7"/><path d="M4 20C9 15 14 10 20 4" stroke="#fff" stroke-width="1" fill="none" opacity=".6"/>',
+      rice: '<path d="M12 22V8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M12 8c-1-3-3-4-6-4 .5 3 2.5 4.5 6 4zM12 8c1-3 3-4 6-4-.5 3-2.5 4.5-6 4zM12 13c-1-2.5-2.7-3.5-5.5-3.5.5 2.7 2.3 4 5.5 3.5zM12 13c1-2.5 2.7-3.5 5.5-3.5-.5 2.7-2.3 4-5.5 3.5z" fill="currentColor" opacity=".75"/>',
+      sun: '<circle cx="12" cy="12" r="5" fill="currentColor" opacity=".8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+      wave: '<path d="M2 12c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3M2 18c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>',
+      wind: '<path d="M3 8h11a3 3 0 1 0-3-3M3 13h15a3 3 0 1 1-3 3M3 18h8a2.5 2.5 0 1 1-2.5 2.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>',
+      grass: '<path d="M6 22c0-6-2-9-4-11 4 .5 6 3 7 6 0-7-1.5-11-4-14 5 2 7 7 7 13 1-6 3-9 6-11-2 4-2.5 8-2 12 1.5-3 3.5-4.5 6-5-2.5 3-3 6-3 10z" fill="currentColor" opacity=".7"/>',
+      higanbana: '<path d="M12 22v-8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12 14c-4-1-7-4-8-8 3 .5 5 2 6 4-1-3-1-5 0-8 1.5 2.5 2 5 2 8 0-3 .5-5.5 2-8 1 3 1 5 0 8 1-2 3-3.5 6-4-1 4-4 7-8 8z" fill="currentColor" opacity=".75"/>',
+      momiji: '<path d="M12 2l1.5 4L17 4l-1 3.5L20 8l-3 2.5 3.5 2-4 1 1.5 3.5-4-1.5L12 20l-2-4.5-4 1.5L7.5 13l-4-1L7 10 4 8l4-.5L7 4l3.5 2z" fill="currentColor" opacity=".75"/>',
+      moon: '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z" fill="currentColor" opacity=".8"/><circle cx="17" cy="6" r="1" fill="currentColor"/><circle cx="20" cy="9" r=".7" fill="currentColor"/>'
+    };
+
+    // モチーフを画面全体に散りばめる。位置は日付を種に固定し、同じ日は同じ配置になるようにする。
+    function renderSeasonDecoration(motif) {
+      var container = document.getElementById('seasonDecoration');
+      if (!container) return;
+      container.innerHTML = '';
+      var pathData = MOTIF_SVGS[motif];
+      if (!pathData) return;
+      var seedStr = toLocalISO(new Date());
+      var seed = 0;
+      for (var i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) % 100000;
+      function nextRand() {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        return seed / 2147483648;
+      }
+      var count = 14;
+      for (var n = 0; n < count; n++) {
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        var size = 18 + Math.floor(nextRand() * 30);
+        svg.setAttribute('width', size);
+        svg.setAttribute('height', size);
+        svg.style.left = (nextRand() * 92) + '%';
+        svg.style.top = (nextRand() * 92) + '%';
+        svg.style.color = 'var(--theme-accent)';
+        svg.style.transform = 'rotate(' + Math.floor(nextRand() * 360) + 'deg)';
+        svg.innerHTML = pathData;
+        container.appendChild(svg);
+      }
+    }
+
+    // 起動時に現在の節気テーマを適用する（toLocalISO等の関数宣言は巻き上げにより参照可能）
+    applySekkiTheme();
 
     // 指定した日時をローカルタイムゾーンの ISO YYYY-MM-DD 形式に変換するヘルパー
     function toLocalISO(date) {
