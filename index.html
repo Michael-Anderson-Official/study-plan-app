@@ -75,6 +75,35 @@
       position: absolute;
       opacity: 0.35;
     }
+    /* 節気切り替わり日のスプラッシュ表示。タップまたは数秒で自動的に消える */
+    #sekkiSplash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 4000;
+      background-size: cover;
+      background-position: center;
+      opacity: 0;
+      transition: opacity 0.7s ease;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      cursor: pointer;
+    }
+    #sekkiSplash.visible {
+      opacity: 1;
+    }
+    #sekkiSplash .sekki-splash-label {
+      margin-bottom: 2.4rem;
+      padding: 0.45rem 1.3rem;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 999px;
+      font-size: 0.92rem;
+      color: #333;
+      letter-spacing: 0.05em;
+    }
     /* 設定アイコン・設定モーダル */
     .settings-icon-btn {
       position: fixed;
@@ -1332,8 +1361,23 @@
       { m: 12, d: 22, name: '冬至', desc: '一年で夜が最も長いころ', motif: 'moon',  theme: ['linear-gradient(180deg,#f4f4f8,#e6e6ef)', '#e6e6ef', '#d9d9e7', '#63639b', '#4f4f82', '#545487', '#eeeef5'] }
     ];
 
+    // 節気ごとの背景写真。画像が用意できた節気から順にここへ追加する。
+    // 追加方法: img/sekki/ にJPEG（長辺1600px程度・200KB前後に圧縮）を置き、ここに1行足すだけ。
+    var SEKKI_IMAGES = {
+      '立春': 'img/sekki/risshun.jpg',
+      '雨水': 'img/sekki/usui.jpg'
+    };
+
     // 今日がどの節気に当たるかを返す
     function getCurrentSekki() {
+      // URLに ?sekki=立春 のように付けると、その節気を強制表示できる（画像・配色・スプラッシュのプレビュー用）
+      var previewMatch = location.search.match(/[?&]sekki=([^&]+)/);
+      if (previewMatch) {
+        var wanted = decodeURIComponent(previewMatch[1]);
+        for (var j = 0; j < SEKKI_TABLE.length; j++) {
+          if (SEKKI_TABLE[j].name === wanted) return SEKKI_TABLE[j];
+        }
+      }
       var now = new Date();
       var m = now.getMonth() + 1;
       var d = now.getDate();
@@ -1366,7 +1410,62 @@
         labelEl.appendChild(nameSpan);
         labelEl.appendChild(document.createTextNode(sekki.desc));
       }
-      renderSeasonDecoration(sekki.motif);
+      // 背景写真がある節気は写真を敷き、SVGモチーフは省略する（重ねると騒がしいため）
+      var hasPhoto = applySekkiPhoto(sekki);
+      renderSeasonDecoration(hasPhoto ? null : sekki.motif);
+      maybeShowSekkiSplash(sekki);
+    }
+
+    // 節気の背景写真を #seasonDecoration に敷く。白の半透明を重ねて表の読みやすさを保つ。
+    // 写真が無い節気では何もせず false を返す（従来のSVGモチーフにフォールバック）。
+    function applySekkiPhoto(sekki) {
+      var container = document.getElementById('seasonDecoration');
+      if (!container) return false;
+      var img = SEKKI_IMAGES[sekki.name];
+      if (!img) {
+        container.style.backgroundImage = '';
+        return false;
+      }
+      container.style.backgroundImage = 'linear-gradient(rgba(253,253,253,0.78), rgba(253,253,253,0.78)), url("' + img + '")';
+      container.style.backgroundSize = 'cover';
+      container.style.backgroundPosition = 'center top';
+      return true;
+    }
+
+    // 節気が切り替わって最初にアプリを開いたとき、その節気の写真を全画面で数秒見せる。
+    // 表示済みかどうかは端末ローカルの 'sekki-splash-seen' に記録する（クラウド同期対象外）。
+    // ?sekki= プレビュー中は毎回表示する。
+    function maybeShowSekkiSplash(sekki) {
+      var img = SEKKI_IMAGES[sekki.name];
+      if (!img) return;
+      var isPreview = /[?&]sekki=/.test(location.search);
+      if (!isPreview && localStorage.getItem('sekki-splash-seen') === sekki.name) return;
+      localStorage.setItem('sekki-splash-seen', sekki.name);
+      var overlay = document.createElement('div');
+      overlay.id = 'sekkiSplash';
+      overlay.style.backgroundImage = 'url("' + img + '")';
+      var label = document.createElement('div');
+      label.className = 'sekki-splash-label';
+      label.textContent = sekki.name + '　' + sekki.desc;
+      overlay.appendChild(label);
+      var dismissed = false;
+      function dismissSplash() {
+        if (dismissed) return;
+        dismissed = true;
+        overlay.classList.remove('visible');
+        setTimeout(function () {
+          if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        }, 700);
+      }
+      overlay.addEventListener('click', dismissSplash);
+      document.body.appendChild(overlay);
+      // 追加直後にクラスを付けるとtransitionが効かないため、1フレーム待ってから表示する
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          overlay.classList.add('visible');
+        });
+      });
+      setTimeout(dismissSplash, 3800);
     }
 
     // 季節モチーフのSVGパス定義。viewBox 0 0 24 24 で描く簡易アイコン。
