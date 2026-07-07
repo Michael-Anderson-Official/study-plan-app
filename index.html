@@ -355,6 +355,10 @@
       <button id="googleSignInBtn" type="button">Googleでサインイン</button>
       <button id="googleSyncBtn" type="button" style="display:none;">今すぐ同期</button>
       <button id="googleAddEventBtn" type="button" style="display:none; margin-left:0.5rem;">＋予定を追加</button>
+      <div id="googleCalendarSelectRow" style="display:none; margin-top:0.5rem;">
+        <label for="googleCalendarSelect" style="font-size:0.85rem;">カレンダー:</label>
+        <select id="googleCalendarSelect" style="padding:0.3rem; margin-left:0.3rem; max-width:70%;"></select>
+      </div>
       <p id="googleSyncStatus" style="font-size:0.8rem; color:#666;"></p>
     </div>
     <div id="googleEventList"></div>
@@ -710,10 +714,13 @@
     // Googleカレンダー連携用の設定。GOOGLE_CLIENT_ID は Google Cloud Console で
     // OAuthクライアントIDを作成した後、そのIDに書き換えてください（秘密情報ではありません）。
     var GOOGLE_CLIENT_ID = '313439643849-h299dp5h354joksqhuegfp4s89oc2dkd.apps.googleusercontent.com';
-    var GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+    // calendar.events: 予定の読み書き / calendar.calendarlist.readonly: カレンダー一覧の取得
+    var GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly';
     var googleTokenClient = null;
     var googleAccessToken = null;
     var googleEvents = [];
+    // 使用するカレンダーのID。選択内容は localStorage に保存して次回も引き継ぐ。
+    var googleCalendarId = localStorage.getItem('google-calendar-id') || 'primary';
 
     // 2026年の日本の祝日一覧。赤字表示の対象となります。
     const holidays2026 = new Set([
@@ -1824,15 +1831,62 @@
       var signInBtn = document.getElementById('googleSignInBtn');
       var syncBtn = document.getElementById('googleSyncBtn');
       var addBtn = document.getElementById('googleAddEventBtn');
+      var calSelectRow = document.getElementById('googleCalendarSelectRow');
       var signedIn = !!googleAccessToken;
       if (signInBtn) signInBtn.style.display = signedIn ? 'none' : '';
       if (syncBtn) syncBtn.style.display = signedIn ? '' : 'none';
       if (addBtn) addBtn.style.display = signedIn ? '' : 'none';
+      if (calSelectRow) calSelectRow.style.display = signedIn ? '' : 'none';
+    }
+
+    // 使用可能なカレンダーの一覧を取得してセレクトボックスに反映する
+    function fetchGoogleCalendarList() {
+      if (!googleAccessToken) return;
+      var selectEl = document.getElementById('googleCalendarSelect');
+      if (!selectEl) return;
+      fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+        headers: { Authorization: 'Bearer ' + googleAccessToken }
+      })
+        .then(function (res) {
+          if (!res.ok) throw new Error('カレンダー一覧の取得に失敗しました。');
+          return res.json();
+        })
+        .then(function (data) {
+          var items = data.items || [];
+          selectEl.innerHTML = '';
+          var found = false;
+          items.forEach(function (cal) {
+            // 書き込みできないカレンダー（購読カレンダー等）は編集不可なので「(閲覧のみ)」を付ける
+            var writable = cal.accessRole === 'owner' || cal.accessRole === 'writer';
+            var opt = document.createElement('option');
+            opt.value = cal.id;
+            opt.textContent = (cal.summary || cal.id) + (writable ? '' : '（閲覧のみ）');
+            if (cal.id === googleCalendarId || (googleCalendarId === 'primary' && cal.primary)) {
+              opt.selected = true;
+              found = true;
+            }
+            selectEl.appendChild(opt);
+          });
+          // 保存されていたカレンダーが一覧に無くなっていた場合はprimaryに戻す
+          if (!found && items.length > 0) {
+            googleCalendarId = 'primary';
+            localStorage.setItem('google-calendar-id', googleCalendarId);
+            var primaryItem = items.filter(function (c) { return c.primary; })[0];
+            if (primaryItem) selectEl.value = primaryItem.id;
+          }
+        })
+        .catch(function () {
+          // 一覧が取れなくてもprimaryでの動作は継続できるため、エラー表示はしない
+        });
     }
 
     function onGoogleCalendarTabShown() {
       updateGoogleSignInUI();
-      if (googleAccessToken) fetchGoogleEvents();
+      if (googleAccessToken) {
+        var selectEl = document.getElementById('googleCalendarSelect');
+        if (selectEl && selectEl.options.length === 0) fetchGoogleCalendarList();
+        fetchGoogleEvents();
+      }
     }
 
     // 週送り・今週へボタンでも、Googleカレンダータブを表示中なら予定を再取得する
@@ -1850,6 +1904,7 @@
           if (response && response.access_token) {
             googleAccessToken = response.access_token;
             updateGoogleSignInUI();
+            fetchGoogleCalendarList();
             fetchGoogleEvents();
           } else if (statusEl) {
             statusEl.textContent = 'サインインできませんでした。';
@@ -1880,7 +1935,7 @@
       var statusEl = document.getElementById('googleSyncStatus');
       if (statusEl) statusEl.textContent = '同期中...';
       var range = getGoogleWeekRange();
-      var url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+      var url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events'
         + '?timeMin=' + encodeURIComponent(range.timeMin)
         + '&timeMax=' + encodeURIComponent(range.timeMax)
         + '&singleEvents=true&orderBy=startTime';
@@ -2024,7 +2079,7 @@
     }
 
     function createGoogleEvent(body) {
-      return fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+      return fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events', {
         method: 'POST',
         headers: {
           Authorization: 'Bearer ' + googleAccessToken,
@@ -2038,7 +2093,7 @@
     }
 
     function updateGoogleEvent(id, body) {
-      return fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events/' + encodeURIComponent(id), {
+      return fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events/' + encodeURIComponent(id), {
         method: 'PATCH',
         headers: {
           Authorization: 'Bearer ' + googleAccessToken,
@@ -2052,7 +2107,7 @@
     }
 
     function deleteGoogleEvent(id) {
-      return fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events/' + encodeURIComponent(id), {
+      return fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events/' + encodeURIComponent(id), {
         method: 'DELETE',
         headers: { Authorization: 'Bearer ' + googleAccessToken }
       }).then(function (res) {
@@ -2099,6 +2154,15 @@
 
     var googleSyncBtn = document.getElementById('googleSyncBtn');
     if (googleSyncBtn) googleSyncBtn.addEventListener('click', fetchGoogleEvents);
+
+    var googleCalendarSelect = document.getElementById('googleCalendarSelect');
+    if (googleCalendarSelect) {
+      googleCalendarSelect.addEventListener('change', function () {
+        googleCalendarId = googleCalendarSelect.value;
+        localStorage.setItem('google-calendar-id', googleCalendarId);
+        fetchGoogleEvents();
+      });
+    }
 
     var googleAddEventBtn = document.getElementById('googleAddEventBtn');
     if (googleAddEventBtn) {
