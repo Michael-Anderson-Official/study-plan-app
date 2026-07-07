@@ -845,6 +845,7 @@
       <!-- 目次や単位を自由に入力できる欄。各行ごとに1項目を入力する。 -->
       <label for="tocInput">目次／単位リスト（各行に1項目）:</label><br/>
       <textarea id="tocInput" rows="5" style="padding:0.3rem; width:90%; max-width:400px;"></textarea>
+      <p id="materialDetailStatus" class="isbn-status"></p>
     </div>
     <button id="saveDetailBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">保存</button>
     <button id="dailyScheduleBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">毎日</button>
@@ -942,6 +943,7 @@
     var isbnScanTimer = null;
     var isbnDetectedBook = null;
     var zxingReader = null; // Safari等 BarcodeDetector 非対応時のフォールバック用リーダー
+    var tocFetchAttempted = {}; // ISBNごとに目次自動取得を1回だけ試すための記録
 
     // 通知用の設定。
     var NOTIFY_WORKER_URL = 'https://keikakuchou-notify.keikakuchou-app.workers.dev';
@@ -1706,6 +1708,30 @@
       status.style.color = isError ? '#b00020' : '#666';
     }
 
+    function setMaterialDetailStatus(message, isError) {
+      var status = document.getElementById('materialDetailStatus');
+      if (!status) return;
+      status.textContent = message || '';
+      status.style.color = isError ? '#b00020' : '#666';
+    }
+
+    // ISBNが分かっている教材について、hanmoto.comの目次データをWorker経由で自動取得する。
+    // 目次欄が空のときだけ埋める（手入力・保存済みの内容は上書きしない）。ISBNごとに1回だけ試みる。
+    function tryAutoFillToc(idx, isbn) {
+      if (!isbn || tocFetchAttempted[isbn]) return;
+      tocFetchAttempted[isbn] = true;
+      fetch(NOTIFY_WORKER_URL + '/toc?isbn=' + encodeURIComponent(isbn))
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (data) {
+          if (!data || !data.toc || currentMaterialIndex !== idx) return;
+          var tocInput = document.getElementById('tocInput');
+          if (!tocInput || tocInput.value.trim()) return;
+          tocInput.value = data.toc;
+          setMaterialDetailStatus('目次を自動取得しました（hanmoto.comより）。内容を確認して保存してください。');
+        })
+        .catch(function () {});
+    }
+
     function setText(id, value) {
       var el = document.getElementById(id);
       if (el) el.textContent = value || '';
@@ -2095,8 +2121,13 @@
           tocInput.value = '';
         }
       }
+      setMaterialDetailStatus('');
       renderBookMeta(detail);
       detailDiv.style.display = 'block';
+      // ISBN付き教材で目次が未入力なら、hanmoto.comから自動取得を試みる
+      if (detail && detail.isbn && (!detail.tocList || !detail.tocList.length)) {
+        tryAutoFillToc(idx, detail.isbn);
+      }
     }
 
     // 詳細保存処理

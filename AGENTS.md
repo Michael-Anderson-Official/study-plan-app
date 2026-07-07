@@ -46,6 +46,7 @@
 - 現在のWorkerはKVキー `subscription` に1件だけ保存する設計。複数ユーザー/複数端末対応ではここを変更する。
 - Google OAuth client IDは公開情報。access tokenは実行時に `localStorage` の `google-token` に短時間保存されるだけで、リポジトリに含めない。
 - ISBN/バーコード教材追加はまずブラウザ標準の `BarcodeDetector` を試す。Safari等の非対応ブラウザでは、CDN読み込みの `@zxing/library`（`window.ZXing`）にフォールバックする。どちらも使えない環境ではISBN手入力を使う。書籍情報は openBD を先に見て、見つからない場合に Google Books の公開検索へフォールバックする。APIキーや秘密情報は使わない。
+- 目次（目次／単位リスト）の自動取得は、openBD/Google Booksに構造化データが無いため、Worker側の `GET /toc?isbn=...` が版元ドットコム（hanmoto.com）のHTMLを取得・解析して返す（非公式スクレイピング、`worker/worker.js` の `handleToc`）。ブラウザは直接hanmoto.comへfetchしない（CORS拒否されるため）。教材詳細を開いたときにISBNがあり目次未入力なら `index.html` の `tryAutoFillToc()` がこのWorkerエンドポイントを呼ぶ。hanmoto.comのHTML構造変更に弱い点に注意する。
 
 ## UI確認時の注意
 

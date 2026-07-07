@@ -1,6 +1,6 @@
 # HANDOFF.md
 
-最終更新: 2026-07-07（Claude Codeが二十四節気テーマを追加）
+最終更新: 2026-07-07（Claude Codeがスキャン教材の目次自動取得を追加）
 
 ## アプリの目的
 
@@ -57,6 +57,7 @@
 - 節気ごとに紐づく季節モチーフ（桜・梅・雪・雨・双葉・紅葉・稲穂・満月など14種、`MOTIF_SVGS`）をインラインSVGで生成し、`#seasonDecoration`（`position:fixed; z-index:-1; pointer-events:none`）に散りばめる。配置は当日の日付を種にした疑似乱数で決めるため、同じ日はリロードしても同じ配置になる。
 - 節気テーマ・季節モチーフはlocalStorageに新しいキーを追加しない（既存の日付計算から都度算出するだけ）。
 - ISBN/バーコード読み取りに、Safari等 `BarcodeDetector` 非対応ブラウザ向けのフォールバックとして `@zxing/library`（CDN読み込み、`window.ZXing`）を追加した。`startIsbnScan()` はネイティブ`BarcodeDetector`→ZXing→非対応メッセージの順で分岐する。`canScanBarcode()` で両方の対応状況をまとめて判定する。
+- Worker（`keikakuchou-notify`）に `GET /toc?isbn=...` を追加した。openBD/Google Booksには目次データが無いため、版元ドットコム（hanmoto.com）の書籍ページ（`https://www.hanmoto.com/bd/isbn/{ISBN}`）をWorker側で取得し、`HTMLRewriter` で `div[data-book-contents-name="toc"] p`（と中の `br`）から目次テキストを抽出してJSON `{ toc, source, isbn }` で返す。ブラウザから直接hanmoto.comへfetchするとCORSで拒否されるが、Worker〜hanmoto.com間はサーバー間通信なのでCORSの対象外という前提で実装した。`index.html` 側は `tryAutoFillToc(idx, isbn)` が教材詳細を開いたとき（ISBN付きかつ目次未入力の場合）にこのエンドポイントを呼び、取得できれば目次入力欄を自動で埋める（ユーザーが手入力済みなら上書きしない）。ISBNごとに1回だけ試みる（`tocFetchAttempted`、ページ内メモリのみ、`localStorage`には保存しない）。
 
 ## 直近でCodexが変更した内容
 
@@ -118,6 +119,9 @@
 - 実カメラでバーコードを読み取れるか（ネイティブ・ZXing両方）。
 - 公開URLでopenBD/Google Booksから期待通り取得できるか。
 - SafariでのZXingフォールバックが実機で期待通り動くか。unpkg CDNが将来メジャーバージョンを上げた場合の互換性（現在 `@zxing/library@0.23.0` に固定）。
+- `/toc` エンドポイントのCloudflare本番デプロイ（`worker.js` 更新分の反映）。
+- 実際のISBNで `/toc` が目次を返し、教材詳細の目次欄に自動反映されるかの公開URL上での実操作。TOCが無い書籍・hanmoto.comにページが無いISBNでの動作（`{ toc: null }` を返してエラーにならないこと）。
+- hanmoto.comのHTML構造が変わった場合、`div[data-book-contents-name="toc"]` セレクタが壊れて目次が取れなくなる可能性がある。非公式スクレイピングであることに留意する。
 
 ### PC版で教材追加ボタンが動かない問題
 
@@ -250,6 +254,7 @@
 - Workerは単一購読設計。
 - `BarcodeDetector` はブラウザ対応差がある。Safari等の非対応環境ではCDN読み込みの `ZXing`（`@zxing/library@0.23.0`）にフォールバックする。両方使えない環境ではISBN手入力を使う。
 - openBD/Google Booksの公開API仕様、CORS、レート制限に依存する。APIキーや秘密情報は使っていない。Google Booksが429を返す場合は、検索失敗ではなく取得失敗として扱う。
+- 目次自動取得（`/toc`）は非公式スクレイピング。hanmoto.comの公式APIではなくHTML構造に依存しているため、サイト改修で無言で取れなくなる可能性がある。取得失敗時は静かに諦める設計（エラー表示せず、手入力のまま）。
 
 ## 次にやるべき作業
 
@@ -262,6 +267,7 @@
 
 優先度中:
 
+- Worker `/toc` エンドポイントをCloudflareへデプロイし、実際のISBNで目次自動取得を実機確認する。
 - ISBN手入力とバーコード読み取りを公開URLの実ブラウザで確認する。
 - 教材削除後の既存予定の扱いを仕様決定する。
 - 教材詳細保存時に手入力セルを消してよいか確認し、必要なら自動割り当て分だけを管理する設計へ変更する。

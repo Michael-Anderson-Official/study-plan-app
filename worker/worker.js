@@ -14,7 +14,7 @@
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type'
 };
 
@@ -28,6 +28,10 @@ export default {
 
     if (url.pathname === '/subscribe' && request.method === 'POST') {
       return handleSubscribe(request, env);
+    }
+
+    if (url.pathname === '/toc' && request.method === 'GET') {
+      return handleToc(request, env);
     }
 
     return new Response('not found', { status: 404, headers: CORS_HEADERS });
@@ -61,6 +65,64 @@ function jsonResponse(obj, status) {
     status: status || 200,
     headers: Object.assign({ 'Content-Type': 'application/json' }, CORS_HEADERS)
   });
+}
+
+// ---- 目次取得（hanmoto.comのスクレイピング） ----
+//
+// openBD/Google Booksは目次(ONIXのTextType=04等)を提供していないため、
+// 版元ドットコム(hanmoto.com)の書籍ページから目次テキストを抽出する。
+// 公式APIではなくHTML構造への依存のため、サイト側の改修で壊れる可能性がある。
+// ブラウザから直接fetchするとCORSで拒否されるが、Worker(サーバー間通信)は
+// CORSの対象外なのでここで代理取得してJSONとして返す。
+async function handleToc(request, env) {
+  const url = new URL(request.url);
+  const isbn = (url.searchParams.get('isbn') || '').replace(/[^0-9Xx]/g, '');
+  if (!/^(97[89]\d{10}|\d{9}[0-9Xx])$/.test(isbn)) {
+    return jsonResponse({ error: 'invalid isbn' }, 400);
+  }
+
+  let pageRes;
+  try {
+    pageRes = await fetch('https://www.hanmoto.com/bd/isbn/' + isbn, {
+      headers: {
+        'User-Agent': 'keikakuchou-study-plan-app/1.0 (+https://michael-anderson-official.github.io/study-plan-app/; personal study planner, fetches ToC for a book the user scanned)'
+      },
+      cf: { cacheTtl: 86400, cacheEverything: true }
+    });
+  } catch (e) {
+    return jsonResponse({ toc: null });
+  }
+  if (!pageRes.ok) {
+    return jsonResponse({ toc: null });
+  }
+
+  let tocText = '';
+  const rewriter = new HTMLRewriter()
+    .on('div[data-book-contents-name="toc"] p', {
+      text(chunk) {
+        tocText += chunk.text;
+      }
+    })
+    .on('div[data-book-contents-name="toc"] p br', {
+      element() {
+        tocText += '\n';
+      }
+    });
+
+  try {
+    await rewriter.transform(pageRes).text();
+  } catch (e) {
+    return jsonResponse({ toc: null });
+  }
+
+  tocText = tocText
+    .split('\n')
+    .map(function (line) { return line.trim(); })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return jsonResponse({ toc: tocText || null, source: 'hanmoto.com', isbn: isbn });
 }
 
 async function checkAndSend(env) {
