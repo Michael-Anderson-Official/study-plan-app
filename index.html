@@ -535,48 +535,6 @@
       align-items: center;
       gap: 0.3rem;
     }
-    /* お試しプレビュー: 曜日カード形式の週表示（?preview=cards のときだけ表示） */
-    #weekCardsPreview {
-      max-width: 480px;
-      margin: 0 auto;
-      padding: 0 0.5rem;
-    }
-    .week-card {
-      background: rgba(255, 255, 255, 0.85);
-      border-radius: 14px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-      margin-bottom: 0.8rem;
-      overflow: hidden;
-    }
-    .week-card.today {
-      box-shadow: 0 0 0 2px var(--theme-accent), 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-    .week-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 0.6rem 0.9rem;
-      background: var(--theme-table-head);
-      font-weight: bold;
-    }
-    .week-card-rate {
-      font-size: 0.72rem;
-      font-weight: normal;
-      color: #666;
-    }
-    .week-card ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-    .week-card .today-task-text {
-      font-weight: normal;
-    }
-    .week-card-empty {
-      padding: 0.7rem 0.9rem;
-      color: #999;
-      font-size: 0.82rem;
-    }
     .status-btn {
       width: 2rem;
       height: 2rem;
@@ -679,7 +637,7 @@
     </div>
   </div>
   <div id="weekView">
-  <div id="planTableWrapper" style="overflow-x: auto;">
+  <div style="overflow-x: auto;">
     <table id="planTable">
       <thead>
         <tr>
@@ -889,9 +847,6 @@
       </tbody>
     </table>
   </div>
-  <!-- お試し用: URLに ?preview=cards を付けたときだけ表示するカード形式のプレビュー。
-       通常表示（#planTable）とは別物で、既存の表を壊さず並行して試せるようにしてある。 -->
-  <div id="weekCardsPreview" style="display:none;"></div>
     <div class="controls">
       <!-- 週送りボタン -- アクションをフォーム送信扱いにしないため type="button" を指定 -->
       <button id="prevWeekBtn" type="button" class="btn-outline">前週へ</button>
@@ -2759,110 +2714,7 @@
         }
       });
       updateDayRates();
-      if (weekCardsPreviewEnabled) renderWeekCardsPreview();
     }
-
-    // ==== お試しプレビュー: 曜日カード形式の週表示 ====
-    // URLに ?preview=cards が付いているときだけ有効。#planTableは隠して#weekCardsPreviewを表示する。
-    var weekCardsPreviewEnabled = /[?&]preview=cards\b/.test(location.search);
-
-    function applyWeekCardsPreviewVisibility() {
-      var wrapper = document.getElementById('planTableWrapper');
-      var cards = document.getElementById('weekCardsPreview');
-      if (!wrapper || !cards) return;
-      wrapper.style.display = weekCardsPreviewEnabled ? 'none' : '';
-      cards.style.display = weekCardsPreviewEnabled ? '' : 'none';
-    }
-
-    // 今日以前の日付に新しく✕を付けたときの後ろ倒し処理。今日ならそのまま、
-    // 過去日なら確認してから実行する（openStatusBubbleと同じ考え方）。未来日は何もしない。
-    function cardCrossCallback(dateISO, subNum) {
-      var todayISO = toLocalISO(new Date());
-      if (dateISO === todayISO) {
-        rescheduleAfterMiss(dateISO, subNum);
-        updateCellsForCurrentWeek();
-      } else if (dateISO < todayISO) {
-        var d = parseISOToDate(dateISO);
-        var dateText = (d.getMonth() + 1) + '/' + d.getDate() + '(' + dayNames[d.getDay()] + ')';
-        if (confirm(dateText + 'の予定を後ろ倒ししますか？\nこの日から連続している予定が1日ずつ後ろにずれます。')) {
-          rescheduleAfterMiss(dateISO, subNum);
-          updateCellsForCurrentWeek();
-        }
-      }
-    }
-
-    function renderWeekCardsPreview() {
-      var container = document.getElementById('weekCardsPreview');
-      if (!container) return;
-      container.innerHTML = '';
-      var startDate = parseISOToDate(window.currentWeekStartISO);
-      var todayISO = toLocalISO(new Date());
-      for (var idx = 0; idx < 7; idx++) {
-        var date = new Date(startDate);
-        date.setDate(startDate.getDate() + idx);
-        var iso = toLocalISO(date);
-        var dayName = dayNames[date.getDay()];
-        var display = (date.getMonth() + 1) + '/' + date.getDate();
-
-        var card = document.createElement('div');
-        card.className = 'week-card' + (iso === todayISO ? ' today' : '');
-
-        var header = document.createElement('div');
-        header.className = 'week-card-header';
-        var titleSpan = document.createElement('span');
-        titleSpan.textContent = display + '（' + dayName + '）';
-        header.appendChild(titleSpan);
-
-        var total = 0;
-        var done = 0;
-        var itemsData = [];
-        for (var n = 1; n <= 7; n++) {
-          var content = localStorage.getItem(iso + '-sub' + n + '-content');
-          if (!content || !content.trim()) continue;
-          total++;
-          if (localStorage.getItem(iso + '-sub' + n + '-status') === 'circle') done++;
-          itemsData.push({ n: n, content: content });
-        }
-        var rateSpan = document.createElement('span');
-        rateSpan.className = 'week-card-rate';
-        rateSpan.textContent = total > 0 ? '達成率 ' + Math.round(done / total * 100) + '%' : '';
-        header.appendChild(rateSpan);
-        card.appendChild(header);
-
-        if (itemsData.length === 0) {
-          var empty = document.createElement('div');
-          empty.className = 'week-card-empty';
-          empty.textContent = '予定はありません。';
-          card.appendChild(empty);
-        } else {
-          var ul = document.createElement('ul');
-          itemsData.forEach(function (item) {
-            var headerCell = document.querySelector('.header-cell[data-header="sub' + item.n + '"]');
-            var label = headerCell ? headerCell.textContent.trim() : ('科目' + item.n);
-            var li = document.createElement('li');
-            var textDiv = document.createElement('div');
-            textDiv.className = 'today-task-text';
-            textDiv.textContent = label + '：' + item.content.trim().split(/\n+/).join('、');
-            li.appendChild(textDiv);
-            var controls = document.createElement('div');
-            controls.className = 'today-task-controls';
-            controls.appendChild(buildTodayStatusGroup(iso + '-sub' + item.n + '-status', function () {
-              cardCrossCallback(iso, item.n);
-            }));
-            li.appendChild(controls);
-            ul.appendChild(li);
-          });
-          card.appendChild(ul);
-        }
-        container.appendChild(card);
-      }
-    }
-
-    applyWeekCardsPreviewVisibility();
-    // ここより前に一度 updateCellsForCurrentWeek() が既に走っている可能性があるため
-    // （weekCardsPreviewEnabled未定義のタイミングで呼ばれ描画がスキップされる）、
-    // 初期表示分としてここで改めて描画しておく。
-    if (weekCardsPreviewEnabled) renderWeekCardsPreview();
 
     // 週の表示を更新する関数。現在の週開始日 (window.currentWeekStartISO) を基準にラベルや data-key を更新します。
     function updateWeekUI() {
