@@ -187,6 +187,7 @@
       flex: 1;
       min-width: 0;
       padding: 0.45rem;
+      font-size: 16px; /* iOS Safariはinputのfont-sizeが16px未満だとフォーカス時に画面を拡大するため */
     }
     .isbn-status {
       min-height: 1.2rem;
@@ -1668,7 +1669,6 @@
 
     function openIsbnScannerModal() {
       var modal = document.getElementById('isbnScannerModal');
-      var input = document.getElementById('isbnManualInput');
       if (!modal) return;
       resetIsbnPreview();
       modal.style.display = 'flex';
@@ -1677,7 +1677,6 @@
       } else {
         setIsbnStatus('このブラウザはカメラ読み取りに未対応です。ISBNを手入力してください。');
       }
-      if (input) input.focus();
     }
 
     function closeIsbnScannerModal() {
