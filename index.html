@@ -369,6 +369,10 @@
       <button id="googleEventCloseBtn" type="button" class="settings-close-btn" aria-label="閉じる">×</button>
       <h2 style="font-size:1rem; margin-top:0;">予定の編集</h2>
       <input type="hidden" id="googleEventId" />
+      <div id="googleEventCalendarRow" style="margin-bottom:0.5rem;">
+        <label for="googleEventCalendarSelect">追加先カレンダー:</label><br />
+        <select id="googleEventCalendarSelect" style="padding:0.3rem; max-width:100%;"></select>
+      </div>
       <div style="margin-bottom:0.5rem;">
         <label for="googleEventTitle">タイトル:</label><br />
         <input id="googleEventTitle" type="text" style="width:100%; box-sizing:border-box; padding:0.3rem;" />
@@ -721,6 +725,8 @@
     var googleEvents = [];
     // 使用するカレンダーのID。選択内容は localStorage に保存して次回も引き継ぐ。
     var googleCalendarId = localStorage.getItem('google-calendar-id') || 'primary';
+    // 取得済みのカレンダー一覧（予定追加時の追加先選択にも使う）
+    var googleCalendarList = [];
 
     // 2026年の日本の祝日一覧。赤字表示の対象となります。
     const holidays2026 = new Set([
@@ -1853,6 +1859,7 @@
         })
         .then(function (data) {
           var items = data.items || [];
+          googleCalendarList = items;
           selectEl.innerHTML = '';
           var found = false;
           items.forEach(function (cal) {
@@ -2045,7 +2052,39 @@
       var endInput = document.getElementById('googleEventEnd');
       var deleteBtn = document.getElementById('googleEventDeleteBtn');
       var statusEl = document.getElementById('googleEventStatus');
+      var calendarRow = document.getElementById('googleEventCalendarRow');
+      var calendarSelect = document.getElementById('googleEventCalendarSelect');
       if (statusEl) statusEl.textContent = '';
+
+      // 新規作成時のみ、追加先カレンダーを選べるようにする（既存予定のカレンダー移動は非対応）。
+      // 書き込みできるカレンダーだけを候補にする。
+      if (calendarRow && calendarSelect) {
+        if (ev) {
+          calendarRow.style.display = 'none';
+        } else {
+          calendarSelect.innerHTML = '';
+          var writable = googleCalendarList.filter(function (cal) {
+            return cal.accessRole === 'owner' || cal.accessRole === 'writer';
+          });
+          writable.forEach(function (cal) {
+            var opt = document.createElement('option');
+            opt.value = cal.id;
+            opt.textContent = cal.summary || cal.id;
+            if (cal.id === googleCalendarId || (googleCalendarId === 'primary' && cal.primary)) {
+              opt.selected = true;
+            }
+            calendarSelect.appendChild(opt);
+          });
+          // 一覧が未取得の場合は現在表示中のカレンダーのみを候補にする
+          if (writable.length === 0) {
+            var fallbackOpt = document.createElement('option');
+            fallbackOpt.value = googleCalendarId;
+            fallbackOpt.textContent = '表示中のカレンダー';
+            calendarSelect.appendChild(fallbackOpt);
+          }
+          calendarRow.style.display = '';
+        }
+      }
 
       if (ev) {
         idInput.value = ev.id;
@@ -2078,8 +2117,9 @@
       if (modal) modal.style.display = 'flex';
     }
 
-    function createGoogleEvent(body) {
-      return fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events', {
+    function createGoogleEvent(body, targetCalendarId) {
+      var calId = targetCalendarId || googleCalendarId;
+      return fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calId) + '/events', {
         method: 'POST',
         headers: {
           Authorization: 'Bearer ' + googleAccessToken,
@@ -2138,7 +2178,9 @@
         body.end = { dateTime: dateVal + 'T' + (endVal || '10:00') + ':00', timeZone: 'Asia/Tokyo' };
       }
       if (statusEl) statusEl.textContent = '保存中...';
-      var request = id ? updateGoogleEvent(id, body) : createGoogleEvent(body);
+      var calendarSelect = document.getElementById('googleEventCalendarSelect');
+      var targetCalendarId = (!id && calendarSelect && calendarSelect.value) ? calendarSelect.value : null;
+      var request = id ? updateGoogleEvent(id, body) : createGoogleEvent(body, targetCalendarId);
       request.then(function () {
         var modal = document.getElementById('googleEventModal');
         if (modal) modal.style.display = 'none';
