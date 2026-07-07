@@ -1721,14 +1721,22 @@
         });
         // 教材が登録されていない科目列（1〜7）は非表示にする。教材を追加すると現れる。
         // 8列目（感想・振り返り）は常に表示する。
+        var visibleColCount = 0;
         for (var colN = 1; colN <= 7; colN++) {
           var showCol = !!(materialsList[colN - 1] && String(materialsList[colN - 1]).trim());
+          if (showCol) visibleColCount++;
           var headCell = document.querySelector('.header-cell[data-header="sub' + colN + '"]');
           if (headCell) headCell.style.display = showCol ? '' : 'none';
           document.querySelectorAll('#planTable tbody tr').forEach(function (row) {
             var cell = row.querySelectorAll('td.cell')[colN - 1];
             if (cell) cell.style.display = showCol ? '' : 'none';
           });
+        }
+        // 表の最小幅を表示中の列数に合わせる（固定1060pxのままだと、列が少ないときに
+        // 1列あたりが間延びして見にくくなるため）。ラベル列＋科目列(1列110px)＋感想列。
+        var planTable = document.getElementById('planTable');
+        if (planTable) {
+          planTable.style.minWidth = (140 + visibleColCount * 110 + 195) + 'px';
         }
         // リスト表示の更新
         var listEl = document.getElementById('materialsList');
