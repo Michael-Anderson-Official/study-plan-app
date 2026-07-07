@@ -148,8 +148,11 @@
       z-index: 10;
     }
     .week-year-label {
+      display: inline-block;
       font-weight: normal;
       font-size: 0.65rem;
+      line-height: 0.8rem;
+      white-space: nowrap;
       color: #666;
     }
     tbody th.row-label {
@@ -1463,14 +1466,16 @@
       var todayDate = new Date();
       todayDate.setHours(0, 0, 0, 0);
       var todayISO = toLocalISO(todayDate);
-      // 表示中の週の西暦をヘッダー直下に表示する（年をまたぐ週は両方表示する）
+      // 表示中の週の西暦をヘッダー直下に表示する。年またぎ週は短く表示してヘッダー高を変えない。
       var weekYearEl = document.getElementById('weekYearLabel');
       if (weekYearEl) {
         var endDate = new Date(startDate);
         endDate.setDate(startDate.getDate() + 6);
-        weekYearEl.textContent = (startDate.getFullYear() === endDate.getFullYear())
-          ? startDate.getFullYear() + '年'
-          : startDate.getFullYear() + '年〜' + endDate.getFullYear() + '年';
+        var startYear = startDate.getFullYear();
+        var endYear = endDate.getFullYear();
+        weekYearEl.textContent = (startYear === endYear)
+          ? startYear + '年'
+          : startYear + '/' + String(endYear).slice(2) + '年';
       }
       rows.forEach(function (row, idx) {
         var date = new Date(startDate);
