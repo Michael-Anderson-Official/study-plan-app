@@ -844,9 +844,14 @@
     <!-- 目次入力欄: ユーザーが各章タイトルを1行ごとに入力できるようにする -->
     <div style="margin-bottom:0.5rem;">
       <!-- 目次や単位を自由に入力できる欄。各行ごとに1項目を入力する。 -->
-      <label for="tocInput">目次／単位リスト（各行に1項目）:</label><br/>
+      <label for="tocInput">目次／単位リスト（各行に1項目）:</label> <span id="tocCountLabel" style="font-size:0.8rem; color:#666;"></span><br/>
       <textarea id="tocInput" rows="5" style="padding:0.3rem; width:90%; max-width:400px;"></textarea>
       <p id="materialDetailStatus" class="isbn-status"></p>
+    </div>
+    <div style="margin-bottom:0.5rem;">
+      <label for="completedUnitsInput">進捗（完了済みの単位数）:</label><br/>
+      <input id="completedUnitsInput" type="number" min="0" style="padding:0.3rem; width:60%; max-width:200px;" />
+      <div style="font-size:0.78rem; color:#666; margin-top:0.2rem;">例: 4を入れて保存すると、目次の5番目から先だけを予定に組みます。目次自体（1〜4）は消えません。</div>
     </div>
     <button id="saveDetailBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">保存</button>
     <button id="dailyScheduleBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">毎日</button>
@@ -1439,6 +1444,11 @@
           detailDiv.style.display = 'none';
         });
       }
+      // 目次入力欄の項目数をリアルタイムで表示
+      var tocInputForCount = document.getElementById('tocInput');
+      if (tocInputForCount) {
+        tocInputForCount.addEventListener('input', updateTocCountLabel);
+      }
 
       // 前週・次週ボタンのクリック処理
       var prevBtn = document.getElementById('prevWeekBtn');
@@ -1549,11 +1559,20 @@
               return line.trim();
             }).filter(function (line) { return line !== ''; });
           }
+          var completedUnitsInputForDaily = document.getElementById('completedUnitsInput');
+          var completedUnitsForDaily = parseInt(completedUnitsInputForDaily ? completedUnitsInputForDaily.value : '', 10);
+          if (isNaN(completedUnitsForDaily) || completedUnitsForDaily < 0) {
+            completedUnitsForDaily = 0;
+          } else {
+            var completedCapForDaily = dailyTocLines.length > 0 ? dailyTocLines.length : (isNaN(unitsVal) ? completedUnitsForDaily : unitsVal);
+            if (completedUnitsForDaily > completedCapForDaily) completedUnitsForDaily = completedCapForDaily;
+          }
           materialsDetails[currentMaterialIndex] = Object.assign({}, existingDailyDetail, {
             units: isNaN(unitsVal) ? null : unitsVal,
             targetDate: null,
             dailyGoal: isNaN(dailyGoalVal) ? null : dailyGoalVal,
-            tocList: tocInputForDaily ? (dailyTocLines.length > 0 ? dailyTocLines : null) : (existingDailyDetail.tocList || null)
+            tocList: tocInputForDaily ? (dailyTocLines.length > 0 ? dailyTocLines : null) : (existingDailyDetail.tocList || null),
+            completedUnits: completedUnitsForDaily > 0 ? completedUnitsForDaily : null
           });
           localStorage.setItem('material-details', JSON.stringify(materialsDetails));
           scheduleMaterialDaily(currentMaterialIndex);
@@ -1712,6 +1731,17 @@
       if (!status) return;
       status.textContent = message || '';
       status.style.color = isError ? '#b00020' : '#666';
+    }
+
+    // 目次入力欄の行数（空行除く）を「現在N項目（=N単位）」として表示する
+    function updateTocCountLabel() {
+      var tocInput = document.getElementById('tocInput');
+      var label = document.getElementById('tocCountLabel');
+      if (!tocInput || !label) return;
+      var count = tocInput.value.split(/\n+/).map(function (line) {
+        return line.trim();
+      }).filter(function (line) { return line !== ''; }).length;
+      label.textContent = count > 0 ? '（現在' + count + '項目 = ' + count + '単位）' : '';
     }
 
     // ISBNが分かっている教材について、hanmoto.comの目次データをWorker経由で自動取得する。
@@ -2053,6 +2083,7 @@
         targetDate: null,
         dailyGoal: null,
         tocList: null,
+        completedUnits: null,
         isbn: book.isbn || null,
         bookTitle: book.title || null,
         authors: normalizeAuthors(book.authors),
@@ -2105,6 +2136,7 @@
       var targetDateInput = document.getElementById('targetDateInput');
       var dailyGoalInput = document.getElementById('dailyGoalInput');
       var tocInput = document.getElementById('tocInput');
+      var completedUnitsInput = document.getElementById('completedUnitsInput');
       // 名前表示
       if (nameSpan) nameSpan.textContent = materialsList[idx];
       // 詳細情報の読み込み
@@ -2112,6 +2144,7 @@
       unitsInput.value = detail && detail.units ? detail.units : '';
       targetDateInput.value = detail && detail.targetDate ? detail.targetDate : '';
       dailyGoalInput.value = detail && detail.dailyGoal ? detail.dailyGoal : '';
+      if (completedUnitsInput) completedUnitsInput.value = (detail && detail.completedUnits) ? detail.completedUnits : '';
       // 目次リストを入力欄に反映
       if (tocInput) {
         if (detail && detail.tocList && Array.isArray(detail.tocList)) {
@@ -2120,6 +2153,7 @@
           tocInput.value = '';
         }
       }
+      updateTocCountLabel();
       setMaterialDetailStatus('');
       renderBookMeta(detail);
       detailDiv.style.display = 'block';
@@ -2148,11 +2182,21 @@
           return line.trim();
         }).filter(function (line) { return line !== ''; });
       }
+      // 進捗（完了済み単位数）。目次の行数を超えない範囲に収める。目次が無い場合は単位数を上限にする。
+      var completedUnitsInput = document.getElementById('completedUnitsInput');
+      var completedUnits = parseInt(completedUnitsInput ? completedUnitsInput.value : '', 10);
+      if (isNaN(completedUnits) || completedUnits < 0) {
+        completedUnits = 0;
+      } else {
+        var completedCap = tocLines.length > 0 ? tocLines.length : (isNaN(units) ? completedUnits : units);
+        if (completedUnits > completedCap) completedUnits = completedCap;
+      }
       materialsDetails[currentMaterialIndex] = Object.assign({}, existingDetail, {
         units: isNaN(units) ? null : units,
         targetDate: targetDate || null,
         dailyGoal: isNaN(dailyGoal) ? null : dailyGoal,
-        tocList: tocLines.length > 0 ? tocLines : null
+        tocList: tocLines.length > 0 ? tocLines : null,
+        completedUnits: completedUnits > 0 ? completedUnits : null
       });
       // 保存
       localStorage.setItem('material-details', JSON.stringify(materialsDetails));
@@ -2199,6 +2243,11 @@
       clearMaterialContentCells(idx);
       // もし目次リストが存在する場合は章タイトルごとにスケジュールする
       var tasks = detail.tocList;
+      // 進捗（完了済み単位数）分は目次の表示自体は変えず、スケジュール対象からだけ除外する
+      var completedForSchedule = parseInt(detail.completedUnits, 10);
+      if (tasks && Array.isArray(tasks) && !isNaN(completedForSchedule) && completedForSchedule > 0) {
+        tasks = tasks.slice(completedForSchedule);
+      }
       if (tasks && Array.isArray(tasks) && tasks.length > 0) {
         // 開始日: 今日
         var start = new Date();
@@ -2268,9 +2317,11 @@
       // 期日までの日数を計算（最低1日）
       var dayCount = Math.floor((endDate - startDate) / 86400000) + 1;
       if (dayCount < 1) dayCount = 1;
-      // 1 から unitsTotal までの番号リストを生成
+      // 完了済み単位数の次の番号から unitsTotal までの番号リストを生成
+      var completedNum = parseInt(detail.completedUnits, 10);
+      if (isNaN(completedNum) || completedNum < 0) completedNum = 0;
       var tasksArray = [];
-      for (var iNum = 1; iNum <= unitsTotal; iNum++) {
+      for (var iNum = completedNum + 1; iNum <= unitsTotal; iNum++) {
         tasksArray.push(iNum);
       }
       // 1日あたりに割り当てる単位数を決定
@@ -2278,7 +2329,7 @@
       if (!isNaN(dailyGoal) && dailyGoal > 0) {
         tasksPerDay = dailyGoal;
       } else {
-        tasksPerDay = Math.ceil(unitsTotal / dayCount);
+        tasksPerDay = Math.ceil(tasksArray.length / dayCount);
       }
       // 各日に割り当てて保存
       var dayIndex = 0;
@@ -2544,6 +2595,11 @@
       clearMaterialContentCells(idx);
       // 目次リストがある場合は章タイトルを日毎に割り当て
       var tasks = detail.tocList;
+      // 進捗（完了済み単位数）分は目次の表示自体は変えず、スケジュール対象からだけ除外する
+      var completedForDaily = parseInt(detail.completedUnits, 10);
+      if (tasks && Array.isArray(tasks) && !isNaN(completedForDaily) && completedForDaily > 0) {
+        tasks = tasks.slice(completedForDaily);
+      }
       if (tasks && Array.isArray(tasks) && tasks.length > 0) {
         var start = new Date();
         start.setHours(0, 0, 0, 0);
@@ -2578,9 +2634,11 @@
       if (isNaN(dailyGoal) || dailyGoal <= 0) {
         dailyGoal = 1;
       }
-      // Create an array of unit numbers [1, 2, ..., unitsTotal]
+      // Create an array of unit numbers, skipping already-completed units
+      var completedDailyNum = parseInt(detail.completedUnits, 10);
+      if (isNaN(completedDailyNum) || completedDailyNum < 0) completedDailyNum = 0;
       var tasksArray = [];
-      for (var num = 1; num <= unitsTotal; num++) {
+      for (var num = completedDailyNum + 1; num <= unitsTotal; num++) {
         tasksArray.push(num);
       }
       var startDate = new Date();

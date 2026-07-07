@@ -57,6 +57,7 @@
 - 節気ごとに紐づく季節モチーフ（桜・梅・雪・雨・双葉・紅葉・稲穂・満月など14種、`MOTIF_SVGS`）をインラインSVGで生成し、`#seasonDecoration`（`position:fixed; z-index:-1; pointer-events:none`）に散りばめる。配置は当日の日付を種にした疑似乱数で決めるため、同じ日はリロードしても同じ配置になる。
 - 節気テーマ・季節モチーフはlocalStorageに新しいキーを追加しない（既存の日付計算から都度算出するだけ）。
 - ISBN/バーコード読み取りに、Safari等 `BarcodeDetector` 非対応ブラウザ向けのフォールバックとして `@zxing/library`（CDN読み込み、`window.ZXing`）を追加した。`startIsbnScan()` はネイティブ`BarcodeDetector`→ZXing→非対応メッセージの順で分岐する。`canScanBarcode()` で両方の対応状況をまとめて判定する。
+- 教材詳細に「進捗（完了済みの単位数）」入力欄（`completedUnitsInput` → `material-details` の `completedUnits`）を追加した。目次リストの内容や単位数はそのまま保持し、`scheduleMaterial`/`scheduleMaterialDaily` が完了済み件数分だけ先頭を読み飛ばしてから予定を組む。目次入力欄には現在の行数（＝単位数）をリアルタイムに表示する（`tocCountLabel`/`updateTocCountLabel()`）。
 - Worker（`keikakuchou-notify`）に `GET /toc?isbn=...` を追加した。openBD/Google Booksには目次データが無いため、版元ドットコム（hanmoto.com）の書籍ページ（`https://www.hanmoto.com/bd/isbn/{ISBN}`）をWorker側で取得し、`HTMLRewriter` で `div[data-book-contents-name="toc"] p`（と中の `br`）から目次テキストを抽出してJSON `{ toc, source, isbn }` で返す。ブラウザから直接hanmoto.comへfetchするとCORSで拒否されるが、Worker〜hanmoto.com間はサーバー間通信なのでCORSの対象外という前提で実装した。`index.html` 側は `tryAutoFillToc(idx, isbn)` が教材詳細を開いたとき（ISBN付きかつ目次未入力の場合）にこのエンドポイントを呼び、取得できれば目次入力欄を自動で埋める（ユーザーが手入力済みなら上書きしない）。ISBNごとに1回だけ試みる（`tocFetchAttempted`、ページ内メモリのみ、`localStorage`には保存しない）。
 
 ## 直近でCodexが変更した内容
@@ -93,6 +94,7 @@
 - Googleカレンダー選択: `google-calendar-id`
 - Google access token一時保存: `google-token`
 - バーコード追加された教材の `material-details` には `isbn`、`bookTitle`、`authors`、`publisher`、`publishedDate`、`coverImage`、`description`、`pageCount`、`source` が入り得る。
+- `material-details` の `completedUnits` は「進捗（完了済みの単位数）」。目次リスト（`tocList`）や数値単位（`units`）はそのまま残し、スケジュール計算（`scheduleMaterial`/`scheduleMaterialDaily`）だけがこの件数分を先頭からスキップする。
 
 移行処理:
 
