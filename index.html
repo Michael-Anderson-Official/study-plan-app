@@ -100,35 +100,6 @@
       border-bottom: 1px solid #bbb;
       transform: rotate(45deg);
     }
-    /* 節気切り替わり日のスプラッシュ表示。タップまたは数秒で自動的に消える */
-    #sekkiSplash {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 4000;
-      background-size: cover;
-      background-position: center;
-      opacity: 0;
-      transition: opacity 0.7s ease;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      cursor: pointer;
-    }
-    #sekkiSplash.visible {
-      opacity: 1;
-    }
-    #sekkiSplash .sekki-splash-label {
-      margin-bottom: 2.4rem;
-      padding: 0.45rem 1.3rem;
-      background: rgba(255, 255, 255, 0.8);
-      border-radius: 999px;
-      font-size: 0.92rem;
-      color: #333;
-      letter-spacing: 0.05em;
-    }
     /* 設定アイコン・設定モーダル */
     .settings-icon-btn {
       position: fixed;
@@ -1461,7 +1432,6 @@
       // 背景写真がある節気は写真を敷き、SVGモチーフは省略する（重ねると騒がしいため）
       var hasPhoto = applySekkiPhoto(sekki);
       renderSeasonDecoration(hasPhoto ? null : sekki.motif);
-      maybeShowSekkiSplash(sekki);
     }
 
     // 節気の背景写真を #seasonDecoration に敷く。白の半透明を重ねて表の読みやすさを保つ。
@@ -1478,42 +1448,6 @@
       container.style.backgroundSize = 'cover';
       container.style.backgroundPosition = 'center top';
       return true;
-    }
-
-    // 節気が切り替わって最初にアプリを開いたとき、その節気の写真を全画面で数秒見せる。
-    // 表示済みかどうかは端末ローカルの 'sekki-splash-seen' に記録する（クラウド同期対象外）。
-    // ?sekki= プレビュー中は毎回表示する。
-    function maybeShowSekkiSplash(sekki) {
-      var img = SEKKI_IMAGES[sekki.name];
-      if (!img) return;
-      var isPreview = /[?&]sekki=/.test(location.search);
-      if (!isPreview && localStorage.getItem('sekki-splash-seen') === sekki.name) return;
-      localStorage.setItem('sekki-splash-seen', sekki.name);
-      var overlay = document.createElement('div');
-      overlay.id = 'sekkiSplash';
-      overlay.style.backgroundImage = 'url("' + img + '")';
-      var label = document.createElement('div');
-      label.className = 'sekki-splash-label';
-      label.textContent = sekki.name + '　' + sekki.desc;
-      overlay.appendChild(label);
-      var dismissed = false;
-      function dismissSplash() {
-        if (dismissed) return;
-        dismissed = true;
-        overlay.classList.remove('visible');
-        setTimeout(function () {
-          if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-        }, 700);
-      }
-      overlay.addEventListener('click', dismissSplash);
-      document.body.appendChild(overlay);
-      // 追加直後にクラスを付けるとtransitionが効かないため、1フレーム待ってから表示する
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () {
-          overlay.classList.add('visible');
-        });
-      });
-      setTimeout(dismissSplash, 3800);
     }
 
     // 季節モチーフのSVGパス定義。viewBox 0 0 24 24 で描く簡易アイコン。
