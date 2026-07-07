@@ -7,6 +7,8 @@
 // - Secret「VAPID_PRIVATE_JWK」に、ローカルで生成した秘密鍵JWK（JSON文字列）を設定する
 // - Secret「VAPID_PUBLIC_KEY」に、対応する公開鍵（base64url文字列）を設定する
 // - Secret「VAPID_SUBJECT」に、連絡先として使うメールアドレス（例: mailto:you@example.com）を設定する
+// - Secret「GOOGLE_OAUTH_CLIENT_SECRET」に、Google Cloud ConsoleのOAuthクライアントシークレットを設定する
+// - 変数「GOOGLE_OAUTH_CLIENT_ID」に、フロントエンドと同じGoogle OAuthクライアントIDを設定する
 // - Cron Trigger を追加する（例: 毎分 "* * * * *"）
 //
 // このファイルはCloudflareの「Quick Edit」にそのまま貼り付けて使うことを想定しており、
@@ -32,6 +34,14 @@ export default {
 
     if (url.pathname === '/toc' && request.method === 'GET') {
       return handleToc(request, env);
+    }
+
+    if (url.pathname === '/google/code' && request.method === 'POST') {
+      return handleGoogleCode(request, env);
+    }
+
+    if (url.pathname === '/google/token' && request.method === 'POST') {
+      return handleGoogleToken(request, env);
     }
 
     return new Response('not found', { status: 404, headers: CORS_HEADERS });
@@ -67,6 +77,186 @@ async function handleSubscribe(request, env) {
     lastSentDate: existingLastSentDate
   }));
   return jsonResponse({ ok: true });
+}
+
+function getGoogleOAuthClientId(env, fallbackClientId) {
+  return env.GOOGLE_OAUTH_CLIENT_ID || env.GOOGLE_CLIENT_ID || fallbackClientId || '';
+}
+
+function validateGoogleSessionInput(body) {
+  return body &&
+    /^[A-Za-z0-9_-]{16,128}$/.test(body.sessionId || '') &&
+    /^[A-Za-z0-9_-]{32,256}$/.test(body.sessionSecret || '');
+}
+
+function googleCalendarKey(sessionId) {
+  return 'googlecal:' + sessionId;
+}
+
+async function sha256Base64Url(value) {
+  const bytes = new TextEncoder().encode(value);
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return arrayBufferToBase64Url(hash);
+}
+
+function arrayBufferToBase64Url(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+async function readGoogleCalendarSession(env, sessionId, sessionSecret) {
+  const raw = await env.NOTIFY_KV.get(googleCalendarKey(sessionId));
+  if (!raw) return null;
+  let stored;
+  try {
+    stored = JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+  const secretHash = await sha256Base64Url(sessionSecret);
+  if (!stored.secretHash || stored.secretHash !== secretHash) return null;
+  return stored;
+}
+
+function googleOAuthNotConfigured(env) {
+  return !env.GOOGLE_OAUTH_CLIENT_SECRET;
+}
+
+async function exchangeGoogleToken(params) {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(params)
+  });
+  const data = await res.json().catch(function () { return {}; });
+  if (!res.ok) {
+    const detail = data.error_description || data.error || ('Google token endpoint status ' + res.status);
+    throw new Error(detail);
+  }
+  return data;
+}
+
+async function handleGoogleCode(request, env) {
+  if (googleOAuthNotConfigured(env)) {
+    return jsonResponse({ error: 'google_oauth_not_configured' }, 503);
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: 'invalid json' }, 400);
+  }
+  if (!validateGoogleSessionInput(body) || !body.code || !body.redirectUri) {
+    return jsonResponse({ error: 'invalid body' }, 400);
+  }
+
+  const origin = request.headers.get('Origin') || '';
+  if (origin && body.redirectUri !== origin) {
+    return jsonResponse({ error: 'invalid redirect origin' }, 400);
+  }
+
+  const clientId = getGoogleOAuthClientId(env, body.clientId);
+  if (!clientId) {
+    return jsonResponse({ error: 'google_oauth_client_id_not_configured' }, 503);
+  }
+
+  let tokenData;
+  try {
+    tokenData = await exchangeGoogleToken({
+      code: body.code,
+      client_id: clientId,
+      client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET,
+      redirect_uri: body.redirectUri,
+      grant_type: 'authorization_code'
+    });
+  } catch (e) {
+    return jsonResponse({ error: 'google_code_exchange_failed', detail: e.message }, 400);
+  }
+
+  const existing = await readGoogleCalendarSession(env, body.sessionId, body.sessionSecret);
+  const now = Date.now();
+  const expiresIn = Number(tokenData.expires_in || 3600);
+  const stored = {
+    secretHash: await sha256Base64Url(body.sessionSecret),
+    refreshToken: tokenData.refresh_token || (existing && existing.refreshToken) || null,
+    accessToken: tokenData.access_token || null,
+    expiresAt: now + Math.max(60, expiresIn - 60) * 1000,
+    scope: tokenData.scope || null,
+    updatedAt: new Date(now).toISOString()
+  };
+  await env.NOTIFY_KV.put(googleCalendarKey(body.sessionId), JSON.stringify(stored));
+
+  return jsonResponse({
+    access_token: tokenData.access_token,
+    expires_in: expiresIn,
+    has_refresh_token: !!stored.refreshToken
+  });
+}
+
+async function handleGoogleToken(request, env) {
+  if (googleOAuthNotConfigured(env)) {
+    return jsonResponse({ error: 'google_oauth_not_configured' }, 503);
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: 'invalid json' }, 400);
+  }
+  if (!validateGoogleSessionInput(body)) {
+    return jsonResponse({ error: 'invalid body' }, 400);
+  }
+
+  const stored = await readGoogleCalendarSession(env, body.sessionId, body.sessionSecret);
+  if (!stored) {
+    return jsonResponse({ error: 'reauthorization_required' }, 401);
+  }
+
+  const now = Date.now();
+  if (stored.accessToken && stored.expiresAt && now < stored.expiresAt) {
+    return jsonResponse({
+      access_token: stored.accessToken,
+      expires_in: Math.max(60, Math.floor((stored.expiresAt - now) / 1000)),
+      has_refresh_token: !!stored.refreshToken
+    });
+  }
+
+  if (!stored.refreshToken) {
+    return jsonResponse({ error: 'reauthorization_required' }, 401);
+  }
+
+  const clientId = getGoogleOAuthClientId(env);
+  if (!clientId) {
+    return jsonResponse({ error: 'google_oauth_client_id_not_configured' }, 503);
+  }
+
+  let tokenData;
+  try {
+    tokenData = await exchangeGoogleToken({
+      refresh_token: stored.refreshToken,
+      client_id: clientId,
+      client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET,
+      grant_type: 'refresh_token'
+    });
+  } catch (e) {
+    return jsonResponse({ error: 'reauthorization_required', detail: e.message }, 401);
+  }
+
+  const expiresIn = Number(tokenData.expires_in || 3600);
+  stored.accessToken = tokenData.access_token;
+  stored.expiresAt = now + Math.max(60, expiresIn - 60) * 1000;
+  stored.scope = tokenData.scope || stored.scope || null;
+  stored.updatedAt = new Date(now).toISOString();
+  if (tokenData.refresh_token) stored.refreshToken = tokenData.refresh_token;
+  await env.NOTIFY_KV.put(googleCalendarKey(body.sessionId), JSON.stringify(stored));
+
+  return jsonResponse({
+    access_token: tokenData.access_token,
+    expires_in: expiresIn,
+    has_refresh_token: !!stored.refreshToken
+  });
 }
 
 function jsonResponse(obj, status) {

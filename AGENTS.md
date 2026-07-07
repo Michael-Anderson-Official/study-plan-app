@@ -41,11 +41,11 @@
 ## アカウント同期（Firebase）
 
 - バックエンドはFirebase Auth（Googleサインインのみ）+ Firestore。サインインは`google.accounts.id`（Google Identity Servicesの「サインインボタン」、`GOOGLE_CLIENT_ID`を共用）でIDトークンを取得し、`signInWithCredential`でFirebaseにサインインする方式（`renderGoogleSignInButton()`/`handleGoogleIdCredential()`）。`signInWithPopup`/`signInWithRedirect`はSafariのストレージ分離(ITP)で`firebaseapp.com`とのセッション受け渡しに失敗する（`auth/unauthorized-domain`や`missing initial state`）ことを実機で確認済みのため使わない。Googleカレンダー連携（`initGoogleAuth`によるCalendar APIアクセストークン取得）とはOAuthクライアントIDこそ共用するが、目的も戻り値も別物で、互いに依存しない。
-- `FIREBASE_CONFIG`（`index.html`内）は、Firebaseコンソールでプロジェクトを作成しWebアプリを登録した後に発行される値へ書き換える。現状はプレースホルダーが入ったままなので、実際のサインインはまだ動作しない。
+- `FIREBASE_CONFIG`（`index.html`内）は、実際のFirebaseプロジェクト `keikakuchou-37440` の公開クライアント設定に置き換え済み。apiKey等は公開クライアント向けの値でsecretではない。実際のアクセス制御はFirestoreセキュリティルールで行う。
 - サインインは任意（opt-in）。サインインしなくても今まで通り`localStorage`のみで完全に動作する。Firebase初期化に失敗した場合も`window.appAuth`/`window.appDb`が未定義のままになるだけで、他の機能に影響しない。
 - 実装は`index.html`の末尾にある`<script type="module">`（`window.appAuth`/`window.appDb`をwindowへ公開するブリッジ）と、先頭付近の`Storage.prototype.setItem/removeItem`フック（`classifyStorageKey`/`markCloudSyncDirty`/`flushCloudSync`）の2箇所に分かれる。`<script type="module">`は暗黙deferされ非moduleスクリプトより後に実行されるため、`window.appAuth`/`window.appDb`はイベントハンドラの中でのみ参照する（トップレベル直書きでは未定義になる）。
 - Firestoreのドキュメント構成は`users/{uid}/app/settings`、`users/{uid}/app/materials`（`materialsList`/`materialDetails`は元のJSON文字列のまま保持）、`users/{uid}/days/{YYYY-MM-DD}`、`users/{uid}/weeklySummaries/{週開始ISO}`。セキュリティルールは`request.auth.uid == uid`のときのみ読み書き許可。
-- `google-token`・`today-trivia-*`・`device-id`は同期対象外（端末ローカルのみ）。
+- `google-token`・`google-calendar-session-id`・`google-calendar-session-secret`・`today-trivia-*`・`device-id`は同期対象外（端末ローカルのみ）。
 
 ## 通知・Worker・外部連携
 
@@ -53,6 +53,7 @@
 - `VAPID_PUBLIC_KEY` は公開鍵なので `index.html` に置いてよい。秘密鍵はCloudflare Secret `VAPID_PRIVATE_JWK` に置く。
 - Workerは `NOTIFY_KV`、`VAPID_PRIVATE_JWK`、`VAPID_PUBLIC_KEY`、`VAPID_SUBJECT`、Cron Trigger を必要とする。
 - Workerの購読はKVキー `sub:<subscriberId>` 単位（複数ユーザー/複数端末対応済み）。`subscriberId`はサインイン中ならFirebaseのuid、未サインインなら`localStorage`の`device-id`（端末ごとのランダムID）。`checkAndSend`は`sub:`プレフィックスで全購読を`KV.list()`して走査し、購読ごとに`lastSentDate`を保持する。
+- Googleカレンダー連携はGISの認可コードモデル（`initCodeClient`）を使い、Workerの `/google/code` でコードをGoogle token endpointに交換し、`/google/token` で期限切れ時にアクセストークンを更新する。Workerには `GOOGLE_OAUTH_CLIENT_ID` と secret `GOOGLE_OAUTH_CLIENT_SECRET` を設定する。client secretとrefresh tokenはリポジトリやブラウザに置かない。
 - Google OAuth client IDは公開情報。access tokenは実行時に `localStorage` の `google-token` に短時間保存されるだけで、リポジトリに含めない。
 - ISBN/バーコード教材追加はまずブラウザ標準の `BarcodeDetector` を試す。Safari等の非対応ブラウザでは、CDN読み込みの `@zxing/library`（`window.ZXing`）にフォールバックする。どちらも使えない環境ではISBN手入力を使う。書籍情報は openBD を先に見て、見つからない場合に Google Books の公開検索へフォールバックする。APIキーや秘密情報は使わない。
 - 目次（目次／単位リスト）の自動取得は、openBD/Google Booksに構造化データが無いため、Worker側の `GET /toc?isbn=...` が版元ドットコム（hanmoto.com）のHTMLを取得・解析して返す（非公式スクレイピング、`worker/worker.js` の `handleToc`）。ブラウザは直接hanmoto.comへfetchしない（CORS拒否されるため）。教材詳細を開いたときにISBNがあり目次未入力なら `index.html` の `tryAutoFillToc()` がこのWorkerエンドポイントを呼ぶ。hanmoto.comのHTML構造変更に弱い点に注意する。

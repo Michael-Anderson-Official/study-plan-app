@@ -1014,9 +1014,15 @@
     // 読み込んだデータをそのままクラウドへ送り返す無駄なラウンドトリップを防ぐ。
     var suppressCloudSync = false;
 
-    // キー名から同期先を判定する。google-token・today-trivia-* は端末ローカルのまま。
+    // キー名から同期先を判定する。Google OAuthトークン/セッション・today-trivia-* は端末ローカルのまま。
     function classifyStorageKey(key) {
-      if (key === 'google-token' || key === 'device-id' || key.indexOf('today-trivia-') === 0) return null;
+      if (
+        key === 'google-token' ||
+        key === 'google-calendar-session-id' ||
+        key === 'google-calendar-session-secret' ||
+        key === 'device-id' ||
+        key.indexOf('today-trivia-') === 0
+      ) return null;
       if (key === 'weekStart' || key === 'notify-time' || key === 'google-calendar-id' || /^header-sub[1-8]$/.test(key)) {
         return { type: 'settings' };
       }
@@ -1242,12 +1248,13 @@
     var GOOGLE_CLIENT_ID = '313439643849-h299dp5h354joksqhuegfp4s89oc2dkd.apps.googleusercontent.com';
     // calendar.events: 予定の読み書き / calendar.calendarlist.readonly: カレンダー一覧の取得
     var GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly';
-    var googleTokenClient = null;
+    var googleCodeClient = null;
     var googleAccessToken = null;
+    var googleAccessTokenExpiresAt = 0;
     var googleEvents = [];
 
-    // アカウント同期（Firebase）用の設定。Firebaseコンソールでプロジェクトを作成後、
-    // 発行される設定値に書き換えてください（apiKeyを含め秘密情報ではありません）。
+    // アカウント同期（Firebase）用の設定。apiKeyを含め公開クライアント向けの値で、
+    // 秘密情報ではありません。実際のアクセス制御はFirestoreセキュリティルールで行います。
     // これはGoogleカレンダー連携のGOOGLE_CLIENT_IDとは別物・無関係です。
     var FIREBASE_CONFIG = {
       apiKey: 'AIzaSyAmERh9l_Ag8NRQskrBns1YCQbxgU5CU34',
@@ -1261,6 +1268,7 @@
         var saved = JSON.parse(localStorage.getItem('google-token') || 'null');
         if (saved && saved.token && saved.expiresAt && Date.now() < saved.expiresAt) {
           googleAccessToken = saved.token;
+          googleAccessTokenExpiresAt = saved.expiresAt;
         } else {
           localStorage.removeItem('google-token');
         }
@@ -3386,6 +3394,133 @@
 
     // ---- Googleカレンダー連携 ----
 
+    function randomBase64Url(bytes) {
+      var arr = new Uint8Array(bytes);
+      crypto.getRandomValues(arr);
+      var str = '';
+      for (var i = 0; i < arr.length; i++) str += String.fromCharCode(arr[i]);
+      return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    function getGoogleCalendarSession(createIfMissing) {
+      var sessionId = localStorage.getItem('google-calendar-session-id');
+      var sessionSecret = localStorage.getItem('google-calendar-session-secret');
+      if ((!sessionId || !sessionSecret) && createIfMissing) {
+        sessionId = randomBase64Url(18);
+        sessionSecret = randomBase64Url(32);
+        localStorage.setItem('google-calendar-session-id', sessionId);
+        localStorage.setItem('google-calendar-session-secret', sessionSecret);
+      }
+      if (!sessionId || !sessionSecret) return null;
+      return { sessionId: sessionId, sessionSecret: sessionSecret };
+    }
+
+    function hasGoogleCalendarSession() {
+      return !!getGoogleCalendarSession(false);
+    }
+
+    function storeGoogleAccessToken(token, expiresIn) {
+      googleAccessToken = token;
+      var expiresInMs = (parseInt(expiresIn, 10) || 3600) * 1000;
+      googleAccessTokenExpiresAt = Date.now() + expiresInMs - 60000;
+      localStorage.setItem('google-token', JSON.stringify({
+        token: googleAccessToken,
+        expiresAt: googleAccessTokenExpiresAt
+      }));
+    }
+
+    function clearGoogleCalendarAuth(clearSession) {
+      googleAccessToken = null;
+      googleAccessTokenExpiresAt = 0;
+      googleEvents = [];
+      localStorage.removeItem('google-token');
+      if (clearSession) {
+        localStorage.removeItem('google-calendar-session-id');
+        localStorage.removeItem('google-calendar-session-secret');
+      }
+      updateGoogleSignInUI();
+      renderGoogleEvents();
+      renderWeekGoogleEvents();
+    }
+
+    function applyWorkerGoogleToken(data) {
+      if (!data || !data.access_token) throw new Error('Googleカレンダーのトークン取得に失敗しました。');
+      storeGoogleAccessToken(data.access_token, data.expires_in);
+      updateGoogleSignInUI();
+      return data;
+    }
+
+    function exchangeGoogleCodeWithWorker(code) {
+      var session = getGoogleCalendarSession(true);
+      return fetch(NOTIFY_WORKER_URL + '/google/code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: session.sessionId,
+          sessionSecret: session.sessionSecret,
+          code: code,
+          redirectUri: window.location.origin,
+          clientId: GOOGLE_CLIENT_ID
+        })
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (!res.ok) throw new Error(data.error || 'Googleカレンダーの認証保存に失敗しました。');
+          return applyWorkerGoogleToken(data);
+        });
+      });
+    }
+
+    function refreshGoogleAccessTokenFromWorker() {
+      var session = getGoogleCalendarSession(false);
+      if (!session) return Promise.reject(new Error('Googleカレンダーの保存済み認証がありません。'));
+      return fetch(NOTIFY_WORKER_URL + '/google/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: session.sessionId,
+          sessionSecret: session.sessionSecret
+        })
+      }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+          if (!res.ok) {
+            if (res.status === 401 || data.error === 'reauthorization_required') clearGoogleCalendarAuth(true);
+            throw new Error(data.error || 'Googleカレンダーの認証更新に失敗しました。');
+          }
+          return applyWorkerGoogleToken(data);
+        });
+      });
+    }
+
+    function ensureGoogleAccessToken() {
+      if (googleAccessToken && googleAccessTokenExpiresAt && Date.now() < googleAccessTokenExpiresAt) {
+        return Promise.resolve(googleAccessToken);
+      }
+      if (hasGoogleCalendarSession()) {
+        return refreshGoogleAccessTokenFromWorker().then(function () {
+          return googleAccessToken;
+        });
+      }
+      return Promise.reject(new Error('Googleカレンダーにサインインしてください。'));
+    }
+
+    function fetchGoogleApi(url, options, retrying) {
+      options = options || {};
+      return ensureGoogleAccessToken().then(function (token) {
+        var headers = Object.assign({}, options.headers || {}, { Authorization: 'Bearer ' + token });
+        return fetch(url, Object.assign({}, options, { headers: headers }));
+      }).then(function (res) {
+        if (res.status === 401 && !retrying && hasGoogleCalendarSession()) {
+          googleAccessToken = null;
+          googleAccessTokenExpiresAt = 0;
+          localStorage.removeItem('google-token');
+          return refreshGoogleAccessTokenFromWorker().then(function () {
+            return fetchGoogleApi(url, options, true);
+          });
+        }
+        return res;
+      });
+    }
+
     function getGoogleEventsForISO(iso) {
       return googleEvents.filter(function (ev) {
         var evStart = ev.start && (ev.start.dateTime || ev.start.date);
@@ -3449,7 +3584,7 @@
       var syncBtn = document.getElementById('googleSyncBtn');
       var addBtn = document.getElementById('googleAddEventBtn');
       var calSelectRow = document.getElementById('googleCalendarSelectRow');
-      var signedIn = !!googleAccessToken;
+      var signedIn = !!googleAccessToken || hasGoogleCalendarSession();
       if (signInBtn) signInBtn.style.display = signedIn ? 'none' : '';
       if (syncBtn) syncBtn.style.display = signedIn ? '' : 'none';
       if (addBtn) addBtn.style.display = signedIn ? '' : 'none';
@@ -3458,12 +3593,9 @@
 
     // 使用可能なカレンダーの一覧を取得してセレクトボックスに反映する
     function fetchGoogleCalendarList() {
-      if (!googleAccessToken) return;
       var selectEl = document.getElementById('googleCalendarSelect');
       if (!selectEl) return;
-      fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
-        headers: { Authorization: 'Bearer ' + googleAccessToken }
-      })
+      fetchGoogleApi('https://www.googleapis.com/calendar/v3/users/me/calendarList')
         .then(function (res) {
           if (!res.ok) throw new Error('カレンダー一覧の取得に失敗しました。');
           return res.json();
@@ -3500,7 +3632,7 @@
 
     function onGoogleCalendarTabShown() {
       updateGoogleSignInUI();
-      if (googleAccessToken) {
+      if (googleAccessToken || hasGoogleCalendarSession()) {
         var selectEl = document.getElementById('googleCalendarSelect');
         if (selectEl && selectEl.options.length === 0) fetchGoogleCalendarList();
         fetchGoogleEvents();
@@ -3509,42 +3641,51 @@
 
     // 週送り・今週へボタンでも、1週間タブの日付セル用にサインイン済みなら予定を再取得する
     function refreshGoogleEventsForCurrentWeek() {
-      if (googleAccessToken) fetchGoogleEvents();
+      if (googleAccessToken || hasGoogleCalendarSession()) fetchGoogleEvents();
     }
 
     function initGoogleAuth() {
-      if (googleTokenClient || !window.google || !google.accounts || !google.accounts.oauth2) return;
-      googleTokenClient = google.accounts.oauth2.initTokenClient({
+      if (googleCodeClient || !window.google || !google.accounts || !google.accounts.oauth2) return;
+      googleCodeClient = google.accounts.oauth2.initCodeClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: GOOGLE_CALENDAR_SCOPE,
+        ux_mode: 'popup',
         callback: function (response) {
           var statusEl = document.getElementById('googleSyncStatus');
-          if (response && response.access_token) {
-            googleAccessToken = response.access_token;
-            // 有効期限（通常3600秒）の1分前までを保存有効期間とし、リロード後も再利用する
-            var expiresInMs = (parseInt(response.expires_in, 10) || 3600) * 1000;
-            localStorage.setItem('google-token', JSON.stringify({
-              token: googleAccessToken,
-              expiresAt: Date.now() + expiresInMs - 60000
-            }));
-            updateGoogleSignInUI();
-            fetchGoogleCalendarList();
-            fetchGoogleEvents();
+          if (response && response.code) {
+            if (statusEl) statusEl.textContent = 'Googleカレンダー認証を保存しています...';
+            exchangeGoogleCodeWithWorker(response.code).then(function (data) {
+              if (statusEl) {
+                statusEl.textContent = data.has_refresh_token === false
+                  ? '連携しました。ただし長期更新用トークンが返らなかったため、期限切れ時は再サインインが必要です。'
+                  : '連携しました。期限切れ時は自動で更新します。';
+              }
+              fetchGoogleCalendarList();
+              fetchGoogleEvents();
+            }).catch(function (err) {
+              console.error(err);
+              if (statusEl) statusEl.textContent = (err && err.message) || 'Googleカレンダーの認証保存に失敗しました。';
+            });
           } else if (statusEl) {
             statusEl.textContent = 'サインインできませんでした。';
           }
+        },
+        error_callback: function (err) {
+          var statusEl = document.getElementById('googleSyncStatus');
+          if (statusEl) statusEl.textContent = 'Googleカレンダーのサインインを開始できませんでした。';
+          console.error(err);
         }
       });
     }
 
     function requestGoogleToken() {
-      if (!googleTokenClient) initGoogleAuth();
-      if (!googleTokenClient) {
+      if (!googleCodeClient) initGoogleAuth();
+      if (!googleCodeClient) {
         var statusEl = document.getElementById('googleSyncStatus');
         if (statusEl) statusEl.textContent = 'Google連携の準備ができていません。しばらくしてから再度お試しください。';
         return;
       }
-      googleTokenClient.requestAccessToken({ prompt: googleAccessToken ? '' : 'consent' });
+      googleCodeClient.requestCode();
     }
 
     function getGoogleWeekRange() {
@@ -3555,7 +3696,6 @@
     }
 
     function fetchGoogleEvents() {
-      if (!googleAccessToken) return;
       var statusEl = document.getElementById('googleSyncStatus');
       if (statusEl) statusEl.textContent = '同期中...';
       var range = getGoogleWeekRange();
@@ -3563,15 +3703,10 @@
         + '?timeMin=' + encodeURIComponent(range.timeMin)
         + '&timeMax=' + encodeURIComponent(range.timeMax)
         + '&singleEvents=true&orderBy=startTime';
-      fetch(url, { headers: { Authorization: 'Bearer ' + googleAccessToken } })
+      fetchGoogleApi(url)
         .then(function (res) {
           if (res.status === 401) {
-            googleAccessToken = null;
-            googleEvents = [];
-            localStorage.removeItem('google-token');
-            updateGoogleSignInUI();
-            renderGoogleEvents();
-            renderWeekGoogleEvents();
+            clearGoogleCalendarAuth(true);
             throw new Error('認証の有効期限が切れました。再度サインインしてください。');
           }
           if (!res.ok) throw new Error('取得に失敗しました。');
@@ -3741,10 +3876,9 @@
 
     function createGoogleEvent(body, targetCalendarId) {
       var calId = targetCalendarId || googleCalendarId;
-      return fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calId) + '/events', {
+      return fetchGoogleApi('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calId) + '/events', {
         method: 'POST',
         headers: {
-          Authorization: 'Bearer ' + googleAccessToken,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(body)
@@ -3755,10 +3889,9 @@
     }
 
     function updateGoogleEvent(id, body) {
-      return fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events/' + encodeURIComponent(id), {
+      return fetchGoogleApi('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events/' + encodeURIComponent(id), {
         method: 'PATCH',
         headers: {
-          Authorization: 'Bearer ' + googleAccessToken,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(body)
@@ -3769,9 +3902,8 @@
     }
 
     function deleteGoogleEvent(id) {
-      return fetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events/' + encodeURIComponent(id), {
-        method: 'DELETE',
-        headers: { Authorization: 'Bearer ' + googleAccessToken }
+      return fetchGoogleApi('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events/' + encodeURIComponent(id), {
+        method: 'DELETE'
       }).then(function (res) {
         if (!res.ok && res.status !== 410) throw new Error('削除に失敗しました。');
       });
