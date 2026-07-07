@@ -21,7 +21,7 @@
 
 ## コーディング方針
 
-- 依存関係を増やさない。必要がなければ単一HTML中心の構成を維持する。
+- 依存関係を増やさない。必要がなければ単一HTML中心の構成を維持する。ビルド不要のCDN読み込み（`<script src>`）に限り、明確な理由（ブラウザAPIの非対応を補うフォールバック等）がある場合のみ例外を許容する（例: Google Identity Services、`@zxing/library`）。npm/ビルドツール導入は不可。
 - 既存の素朴なVanilla JSスタイルに合わせる。大きな抽象化やフレームワーク化は避ける。
 - `localStorage` から読むJSONは `try/catch` と `Array.isArray` などで型を確認する。
 - 既存データを壊す変更を避ける。保存キーを変える場合は移行処理を書く。
@@ -45,7 +45,7 @@
 - Workerは `NOTIFY_KV`、`VAPID_PRIVATE_JWK`、`VAPID_PUBLIC_KEY`、`VAPID_SUBJECT`、Cron Trigger を必要とする。
 - 現在のWorkerはKVキー `subscription` に1件だけ保存する設計。複数ユーザー/複数端末対応ではここを変更する。
 - Google OAuth client IDは公開情報。access tokenは実行時に `localStorage` の `google-token` に短時間保存されるだけで、リポジトリに含めない。
-- ISBN/バーコード教材追加はブラウザ標準の `BarcodeDetector` を使う。非対応ブラウザではISBN手入力を使う。書籍情報は openBD を先に見て、見つからない場合に Google Books の公開検索へフォールバックする。APIキーや秘密情報は使わない。
+- ISBN/バーコード教材追加はまずブラウザ標準の `BarcodeDetector` を試す。Safari等の非対応ブラウザでは、CDN読み込みの `@zxing/library`（`window.ZXing`）にフォールバックする。どちらも使えない環境ではISBN手入力を使う。書籍情報は openBD を先に見て、見つからない場合に Google Books の公開検索へフォールバックする。APIキーや秘密情報は使わない。
 
 ## UI確認時の注意
 

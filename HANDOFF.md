@@ -56,6 +56,7 @@
 - 二十四節気（24件）の日付テーブル `SEKKI_TABLE` と `getCurrentSekki()` / `applySekkiTheme()` を追加し、起動時に現在の節気に応じて上記CSS変数と背景モチーフを切り替えるようにした。タイトル下に節気名と一言説明（`#sekkiLabel`）を表示する。
 - 節気ごとに紐づく季節モチーフ（桜・梅・雪・雨・双葉・紅葉・稲穂・満月など14種、`MOTIF_SVGS`）をインラインSVGで生成し、`#seasonDecoration`（`position:fixed; z-index:-1; pointer-events:none`）に散りばめる。配置は当日の日付を種にした疑似乱数で決めるため、同じ日はリロードしても同じ配置になる。
 - 節気テーマ・季節モチーフはlocalStorageに新しいキーを追加しない（既存の日付計算から都度算出するだけ）。
+- ISBN/バーコード読み取りに、Safari等 `BarcodeDetector` 非対応ブラウザ向けのフォールバックとして `@zxing/library`（CDN読み込み、`window.ZXing`）を追加した。`startIsbnScan()` はネイティブ`BarcodeDetector`→ZXing→非対応メッセージの順で分岐する。`canScanBarcode()` で両方の対応状況をまとめて判定する。
 
 ## 直近でCodexが変更した内容
 
@@ -105,7 +106,8 @@
 コード上確認できた事実:
 
 - `scanIsbnBtn` で `isbnScannerModal` を開く。
-- `isbnStartScanBtn` は `BarcodeDetector` と `getUserMedia` が使える場合だけカメラ読み取りを開始する。
+- `isbnStartScanBtn` は `getUserMedia` が使える場合に、ネイティブ `BarcodeDetector`（Chrome系）→ CDN読み込みの `ZXing`（Safari等のフォールバック）の順でカメラ読み取りを試みる。`canScanBarcode()` がどちらか使えるかをまとめて判定する。
+- ZXing使用時は `startIsbnScanZXing()` が `ZXing.BrowserMultiFormatReader.decodeFromConstraints()` でカメラ起動とデコードを行い、`stopIsbnScan()` が `zxingReader.reset()` で解放する。
 - `isbnManualInput` と `isbnLookupBtn` でISBN手入力検索ができる。
 - 書籍情報取得は openBD → Google Books の順。秘密鍵やAPIキーは使っていない。
 - `isbnAddBookBtn` は検索済み書籍を教材として追加し、追加後に教材詳細を開く。
@@ -113,9 +115,9 @@
 
 未確認事項:
 
-- 実カメラでバーコードを読み取れるか。
+- 実カメラでバーコードを読み取れるか（ネイティブ・ZXing両方）。
 - 公開URLでopenBD/Google Booksから期待通り取得できるか。
-- Safari/iPhone PWAなど `BarcodeDetector` 非対応環境で、手入力導線が十分わかりやすいか。
+- SafariでのZXingフォールバックが実機で期待通り動くか。unpkg CDNが将来メジャーバージョンを上げた場合の互換性（現在 `@zxing/library@0.23.0` に固定）。
 
 ### PC版で教材追加ボタンが動かない問題
 
@@ -246,7 +248,7 @@
 - `sw.js` の通知クリックはURLに `index.html` を含むクライアントだけフォーカス対象にしている。ルートURLで開いているタブはフォーカスされない可能性がある。
 - `holidays2026` は固定リスト。
 - Workerは単一購読設計。
-- `BarcodeDetector` はブラウザ対応差がある。非対応環境ではISBN手入力を使う前提。
+- `BarcodeDetector` はブラウザ対応差がある。Safari等の非対応環境ではCDN読み込みの `ZXing`（`@zxing/library@0.23.0`）にフォールバックする。両方使えない環境ではISBN手入力を使う。
 - openBD/Google Booksの公開API仕様、CORS、レート制限に依存する。APIキーや秘密情報は使っていない。Google Booksが429を返す場合は、検索失敗ではなく取得失敗として扱う。
 
 ## 次にやるべき作業

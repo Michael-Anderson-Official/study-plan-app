@@ -9,6 +9,8 @@
   <meta name="apple-mobile-web-app-title" content="計画帳" />
   <link rel="apple-touch-icon" href="icon-192.png" />
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Safari等 BarcodeDetector 非対応ブラウザ向けのバーコード読み取りフォールバック -->
+  <script src="https://unpkg.com/@zxing/library@0.23.0/umd/index.min.js" defer></script>
   <style>
     /* テーマ変数（二十四節気ごとにJSから上書きされる）。デフォルトは従来の青系。 */
     :root {
@@ -939,6 +941,7 @@
     var isbnScanStream = null;
     var isbnScanTimer = null;
     var isbnDetectedBook = null;
+    var zxingReader = null; // Safari等 BarcodeDetector 非対応時のフォールバック用リーダー
 
     // 通知用の設定。
     var NOTIFY_WORKER_URL = 'https://keikakuchou-notify.keikakuchou-app.workers.dev';
@@ -1655,13 +1658,19 @@
       }
     }
 
+    // ネイティブの BarcodeDetector（Chrome系）か、フォールバックのZXing（Safari等）のどちらかが使えるか判定する
+    function canScanBarcode() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return false;
+      return ('BarcodeDetector' in window) || (typeof ZXing !== 'undefined');
+    }
+
     function openIsbnScannerModal() {
       var modal = document.getElementById('isbnScannerModal');
       var input = document.getElementById('isbnManualInput');
       if (!modal) return;
       resetIsbnPreview();
       modal.style.display = 'flex';
-      if ('BarcodeDetector' in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      if (canScanBarcode()) {
         setIsbnStatus('カメラでバーコードを読むか、ISBNを手入力してください。');
       } else {
         setIsbnStatus('このブラウザはカメラ読み取りに未対応です。ISBNを手入力してください。');
@@ -1711,15 +1720,21 @@
     function startIsbnScan() {
       var video = document.getElementById('isbnScannerVideo');
       if (!video) return;
-      if (!('BarcodeDetector' in window)) {
-        setIsbnStatus('このブラウザはバーコードのカメラ読み取りに未対応です。ISBNを手入力してください。', true);
-        return;
-      }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setIsbnStatus('カメラを起動できません。ISBNを手入力してください。', true);
         return;
       }
+      if ('BarcodeDetector' in window) {
+        startIsbnScanNative(video);
+      } else if (typeof ZXing !== 'undefined') {
+        startIsbnScanZXing(video);
+      } else {
+        setIsbnStatus('このブラウザはバーコードのカメラ読み取りに未対応です。ISBNを手入力してください。', true);
+      }
+    }
 
+    // Chrome系などネイティブ BarcodeDetector が使える場合の読み取り
+    function startIsbnScanNative(video) {
       stopIsbnScan();
       setIsbnStatus('カメラを起動しています...');
       navigator.mediaDevices.getUserMedia({
@@ -1742,6 +1757,48 @@
         }
         setIsbnStatus('バーコードを探しています。ISBNのバーコードをカメラに近づけてください。');
         scanIsbnFrame(detector);
+      }).catch(function () {
+        stopIsbnScan();
+        setIsbnStatus('カメラを起動できませんでした。ブラウザの権限を確認するか、ISBNを手入力してください。', true);
+      });
+    }
+
+    // Safari等、ネイティブ BarcodeDetector が無い場合のフォールバック（ZXingライブラリで読み取る）
+    function startIsbnScanZXing(video) {
+      stopIsbnScan();
+      setIsbnStatus('カメラを起動しています...');
+      try {
+        var hints = new Map();
+        hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+          ZXing.BarcodeFormat.EAN_13,
+          ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.UPC_A,
+          ZXing.BarcodeFormat.UPC_E,
+          ZXing.BarcodeFormat.CODE_128
+        ]);
+        zxingReader = new ZXing.BrowserMultiFormatReader(hints);
+      } catch (e) {
+        zxingReader = new ZXing.BrowserMultiFormatReader();
+      }
+      var constraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      };
+      setIsbnStatus('バーコードを探しています。ISBNのバーコードをカメラに近づけてください。');
+      zxingReader.decodeFromConstraints(constraints, video, function (result, err) {
+        if (result) {
+          var isbn = normalizeIsbn(result.getText());
+          if (isbn) {
+            stopIsbnScan();
+            setIsbnStatus('ISBN ' + isbn + ' を読み取りました。書籍情報を検索しています...');
+            lookupIsbn(isbn);
+          }
+        }
+        // NotFoundException は1フレームごとに毎回発生し得るため無視する
       }).catch(function () {
         stopIsbnScan();
         setIsbnStatus('カメラを起動できませんでした。ブラウザの権限を確認するか、ISBNを手入力してください。', true);
@@ -1785,6 +1842,10 @@
       if (isbnScanStream) {
         isbnScanStream.getTracks().forEach(function (track) { track.stop(); });
         isbnScanStream = null;
+      }
+      if (zxingReader) {
+        try { zxingReader.reset(); } catch (e) { /* 既に停止済みの場合は無視 */ }
+        zxingReader = null;
       }
       if (video) {
         video.pause();
