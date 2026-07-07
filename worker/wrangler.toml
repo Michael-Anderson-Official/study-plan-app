@@ -5,6 +5,9 @@ name = "keikakuchou-notify"
 main = "worker.js"
 compatibility_date = "2026-01-01"
 
+[vars]
+GOOGLE_OAUTH_CLIENT_ID = "313439643849-h299dp5h354joksqhuegfp4s89oc2dkd.apps.googleusercontent.com"
+
 [[kv_namespaces]]
 binding = "NOTIFY_KV"
 id = "a9643ad25f174787b034e5ec184f431e"
