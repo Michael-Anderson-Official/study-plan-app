@@ -2820,7 +2820,7 @@
           total++;
           if (localStorage.getItem(iso + '-sub' + n + '-status') === 'circle') done++;
         }
-        rateEl.textContent = total > 0 ? Math.round(done / total * 100) + '%' : '';
+        rateEl.textContent = total > 0 ? '達成率 ' + Math.round(done / total * 100) + '%' : '';
       });
     }
 
