@@ -2901,9 +2901,13 @@
 
           var controls2 = document.createElement('div');
           controls2.className = 'today-task-controls';
-          // 過去分の✕は記録のみで、予定の後ろ倒し（rescheduleAfterMiss）は行わない
-          // （過去日を起点に繰り越すと、すでに過ぎた日々の内容を書き換えてしまうため）
-          controls2.appendChild(buildTodayStatusGroup(task.iso + '-sub' + task.subNum + '-status'));
+          // 過去分の✕は、後ろ倒しするかどうかを確認してから実行する
+          // （今日の分と違い、途中の日に既に記録が入っている可能性があるため無断では動かさない）
+          controls2.appendChild(buildTodayStatusGroup(task.iso + '-sub' + task.subNum + '-status', function () {
+            if (confirm(dateText + 'の「' + label2 + '」を後ろ倒ししますか？\nこの日から連続している予定が1日ずつ後ろにずれます。')) {
+              rescheduleAfterMiss(task.iso, task.subNum);
+            }
+          }));
           li2.appendChild(controls2);
 
           listEl.appendChild(li2);
