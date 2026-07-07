@@ -771,7 +771,7 @@
     // テーブル行要素をキャッシュ
     const rows = document.querySelectorAll('tbody tr');
 
-    // モチベーション用の一言。日替わりで1つ表示する。
+    // モチベーション用の一言。リロードごとに1つ表示する。
     const motivationQuotes = [
       '今日の1ページが、未来の自分を助ける。',
       '続けることが、いちばんの近道。',
@@ -794,15 +794,22 @@
       '苦手なところこそ、伸びしろがある。',
       '目標は遠くても、道は今日から。'
     ];
-    function pickDailyQuote() {
-      var todayIso = toLocalISO(new Date());
-      var seed = 0;
-      for (var i = 0; i < todayIso.length; i++) seed += todayIso.charCodeAt(i);
-      return motivationQuotes[seed % motivationQuotes.length];
+    function pickRandomQuote() {
+      var nextIndex = Math.floor(Math.random() * motivationQuotes.length);
+      try {
+        var lastIndex = parseInt(sessionStorage.getItem('last-motivation-quote-index'), 10);
+        if (motivationQuotes.length > 1 && nextIndex === lastIndex) {
+          nextIndex = (nextIndex + 1) % motivationQuotes.length;
+        }
+        sessionStorage.setItem('last-motivation-quote-index', String(nextIndex));
+      } catch (e) {
+        // sessionStorageが使えない環境では単純なランダム表示にする。
+      }
+      return motivationQuotes[nextIndex];
     }
     (function () {
       var quoteEl = document.getElementById('motivationQuote');
-      if (quoteEl) quoteEl.textContent = pickDailyQuote();
+      if (quoteEl) quoteEl.textContent = pickRandomQuote();
     })();
 
     // 指定した日時をローカルタイムゾーンの ISO YYYY-MM-DD 形式に変換するヘルパー
