@@ -8,6 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="計画帳" />
   <link rel="apple-touch-icon" href="icon-192.png" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     /* 全体のスタイル */
     body {
@@ -94,6 +95,33 @@
     }
     .backup-section {
       border-bottom: none;
+    }
+    /* Googleカレンダービュー */
+    .google-event-day {
+      margin-bottom: 1rem;
+    }
+    .google-event-day h3 {
+      font-size: 0.9rem;
+      margin: 0 0 0.3rem 0;
+      padding-bottom: 0.2rem;
+      border-bottom: 1px solid #ccc;
+    }
+    .google-event-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.4rem 0.2rem;
+      border-bottom: 1px solid #eee;
+      font-size: 0.85rem;
+    }
+    .google-event-item .google-event-time {
+      color: #666;
+      white-space: nowrap;
+    }
+    .google-event-item .google-event-title {
+      flex: 1;
+      margin: 0 0.5rem;
     }
     table {
       border-collapse: collapse;
@@ -313,12 +341,53 @@
   <div class="view-tabs">
     <button id="weekTabBtn" type="button" class="tab-btn active">1週間</button>
     <button id="todayTabBtn" type="button" class="tab-btn">今日やること</button>
+    <button id="googleCalendarTabBtn" type="button" class="tab-btn">Googleカレンダー</button>
   </div>
   <!-- 今日やることビュー -->
   <div id="todayView" style="display:none; margin:1.5rem 1rem;">
     <p id="todayDateLabel" style="text-align:center; font-weight:bold; font-size:1.1rem; margin-bottom:0.3rem;"></p>
     <p id="todayTrivia" style="text-align:center; font-size:0.8rem; color:#666; margin-top:0; margin-bottom:1rem;"></p>
     <ul id="todayTaskList"></ul>
+  </div>
+  <!-- Googleカレンダービュー -->
+  <div id="googleCalendarView" style="display:none; margin:1.5rem 1rem;">
+    <div style="text-align:center; margin-bottom:1rem;">
+      <button id="googleSignInBtn" type="button">Googleでサインイン</button>
+      <button id="googleSyncBtn" type="button" style="display:none;">今すぐ同期</button>
+      <button id="googleAddEventBtn" type="button" style="display:none; margin-left:0.5rem;">＋予定を追加</button>
+      <p id="googleSyncStatus" style="font-size:0.8rem; color:#666;"></p>
+    </div>
+    <div id="googleEventList"></div>
+  </div>
+  <!-- Google予定の追加・編集モーダル -->
+  <div id="googleEventModal" class="settings-modal" style="display:none;">
+    <div class="settings-panel">
+      <button id="googleEventCloseBtn" type="button" class="settings-close-btn" aria-label="閉じる">×</button>
+      <h2 style="font-size:1rem; margin-top:0;">予定の編集</h2>
+      <input type="hidden" id="googleEventId" />
+      <div style="margin-bottom:0.5rem;">
+        <label for="googleEventTitle">タイトル:</label><br />
+        <input id="googleEventTitle" type="text" style="width:100%; box-sizing:border-box; padding:0.3rem;" />
+      </div>
+      <div style="margin-bottom:0.5rem;">
+        <label for="googleEventDate">日付:</label><br />
+        <input id="googleEventDate" type="date" style="padding:0.3rem;" />
+      </div>
+      <div style="margin-bottom:0.5rem;">
+        <label>
+          <input id="googleEventAllDay" type="checkbox" /> 終日
+        </label>
+      </div>
+      <div id="googleEventTimeRow" style="margin-bottom:0.5rem;">
+        <label for="googleEventStart">開始:</label>
+        <input id="googleEventStart" type="time" style="padding:0.3rem;" />
+        <label for="googleEventEnd" style="margin-left:0.5rem;">終了:</label>
+        <input id="googleEventEnd" type="time" style="padding:0.3rem;" />
+      </div>
+      <button id="googleEventSaveBtn" type="button">保存</button>
+      <button id="googleEventDeleteBtn" type="button" style="margin-left:0.5rem; background:#d9534f; display:none;">削除</button>
+      <p id="googleEventStatus" style="font-size:0.8rem; color:#666;"></p>
+    </div>
   </div>
   <div id="weekView">
   <div style="overflow-x: auto;">
@@ -637,6 +706,14 @@
     // 通知用の設定。
     var NOTIFY_WORKER_URL = 'https://keikakuchou-notify.keikakuchou-app.workers.dev';
     var VAPID_PUBLIC_KEY = 'BIiq4n3mytcp7ma9winH7y2KqPp701Tyi5-8kmK9KLbj-jnDyWc1wuypOH7saJaR0BDGvCyNevHT_M8ESTojqYU';
+
+    // Googleカレンダー連携用の設定。GOOGLE_CLIENT_ID は Google Cloud Console で
+    // OAuthクライアントIDを作成した後、そのIDに書き換えてください（秘密情報ではありません）。
+    var GOOGLE_CLIENT_ID = '313439643849-h299dp5h354joksqhuegfp4s89oc2dkd.apps.googleusercontent.com';
+    var GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+    var googleTokenClient = null;
+    var googleAccessToken = null;
+    var googleEvents = [];
 
     // 2026年の日本の祝日一覧。赤字表示の対象となります。
     const holidays2026 = new Set([
@@ -971,6 +1048,7 @@
           window.currentWeekStartISO = toLocalISO(start);
           updateWeekUI();
           updateCellsForCurrentWeek();
+          refreshGoogleEventsIfVisible();
         });
       }
       var nextBtn = document.getElementById('nextWeekBtn');
@@ -981,6 +1059,7 @@
           window.currentWeekStartISO = toLocalISO(start);
           updateWeekUI();
           updateCellsForCurrentWeek();
+          refreshGoogleEventsIfVisible();
         });
       }
 
@@ -998,27 +1077,36 @@
           window.currentWeekStartISO = toLocalISO(startOfWeekNow);
           updateWeekUI();
           updateCellsForCurrentWeek();
+          refreshGoogleEventsIfVisible();
         });
       }
 
       // 表示切り替えタブのクリック処理
       var weekTabBtn = document.getElementById('weekTabBtn');
       var todayTabBtn = document.getElementById('todayTabBtn');
+      var googleCalendarTabBtn = document.getElementById('googleCalendarTabBtn');
       var weekView = document.getElementById('weekView');
       var todayView = document.getElementById('todayView');
-      if (weekTabBtn && todayTabBtn && weekView && todayView) {
+      var googleCalendarView = document.getElementById('googleCalendarView');
+      if (weekTabBtn && todayTabBtn && googleCalendarTabBtn && weekView && todayView && googleCalendarView) {
+        var allTabBtns = [weekTabBtn, todayTabBtn, googleCalendarTabBtn];
+        var allViews = [weekView, todayView, googleCalendarView];
+        function showTab(activeBtn, activeView) {
+          allViews.forEach(function (v) { v.style.display = 'none'; });
+          allTabBtns.forEach(function (b) { b.classList.remove('active'); });
+          activeView.style.display = '';
+          activeBtn.classList.add('active');
+        }
         weekTabBtn.addEventListener('click', function () {
-          weekView.style.display = '';
-          todayView.style.display = 'none';
-          weekTabBtn.classList.add('active');
-          todayTabBtn.classList.remove('active');
+          showTab(weekTabBtn, weekView);
         });
         todayTabBtn.addEventListener('click', function () {
-          weekView.style.display = 'none';
-          todayView.style.display = '';
-          todayTabBtn.classList.add('active');
-          weekTabBtn.classList.remove('active');
+          showTab(todayTabBtn, todayView);
           updateTodayView();
+        });
+        googleCalendarTabBtn.addEventListener('click', function () {
+          showTab(googleCalendarTabBtn, googleCalendarView);
+          onGoogleCalendarTabShown();
         });
       }
 
@@ -1079,6 +1167,7 @@
           window.currentWeekStartISO = toLocalISO(startOfWeek);
           updateWeekUI();
           updateCellsForCurrentWeek();
+          refreshGoogleEventsIfVisible();
         });
       }
       // ページ全体が読み込まれた後に初期化を行います。これによりデスクトップブラウザでも
@@ -1721,6 +1810,332 @@
           }
         };
         reader.readAsText(file);
+      });
+    }
+
+    // ---- Googleカレンダー連携 ----
+
+    function isGoogleCalendarTabVisible() {
+      var view = document.getElementById('googleCalendarView');
+      return !!view && view.style.display !== 'none';
+    }
+
+    function updateGoogleSignInUI() {
+      var signInBtn = document.getElementById('googleSignInBtn');
+      var syncBtn = document.getElementById('googleSyncBtn');
+      var addBtn = document.getElementById('googleAddEventBtn');
+      var signedIn = !!googleAccessToken;
+      if (signInBtn) signInBtn.style.display = signedIn ? 'none' : '';
+      if (syncBtn) syncBtn.style.display = signedIn ? '' : 'none';
+      if (addBtn) addBtn.style.display = signedIn ? '' : 'none';
+    }
+
+    function onGoogleCalendarTabShown() {
+      updateGoogleSignInUI();
+      if (googleAccessToken) fetchGoogleEvents();
+    }
+
+    // 週送り・今週へボタンでも、Googleカレンダータブを表示中なら予定を再取得する
+    function refreshGoogleEventsIfVisible() {
+      if (isGoogleCalendarTabVisible() && googleAccessToken) fetchGoogleEvents();
+    }
+
+    function initGoogleAuth() {
+      if (googleTokenClient || !window.google || !google.accounts || !google.accounts.oauth2) return;
+      googleTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: GOOGLE_CALENDAR_SCOPE,
+        callback: function (response) {
+          var statusEl = document.getElementById('googleSyncStatus');
+          if (response && response.access_token) {
+            googleAccessToken = response.access_token;
+            updateGoogleSignInUI();
+            fetchGoogleEvents();
+          } else if (statusEl) {
+            statusEl.textContent = 'サインインできませんでした。';
+          }
+        }
+      });
+    }
+
+    function requestGoogleToken() {
+      if (!googleTokenClient) initGoogleAuth();
+      if (!googleTokenClient) {
+        var statusEl = document.getElementById('googleSyncStatus');
+        if (statusEl) statusEl.textContent = 'Google連携の準備ができていません。しばらくしてから再度お試しください。';
+        return;
+      }
+      googleTokenClient.requestAccessToken({ prompt: googleAccessToken ? '' : 'consent' });
+    }
+
+    function getGoogleWeekRange() {
+      var start = parseISOToDate(window.currentWeekStartISO);
+      var end = new Date(start);
+      end.setDate(start.getDate() + 7);
+      return { timeMin: start.toISOString(), timeMax: end.toISOString() };
+    }
+
+    function fetchGoogleEvents() {
+      if (!googleAccessToken) return;
+      var statusEl = document.getElementById('googleSyncStatus');
+      if (statusEl) statusEl.textContent = '同期中...';
+      var range = getGoogleWeekRange();
+      var url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+        + '?timeMin=' + encodeURIComponent(range.timeMin)
+        + '&timeMax=' + encodeURIComponent(range.timeMax)
+        + '&singleEvents=true&orderBy=startTime';
+      fetch(url, { headers: { Authorization: 'Bearer ' + googleAccessToken } })
+        .then(function (res) {
+          if (res.status === 401) {
+            googleAccessToken = null;
+            updateGoogleSignInUI();
+            throw new Error('認証の有効期限が切れました。再度サインインしてください。');
+          }
+          if (!res.ok) throw new Error('取得に失敗しました。');
+          return res.json();
+        })
+        .then(function (data) {
+          googleEvents = data.items || [];
+          renderGoogleEvents();
+          if (statusEl) {
+            var now = new Date();
+            statusEl.textContent = '最終同期: ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+          }
+        })
+        .catch(function (err) {
+          if (statusEl) statusEl.textContent = err.message || '同期に失敗しました。';
+        });
+    }
+
+    function renderGoogleEvents() {
+      var listEl = document.getElementById('googleEventList');
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      var startDate = parseISOToDate(window.currentWeekStartISO);
+      for (var i = 0; i < 7; i++) {
+        var date = new Date(startDate);
+        date.setDate(startDate.getDate() + i);
+        var iso = toLocalISO(date);
+        var dayEvents = googleEvents.filter(function (ev) {
+          var evStart = ev.start && (ev.start.dateTime || ev.start.date);
+          return !!evStart && evStart.indexOf(iso) === 0;
+        });
+        var dayDiv = document.createElement('div');
+        dayDiv.className = 'google-event-day';
+        var h3 = document.createElement('h3');
+        h3.textContent = (date.getMonth() + 1) + '/' + date.getDate() + ' ' + dayNames[date.getDay()] + '曜日';
+        dayDiv.appendChild(h3);
+        if (dayEvents.length === 0) {
+          var emptyP = document.createElement('p');
+          emptyP.style.cssText = 'font-size:0.8rem; color:#999; margin:0.2rem 0;';
+          emptyP.textContent = '予定はありません。';
+          dayDiv.appendChild(emptyP);
+        } else {
+          dayEvents.forEach(function (ev) {
+            dayDiv.appendChild(buildGoogleEventItem(ev));
+          });
+        }
+        listEl.appendChild(dayDiv);
+      }
+    }
+
+    function buildGoogleEventItem(ev) {
+      var item = document.createElement('div');
+      item.className = 'google-event-item';
+
+      var timeSpan = document.createElement('span');
+      timeSpan.className = 'google-event-time';
+      if (ev.start && ev.start.dateTime) {
+        var st = new Date(ev.start.dateTime);
+        var timeText = String(st.getHours()).padStart(2, '0') + ':' + String(st.getMinutes()).padStart(2, '0');
+        if (ev.end && ev.end.dateTime) {
+          var et = new Date(ev.end.dateTime);
+          timeText += '〜' + String(et.getHours()).padStart(2, '0') + ':' + String(et.getMinutes()).padStart(2, '0');
+        }
+        timeSpan.textContent = timeText;
+      } else {
+        timeSpan.textContent = '終日';
+      }
+      item.appendChild(timeSpan);
+
+      var titleSpan = document.createElement('span');
+      titleSpan.className = 'google-event-title';
+      titleSpan.textContent = ev.summary || '(タイトルなし)';
+      item.appendChild(titleSpan);
+
+      var editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.textContent = '編集';
+      editBtn.className = 'btn-outline';
+      editBtn.addEventListener('click', function () {
+        openGoogleEventModal(ev);
+      });
+      item.appendChild(editBtn);
+
+      return item;
+    }
+
+    function toggleGoogleEventTimeRow() {
+      var allDayInput = document.getElementById('googleEventAllDay');
+      var timeRow = document.getElementById('googleEventTimeRow');
+      if (timeRow) timeRow.style.display = (allDayInput && allDayInput.checked) ? 'none' : '';
+    }
+
+    function openGoogleEventModal(ev) {
+      var idInput = document.getElementById('googleEventId');
+      var titleInput = document.getElementById('googleEventTitle');
+      var dateInput = document.getElementById('googleEventDate');
+      var allDayInput = document.getElementById('googleEventAllDay');
+      var startInput = document.getElementById('googleEventStart');
+      var endInput = document.getElementById('googleEventEnd');
+      var deleteBtn = document.getElementById('googleEventDeleteBtn');
+      var statusEl = document.getElementById('googleEventStatus');
+      if (statusEl) statusEl.textContent = '';
+
+      if (ev) {
+        idInput.value = ev.id;
+        titleInput.value = ev.summary || '';
+        if (ev.start && ev.start.dateTime) {
+          var st = new Date(ev.start.dateTime);
+          var et = (ev.end && ev.end.dateTime) ? new Date(ev.end.dateTime) : st;
+          dateInput.value = toLocalISO(st);
+          allDayInput.checked = false;
+          startInput.value = String(st.getHours()).padStart(2, '0') + ':' + String(st.getMinutes()).padStart(2, '0');
+          endInput.value = String(et.getHours()).padStart(2, '0') + ':' + String(et.getMinutes()).padStart(2, '0');
+        } else if (ev.start && ev.start.date) {
+          dateInput.value = ev.start.date;
+          allDayInput.checked = true;
+          startInput.value = '';
+          endInput.value = '';
+        }
+        if (deleteBtn) deleteBtn.style.display = '';
+      } else {
+        idInput.value = '';
+        titleInput.value = '';
+        dateInput.value = toLocalISO(new Date());
+        allDayInput.checked = false;
+        startInput.value = '09:00';
+        endInput.value = '10:00';
+        if (deleteBtn) deleteBtn.style.display = 'none';
+      }
+      toggleGoogleEventTimeRow();
+      var modal = document.getElementById('googleEventModal');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function createGoogleEvent(body) {
+      return fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + googleAccessToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      }).then(function (res) {
+        if (!res.ok) throw new Error('作成に失敗しました。');
+        return res.json();
+      });
+    }
+
+    function updateGoogleEvent(id, body) {
+      return fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events/' + encodeURIComponent(id), {
+        method: 'PATCH',
+        headers: {
+          Authorization: 'Bearer ' + googleAccessToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      }).then(function (res) {
+        if (!res.ok) throw new Error('更新に失敗しました。');
+        return res.json();
+      });
+    }
+
+    function deleteGoogleEvent(id) {
+      return fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events/' + encodeURIComponent(id), {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + googleAccessToken }
+      }).then(function (res) {
+        if (!res.ok && res.status !== 410) throw new Error('削除に失敗しました。');
+      });
+    }
+
+    function saveGoogleEvent() {
+      var id = document.getElementById('googleEventId').value;
+      var title = document.getElementById('googleEventTitle').value.trim();
+      var dateVal = document.getElementById('googleEventDate').value;
+      var allDay = document.getElementById('googleEventAllDay').checked;
+      var startVal = document.getElementById('googleEventStart').value;
+      var endVal = document.getElementById('googleEventEnd').value;
+      var statusEl = document.getElementById('googleEventStatus');
+      if (!title || !dateVal) {
+        if (statusEl) statusEl.textContent = 'タイトルと日付を入力してください。';
+        return;
+      }
+      var body = { summary: title };
+      if (allDay) {
+        var nextDate = parseISOToDate(dateVal);
+        nextDate.setDate(nextDate.getDate() + 1);
+        body.start = { date: dateVal };
+        body.end = { date: toLocalISO(nextDate) };
+      } else {
+        body.start = { dateTime: dateVal + 'T' + (startVal || '09:00') + ':00', timeZone: 'Asia/Tokyo' };
+        body.end = { dateTime: dateVal + 'T' + (endVal || '10:00') + ':00', timeZone: 'Asia/Tokyo' };
+      }
+      if (statusEl) statusEl.textContent = '保存中...';
+      var request = id ? updateGoogleEvent(id, body) : createGoogleEvent(body);
+      request.then(function () {
+        var modal = document.getElementById('googleEventModal');
+        if (modal) modal.style.display = 'none';
+        fetchGoogleEvents();
+      }).catch(function (err) {
+        if (statusEl) statusEl.textContent = err.message || '保存に失敗しました。';
+      });
+    }
+
+    // Googleカレンダー関連のボタンの配線
+    var googleSignInBtn = document.getElementById('googleSignInBtn');
+    if (googleSignInBtn) googleSignInBtn.addEventListener('click', requestGoogleToken);
+
+    var googleSyncBtn = document.getElementById('googleSyncBtn');
+    if (googleSyncBtn) googleSyncBtn.addEventListener('click', fetchGoogleEvents);
+
+    var googleAddEventBtn = document.getElementById('googleAddEventBtn');
+    if (googleAddEventBtn) {
+      googleAddEventBtn.addEventListener('click', function () { openGoogleEventModal(null); });
+    }
+
+    var googleEventCloseBtn = document.getElementById('googleEventCloseBtn');
+    var googleEventModal = document.getElementById('googleEventModal');
+    if (googleEventCloseBtn && googleEventModal) {
+      googleEventCloseBtn.addEventListener('click', function () {
+        googleEventModal.style.display = 'none';
+      });
+      googleEventModal.addEventListener('click', function (event) {
+        if (event.target === googleEventModal) googleEventModal.style.display = 'none';
+      });
+    }
+
+    var googleEventAllDay = document.getElementById('googleEventAllDay');
+    if (googleEventAllDay) googleEventAllDay.addEventListener('change', toggleGoogleEventTimeRow);
+
+    var googleEventSaveBtn = document.getElementById('googleEventSaveBtn');
+    if (googleEventSaveBtn) googleEventSaveBtn.addEventListener('click', saveGoogleEvent);
+
+    var googleEventDeleteBtn = document.getElementById('googleEventDeleteBtn');
+    if (googleEventDeleteBtn) {
+      googleEventDeleteBtn.addEventListener('click', function () {
+        var id = document.getElementById('googleEventId').value;
+        if (!id) return;
+        if (!confirm('この予定を削除しますか？')) return;
+        var statusEl = document.getElementById('googleEventStatus');
+        if (statusEl) statusEl.textContent = '削除中...';
+        deleteGoogleEvent(id).then(function () {
+          if (googleEventModal) googleEventModal.style.display = 'none';
+          fetchGoogleEvents();
+        }).catch(function (err) {
+          if (statusEl) statusEl.textContent = err.message || '削除に失敗しました。';
+        });
       });
     }
   </script>
