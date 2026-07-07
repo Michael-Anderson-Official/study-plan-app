@@ -48,6 +48,7 @@
 - 「一週間をリセット」ボタンを削除し、週始まり設定を設定モーダルへ移動。
 - 行の折りたたみ、今日ハイライト、年表示、ダブルタップズーム対策などUI調整を実施。
 - Googleカレンダータブを追加し、予定の取得・作成・編集・削除・場所入力・対象カレンダー選択・アクセストークン短期保存を追加。
+- 1週間タブの日付セルにも、サインイン済みGoogleカレンダーのその日の予定を箇条書き表示するようにした。
 
 ## 保存キー・データ構造
 
@@ -116,7 +117,7 @@
 
 - `currentWeekBtn` が存在し、表示テキストは `今週へ`。
 - クリック時は現在日付と `weekStart` 設定から週開始日を再計算し、`window.currentWeekStartISO` を更新する。
-- 更新後に `updateWeekUI()`、`updateCellsForCurrentWeek()`、Googleカレンダー表示中なら `refreshGoogleEventsIfVisible()` を呼ぶ。
+- 更新後に `updateWeekUI()`、`updateCellsForCurrentWeek()`、サインイン済みなら `refreshGoogleEventsForCurrentWeek()` を呼ぶ。
 
 未確認事項:
 
@@ -180,6 +181,7 @@
 - 教材詳細保存時に手入力セルが消える挙動が許容されるか。
 - 今日やることの×による繰り越しが全ケースで期待どおりか。
 - Googleサインイン、カレンダー一覧取得、予定作成/編集/削除の実操作。
+- 1週間タブの日付セル内にGoogle予定が期待通り表示されるかの実ブラウザ確認。
 - iPhone PWA通知、Android/PC通知、Worker scheduled push。
 - 2027年以降の祝日表示。
 

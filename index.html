@@ -129,11 +129,11 @@
       table-layout: fixed;
     }
     #planTable {
-      min-width: 760px;
+      min-width: 960px;
     }
     #planTable th.row-label {
-      width: 4.8rem;
-      min-width: 4.8rem;
+      width: 9rem;
+      min-width: 9rem;
       box-sizing: border-box;
     }
     th, td {
@@ -177,9 +177,36 @@
     tbody tr.row-collapsed th.row-label {
       padding: 0.3rem 0.2rem;
       font-size: 0.7rem;
-      height: 1.2rem;
-      white-space: nowrap;
+      height: auto;
+      min-height: 1.2rem;
+      white-space: normal;
       overflow: hidden;
+      vertical-align: top;
+    }
+    .row-date-text {
+      text-align: center;
+      white-space: nowrap;
+    }
+    .week-google-events {
+      margin: 0.15rem 0 0;
+      padding-left: 1rem;
+      max-height: 4.2rem;
+      overflow: auto;
+      color: #555;
+      font-size: 0.62rem;
+      font-weight: normal;
+      line-height: 1.25;
+      text-align: left;
+      white-space: normal;
+    }
+    .week-google-events li {
+      margin: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .week-google-event-time {
+      color: #777;
     }
     /* セルのスタイル */
     .cell {
@@ -1108,7 +1135,7 @@
           window.currentWeekStartISO = toLocalISO(start);
           updateWeekUI();
           updateCellsForCurrentWeek();
-          refreshGoogleEventsIfVisible();
+          refreshGoogleEventsForCurrentWeek();
         });
       }
       var nextBtn = document.getElementById('nextWeekBtn');
@@ -1119,7 +1146,7 @@
           window.currentWeekStartISO = toLocalISO(start);
           updateWeekUI();
           updateCellsForCurrentWeek();
-          refreshGoogleEventsIfVisible();
+          refreshGoogleEventsForCurrentWeek();
         });
       }
 
@@ -1137,7 +1164,7 @@
           window.currentWeekStartISO = toLocalISO(startOfWeekNow);
           updateWeekUI();
           updateCellsForCurrentWeek();
-          refreshGoogleEventsIfVisible();
+          refreshGoogleEventsForCurrentWeek();
         });
       }
 
@@ -1227,7 +1254,7 @@
           window.currentWeekStartISO = toLocalISO(startOfWeek);
           updateWeekUI();
           updateCellsForCurrentWeek();
-          refreshGoogleEventsIfVisible();
+          refreshGoogleEventsForCurrentWeek();
         });
       }
       // ページ全体が読み込まれた後に初期化を行います。これによりデスクトップブラウザでも
@@ -1248,6 +1275,11 @@
         updateCellsForCurrentWeek();
         // 教材リストを画面に反映
         updateMaterialsUI();
+        if (googleAccessToken) {
+          updateGoogleSignInUI();
+          fetchGoogleCalendarList();
+          fetchGoogleEvents();
+        }
       });
     // DOMContentLoaded 用のクロージャを削除したため閉じカッコは不要になりました。
 
@@ -1485,7 +1517,12 @@
         var dayName = dayNames[date.getDay()];
         var labelCell = row.querySelector('th.row-label');
         if (labelCell) {
-          labelCell.textContent = dayName + ' ' + display;
+          labelCell.innerHTML = '';
+          labelCell.setAttribute('data-date-iso', iso);
+          var dateText = document.createElement('div');
+          dateText.className = 'row-date-text';
+          dateText.textContent = dayName + ' ' + display;
+          labelCell.appendChild(dateText);
           // 今日の日付行の場合はハイライト用クラスを追加する（サイズは他の行と同じく折りたたむ）
           if (iso === todayISO) {
             labelCell.classList.add('today');
@@ -1509,6 +1546,7 @@
           if (section) section.setAttribute('data-key', iso + '-sub' + subNum + '-content');
         });
       });
+      renderWeekGoogleEvents();
       // 一週間の振り返り欄の読み込みと保存イベントの更新
       var weeklySummaryEl = document.getElementById('weeklySummary');
       if (weeklySummaryEl) {
@@ -1877,6 +1915,52 @@
 
     // ---- Googleカレンダー連携 ----
 
+    function getGoogleEventsForISO(iso) {
+      return googleEvents.filter(function (ev) {
+        var evStart = ev.start && (ev.start.dateTime || ev.start.date);
+        return !!evStart && evStart.indexOf(iso) === 0;
+      });
+    }
+
+    function formatGoogleEventTime(ev) {
+      if (ev.start && ev.start.dateTime) {
+        var st = new Date(ev.start.dateTime);
+        var timeText = String(st.getHours()).padStart(2, '0') + ':' + String(st.getMinutes()).padStart(2, '0');
+        if (ev.end && ev.end.dateTime) {
+          var et = new Date(ev.end.dateTime);
+          timeText += '〜' + String(et.getHours()).padStart(2, '0') + ':' + String(et.getMinutes()).padStart(2, '0');
+        }
+        return timeText;
+      }
+      return '終日';
+    }
+
+    function renderWeekGoogleEvents() {
+      document.querySelectorAll('#planTable tbody th.row-label').forEach(function (labelCell) {
+        var existing = labelCell.querySelector('.week-google-events');
+        if (existing) existing.remove();
+
+        var iso = labelCell.getAttribute('data-date-iso');
+        if (!iso || !googleAccessToken) return;
+
+        var dayEvents = getGoogleEventsForISO(iso);
+        if (dayEvents.length === 0) return;
+
+        var ul = document.createElement('ul');
+        ul.className = 'week-google-events';
+        dayEvents.forEach(function (ev) {
+          var li = document.createElement('li');
+          var timeSpan = document.createElement('span');
+          timeSpan.className = 'week-google-event-time';
+          timeSpan.textContent = formatGoogleEventTime(ev) + ' ';
+          li.appendChild(timeSpan);
+          li.appendChild(document.createTextNode(ev.summary || '(タイトルなし)'));
+          ul.appendChild(li);
+        });
+        labelCell.appendChild(ul);
+      });
+    }
+
     function isGoogleCalendarTabVisible() {
       var view = document.getElementById('googleCalendarView');
       return !!view && view.style.display !== 'none';
@@ -1945,9 +2029,9 @@
       }
     }
 
-    // 週送り・今週へボタンでも、Googleカレンダータブを表示中なら予定を再取得する
-    function refreshGoogleEventsIfVisible() {
-      if (isGoogleCalendarTabVisible() && googleAccessToken) fetchGoogleEvents();
+    // 週送り・今週へボタンでも、1週間タブの日付セル用にサインイン済みなら予定を再取得する
+    function refreshGoogleEventsForCurrentWeek() {
+      if (googleAccessToken) fetchGoogleEvents();
     }
 
     function initGoogleAuth() {
@@ -2005,8 +2089,11 @@
         .then(function (res) {
           if (res.status === 401) {
             googleAccessToken = null;
+            googleEvents = [];
             localStorage.removeItem('google-token');
             updateGoogleSignInUI();
+            renderGoogleEvents();
+            renderWeekGoogleEvents();
             throw new Error('認証の有効期限が切れました。再度サインインしてください。');
           }
           if (!res.ok) throw new Error('取得に失敗しました。');
@@ -2015,6 +2102,7 @@
         .then(function (data) {
           googleEvents = data.items || [];
           renderGoogleEvents();
+          renderWeekGoogleEvents();
           if (statusEl) {
             var now = new Date();
             statusEl.textContent = '最終同期: ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
@@ -2034,10 +2122,7 @@
         var date = new Date(startDate);
         date.setDate(startDate.getDate() + i);
         var iso = toLocalISO(date);
-        var dayEvents = googleEvents.filter(function (ev) {
-          var evStart = ev.start && (ev.start.dateTime || ev.start.date);
-          return !!evStart && evStart.indexOf(iso) === 0;
-        });
+        var dayEvents = getGoogleEventsForISO(iso);
         var dayDiv = document.createElement('div');
         dayDiv.className = 'google-event-day';
         var h3 = document.createElement('h3');
@@ -2063,17 +2148,7 @@
 
       var timeSpan = document.createElement('span');
       timeSpan.className = 'google-event-time';
-      if (ev.start && ev.start.dateTime) {
-        var st = new Date(ev.start.dateTime);
-        var timeText = String(st.getHours()).padStart(2, '0') + ':' + String(st.getMinutes()).padStart(2, '0');
-        if (ev.end && ev.end.dateTime) {
-          var et = new Date(ev.end.dateTime);
-          timeText += '〜' + String(et.getHours()).padStart(2, '0') + ':' + String(et.getMinutes()).padStart(2, '0');
-        }
-        timeSpan.textContent = timeText;
-      } else {
-        timeSpan.textContent = '終日';
-      }
+      timeSpan.textContent = formatGoogleEventTime(ev);
       item.appendChild(timeSpan);
 
       var titleSpan = document.createElement('span');
