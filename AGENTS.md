@@ -1,42 +1,55 @@
 # AGENTS.md
 
-このリポジトリは、AIエージェントが引き継いで作業する前提です。最初にこのファイルを読んでください。
+このリポジトリは、Codex / Claude Code / ChatGPT などの開発AIが引き継いで作業する前提です。作業前に必ずこのファイルと `HANDOFF.md` を読んでください。
 
 ## プロジェクト概要
 
-- 目的: 1週間の学習計画を、予習欄・復習欄・教材リスト・週の振り返りで管理する静的Webアプリ。
-- 実装: ルート直下の `index.html` だけで動く単一HTMLアプリ。
-- 使用技術: HTML / CSS / Vanilla JavaScript。外部ライブラリ、ビルドツール、npm依存はなし。
-- 保存: ブラウザの `localStorage`。
-- 公開: GitHub Pages。
+- 目的: 1週間の学習計画、今日やること、教材リスト、週の振り返り、Googleカレンダー予定、毎日通知を管理する静的Webアプリ。
+- 公開URL: `https://michael-anderson-official.github.io/study-plan-app/`
+- 使用技術: HTML / CSS / Vanilla JavaScript。ビルドツールやnpm依存は使わない。
+- 主要ファイル: `index.html`。PWA/通知用に `manifest.json`、`sw.js`、Cloudflare Worker 用に `worker/worker.js`、`worker/wrangler.toml` がある。
+- 保存: アプリ本体はブラウザの `localStorage`。通知購読はCloudflare KV。
+- 公開: GitHub Pages の `main` ブランチ。
 
 ## 起動・ビルド・テスト
 
-- 起動: 任意の静的HTTPサーバーでルートを配信する。例: `python -m http.server 8765`
-- 公開URL: `https://michael-anderson-official.github.io/study-plan-app/`
+- 起動: ルートを静的HTTPサーバーで配信する。例: `python -m http.server 8765`
 - ビルド: 不要。
-- 構文確認: `index.html` 内の `<script>` を抽出して `new Function(script)` で確認する。
-- 手動確認: PC幅とスマホ幅の両方で、教材追加、教材詳細、削除、週移動、振り返り保存を確認する。
+- 構文確認: `index.html` 内の最終 `<script>` を抽出して `new Function(script)` で確認する。`worker/worker.js` はES moduleとしてimportできるか確認する。`manifest.json` はJSON parseする。
+- 手動確認: PC幅とスマホ幅の両方で、教材追加、教材詳細保存、教材削除、週移動、今週へ、今日やること、週の振り返り、設定モーダル、バックアップ/復元を確認する。
+- 通知確認: HTTPSの公開URLまたはlocalhostでService Worker登録を確認する。実push、iPhone PWA、Cron実行はCloudflare設定と実機が必要。
 
 ## コーディング方針
 
-- 依存関係を増やさない。必要がなければ単一HTML構成を維持する。
-- 既存の素朴な Vanilla JS スタイルに合わせる。
-- `localStorage` から読むJSONは、必ず `try/catch` と `Array.isArray` などで型を確認する。
+- 依存関係を増やさない。必要がなければ単一HTML中心の構成を維持する。
+- 既存の素朴なVanilla JSスタイルに合わせる。大きな抽象化やフレームワーク化は避ける。
+- `localStorage` から読むJSONは `try/catch` と `Array.isArray` などで型を確認する。
 - 既存データを壊す変更を避ける。保存キーを変える場合は移行処理を書く。
-- 既存の教材リスト、教材詳細、週ごとの記録を勝手に削除しない。
+- 教材リスト、教材詳細、週ごとの記録、週の振り返りを勝手に削除しない。
+- secretやprivate keyをコミットしない。VAPID private JWK、Cloudflare secrets、Google OAuth access tokenはリポジトリに置かない。
 
 ## 日付・週表示の注意
 
-- 日本時間で使う前提。`toLocalISO(date)` と `parseISOToDate(iso)` を使い、UTC由来の日付ずれを避ける。
-- 週の開始日は `localStorage` の `weekStart` に保存される。値は `Date.getDay()` と同じ数値文字列（`'0'`=日〜`'6'`=土）。設定UIは設定モーダル（⚙️アイコン）内にある。古い `monday`/`sunday` 形式は `getWeekStartDay()` が読み込み時に数値へ移行する。
-- `window.currentWeekStartISO` を基準に、表の行ラベルと各セルの `data-key` を更新する。
-- 今日ハイライトはブラウザのローカル日付を `toLocalISO` で比較する。
-- 祝日判定は現在 `holidays2026` の固定セット。年をまたぐ変更では更新が必要。
+- 日本時間で使う前提。ブラウザ側の日付は `toLocalISO(date)` と `parseISOToDate(iso)` を使い、UTC由来の日付ずれを避ける。
+- 週の開始日は `localStorage` の `weekStart` に保存する。値は `Date.getDay()` と同じ数値文字列（`'0'`=日〜`'6'`=土）。
+- 古い `monday` / `sunday` 形式は `getWeekStartDay()` が読み込み時に数値へ移行する。
+- `window.currentWeekStartISO` を基準に、表の行ラベル、各セルの `data-key`、週の振り返りキーを更新する。
+- 今日ハイライトと今日やることはブラウザのローカル日付を `toLocalISO` で比較する。端末タイムゾーンが日本時間以外の場合は未検証。
+- Googleカレンダー予定の作成は `timeZone: 'Asia/Tokyo'` を指定している。
+- 祝日判定は `holidays2026` の固定セット。2027年以降は更新が必要。
+
+## 通知・Worker・外部連携
+
+- `NOTIFY_WORKER_URL` は `https://keikakuchou-notify.keikakuchou-app.workers.dev`。
+- `VAPID_PUBLIC_KEY` は公開鍵なので `index.html` に置いてよい。秘密鍵はCloudflare Secret `VAPID_PRIVATE_JWK` に置く。
+- Workerは `NOTIFY_KV`、`VAPID_PRIVATE_JWK`、`VAPID_PUBLIC_KEY`、`VAPID_SUBJECT`、Cron Trigger を必要とする。
+- 現在のWorkerはKVキー `subscription` に1件だけ保存する設計。複数ユーザー/複数端末対応ではここを変更する。
+- Google OAuth client IDは公開情報。access tokenは実行時に `localStorage` の `google-token` に短時間保存されるだけで、リポジトリに含めない。
 
 ## UI確認時の注意
 
-- カレンダー上部のヘッダーには教材名が入る。セル内に教材名を重複表示しない。
-- 「一週間をリセット」ボタンは廃止済み。教材詳細の保存時に既存セル内容を自動で上書きするため不要になった。
-- 教材削除は教材詳細パネル内の「削除」ボタンで行う。
-- 教材削除後も、カレンダーにすでに記入済みの予定は残る。
+- カレンダー上部ヘッダーには教材名が入る。セル内に教材名を重複表示しない。
+- 「一週間をリセット」ボタンは廃止済み。
+- 教材削除は教材詳細パネル内の「削除」ボタンで行う。削除しても、カレンダーにすでに記入済みの予定は残る。
+- 教材詳細保存や「毎日」は、その教材列の既存スケジュールセルを消して再割り当てする。手入力が消える可能性に注意する。
+- 今日やることの「×」は、その日以降の連続予定を1日後ろ倒しにする。
