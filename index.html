@@ -926,6 +926,20 @@
         <p id="notifyStatus" style="font-size:0.8rem; color:#666; margin-bottom:0;"></p>
       </div>
 
+      <!-- アカウント同期 -->
+      <div class="account-section">
+        <h2 style="font-size:1rem; margin-top:0; margin-bottom:0.5rem;">アカウント同期</h2>
+        <p style="font-size:0.8rem; color:#666; margin-top:0;">
+          Googleでサインインすると、複数の端末でデータが同期されます。サインインしなくても今まで通り使えます。
+        </p>
+        <button id="accountSignInBtn" type="button">Googleでサインイン</button>
+        <div id="accountSignedInInfo" style="display:none;">
+          <p id="accountEmailLabel" style="font-size:0.85rem; margin:0 0 0.3rem;"></p>
+          <button id="accountSignOutBtn" type="button">サインアウト</button>
+        </div>
+        <p id="accountSyncStatus" style="font-size:0.8rem; color:#666; margin-bottom:0;"></p>
+      </div>
+
       <!-- データのバックアップ・復元 -->
       <div class="backup-section">
         <h2 style="font-size:1rem; margin-top:0; margin-bottom:0.5rem;">データのバックアップ・復元</h2>
@@ -940,6 +954,225 @@
     </div>
   </div>
   <script>
+    // ==== クラウド同期（Firebase）用のlocalStorageフック ====
+    // window.appAuth / window.appDb は末尾のtype="module"スクリプトが用意する。
+    // ここでは localStorage への書き込みを検知して「同期対象かどうか」を分類し、
+    // まとめてFirestoreへ書き出すだけの薄い層にする。既存のsetItem呼び出し側は
+    // 一切変更しない（新しく増えても自動的にここを通る）。
+    var cloudSyncDirty = { settings: false, materials: false, days: {}, weeklySummaries: {} };
+    var cloudSyncFlushTimer = null;
+    // クラウドから取得したデータをlocalStorageへ書き戻す間だけtrueにし、
+    // 読み込んだデータをそのままクラウドへ送り返す無駄なラウンドトリップを防ぐ。
+    var suppressCloudSync = false;
+
+    // キー名から同期先を判定する。google-token・today-trivia-* は端末ローカルのまま。
+    function classifyStorageKey(key) {
+      if (key === 'google-token' || key === 'device-id' || key.indexOf('today-trivia-') === 0) return null;
+      if (key === 'weekStart' || key === 'notify-time' || key === 'google-calendar-id' || /^header-sub[1-8]$/.test(key)) {
+        return { type: 'settings' };
+      }
+      if (key === 'materials-list' || key === 'material-details') {
+        return { type: 'materials' };
+      }
+      var dayMatch = key.match(/^(\d{4}-\d{2}-\d{2})-sub[1-8]-(content|status)$/);
+      if (dayMatch) return { type: 'days', iso: dayMatch[1] };
+      var summaryMatch = key.match(/^weekly-summary-(\d{4}-\d{2}-\d{2})$/);
+      if (summaryMatch) return { type: 'weeklySummaries', iso: summaryMatch[1] };
+      return null;
+    }
+
+    function markCloudSyncDirty(key) {
+      if (suppressCloudSync) return;
+      var target = classifyStorageKey(key);
+      if (!target) return;
+      if (target.type === 'settings' || target.type === 'materials') {
+        cloudSyncDirty[target.type] = true;
+      } else {
+        cloudSyncDirty[target.type][target.iso] = true;
+      }
+      scheduleCloudSyncFlush();
+    }
+
+    function scheduleCloudSyncFlush() {
+      if (cloudSyncFlushTimer) clearTimeout(cloudSyncFlushTimer);
+      cloudSyncFlushTimer = setTimeout(flushCloudSync, 1500);
+    }
+
+    // dirtyになった対象を、今のlocalStorageの中身でFirestoreへ洗い替え保存する。
+    // window.appDbが無い（Firebase未初期化）か、サインインしていない場合は何もしない。
+    function flushCloudSync() {
+      cloudSyncFlushTimer = null;
+      if (!window.appAuth || !window.appDb) return;
+      var user = window.appAuth.getUser && window.appAuth.getUser();
+      if (!user) return;
+      var uid = user.uid;
+      if (cloudSyncDirty.settings) {
+        cloudSyncDirty.settings = false;
+        window.appDb.pushSettings(uid, {
+          weekStart: localStorage.getItem('weekStart'),
+          notifyTime: localStorage.getItem('notify-time'),
+          googleCalendarId: localStorage.getItem('google-calendar-id'),
+          headerSub1: localStorage.getItem('header-sub1'),
+          headerSub2: localStorage.getItem('header-sub2'),
+          headerSub3: localStorage.getItem('header-sub3'),
+          headerSub4: localStorage.getItem('header-sub4'),
+          headerSub5: localStorage.getItem('header-sub5'),
+          headerSub6: localStorage.getItem('header-sub6'),
+          headerSub7: localStorage.getItem('header-sub7'),
+          headerSub8: localStorage.getItem('header-sub8')
+        }).catch(function () {});
+      }
+      if (cloudSyncDirty.materials) {
+        cloudSyncDirty.materials = false;
+        window.appDb.pushMaterials(uid, {
+          materialsList: localStorage.getItem('materials-list'),
+          materialDetails: localStorage.getItem('material-details')
+        }).catch(function () {});
+      }
+      Object.keys(cloudSyncDirty.days).forEach(function (iso) {
+        delete cloudSyncDirty.days[iso];
+        var dayData = {};
+        for (var n = 1; n <= 8; n++) {
+          dayData['sub' + n + 'Content'] = localStorage.getItem(iso + '-sub' + n + '-content') || null;
+          if (n <= 7) dayData['sub' + n + 'Status'] = localStorage.getItem(iso + '-sub' + n + '-status') || null;
+        }
+        window.appDb.pushDay(uid, iso, dayData).catch(function () {});
+      });
+      Object.keys(cloudSyncDirty.weeklySummaries).forEach(function (iso) {
+        delete cloudSyncDirty.weeklySummaries[iso];
+        window.appDb.pushWeeklySummary(uid, iso, localStorage.getItem('weekly-summary-' + iso) || '').catch(function () {});
+      });
+    }
+
+    (function installCloudSyncHook() {
+      var originalSetItem = Storage.prototype.setItem;
+      var originalRemoveItem = Storage.prototype.removeItem;
+      Storage.prototype.setItem = function (key, value) {
+        originalSetItem.call(this, key, value);
+        if (this === localStorage) markCloudSyncDirty(key);
+      };
+      Storage.prototype.removeItem = function (key) {
+        originalRemoveItem.call(this, key);
+        if (this === localStorage) markCloudSyncDirty(key);
+      };
+    })();
+    window.addEventListener('online', scheduleCloudSyncFlush);
+
+    // 現在のlocalStorage全体をクラウドへ初回アップロードする（サインイン直後、クラウドが空の場合のみ）。
+    // 既存のmarkCloudSyncDirty/flushCloudSyncの分類ロジックをそのまま再利用する。
+    function seedCloudFromLocalStorage() {
+      Object.keys(localStorage).forEach(function (key) {
+        markCloudSyncDirty(key);
+      });
+    }
+
+    // クラウドから取得したデータをlocalStorageへ書き戻し、既存の描画関数で再描画する。
+    function applyCloudDataToLocalStorage(cloud) {
+      suppressCloudSync = true;
+      try {
+        if (cloud.settings) {
+          var s = cloud.settings;
+          if (s.weekStart != null) localStorage.setItem('weekStart', s.weekStart);
+          if (s.notifyTime != null) localStorage.setItem('notify-time', s.notifyTime);
+          if (s.googleCalendarId != null) localStorage.setItem('google-calendar-id', s.googleCalendarId);
+          for (var n = 1; n <= 8; n++) {
+            var v = s['headerSub' + n];
+            if (v != null) localStorage.setItem('header-sub' + n, v);
+          }
+        }
+        if (cloud.materials) {
+          if (cloud.materials.materialsList != null) localStorage.setItem('materials-list', cloud.materials.materialsList);
+          if (cloud.materials.materialDetails != null) localStorage.setItem('material-details', cloud.materials.materialDetails);
+        }
+        Object.keys(cloud.days || {}).forEach(function (iso) {
+          var day = cloud.days[iso];
+          for (var n2 = 1; n2 <= 8; n2++) {
+            var content = day['sub' + n2 + 'Content'];
+            if (content != null) localStorage.setItem(iso + '-sub' + n2 + '-content', content);
+            if (n2 <= 7) {
+              var status = day['sub' + n2 + 'Status'];
+              if (status != null) localStorage.setItem(iso + '-sub' + n2 + '-status', status);
+            }
+          }
+        });
+        Object.keys(cloud.weeklySummaries || {}).forEach(function (iso) {
+          localStorage.setItem('weekly-summary-' + iso, cloud.weeklySummaries[iso] || '');
+        });
+
+        // header-subN由来の見出しを反映（教材が割り当たっている列は直後のloadMaterials()で上書きされる。
+        // これは元々の初期化コードと同じ優先順位）。
+        document.querySelectorAll('.header-cell').forEach(function (cell) {
+          var key = 'header-' + cell.getAttribute('data-header');
+          var saved = localStorage.getItem(key);
+          if (saved) cell.textContent = saved;
+        });
+        var notifyTimeInput = document.getElementById('notifyTimeInput');
+        if (notifyTimeInput) {
+          var savedTime = localStorage.getItem('notify-time');
+          if (savedTime) notifyTimeInput.value = savedTime;
+        }
+        // 週の始まり設定を反映し、現在表示中の週を再計算する
+        var weekStartDay = getWeekStartDay();
+        var weekStartSelectEl = document.getElementById('weekStartSelect');
+        if (weekStartSelectEl) weekStartSelectEl.value = String(weekStartDay);
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        var diff = (today.getDay() - weekStartDay + 7) % 7;
+        var startDate = new Date(today);
+        startDate.setDate(today.getDate() - diff);
+        window.currentWeekStartISO = toLocalISO(startDate);
+
+        loadMaterials();
+        updateWeekUI();
+        updateCellsForCurrentWeek();
+      } finally {
+        suppressCloudSync = false;
+      }
+    }
+
+    function updateAccountSectionUI(user) {
+      var signInBtn = document.getElementById('accountSignInBtn');
+      var signedInInfo = document.getElementById('accountSignedInInfo');
+      var emailLabel = document.getElementById('accountEmailLabel');
+      if (!signInBtn || !signedInInfo) return;
+      if (user) {
+        signInBtn.style.display = 'none';
+        signedInInfo.style.display = 'block';
+        if (emailLabel) emailLabel.textContent = 'サインイン中: ' + (user.email || user.uid);
+      } else {
+        signInBtn.style.display = '';
+        signedInInfo.style.display = 'none';
+      }
+    }
+
+    function setAccountSyncStatus(message, isError) {
+      var el = document.getElementById('accountSyncStatus');
+      if (!el) return;
+      el.textContent = message || '';
+      el.style.color = isError ? '#b00020' : '#666';
+    }
+
+    // Firebaseブリッジ（末尾のtype="module"スクリプト）がサインイン状態の変化のたびに呼び出す。
+    // window.appAuth/appDbの初期化完了を待つ必要があるため、window.addEventListener('load', ...)や
+    // クリックハンドラの中からではなく、ブリッジ側から能動的に呼んでもらう設計にしている。
+    window.handleAuthStateChange = function (user) {
+      updateAccountSectionUI(user);
+      if (!user || !window.appDb) return;
+      setAccountSyncStatus('クラウドのデータを確認しています...');
+      window.appDb.pullAll(user.uid).then(function (cloud) {
+        if (cloud.empty) {
+          seedCloudFromLocalStorage();
+          setAccountSyncStatus('この端末のデータをクラウドに保存しました。');
+        } else {
+          applyCloudDataToLocalStorage(cloud);
+          setAccountSyncStatus('クラウドのデータを読み込みました。');
+        }
+      }).catch(function (e) {
+        console.error('クラウドデータの取得に失敗しました', e);
+        setAccountSyncStatus('クラウドとの同期に失敗しました。', true);
+      });
+    };
+
     // グローバル変数の定義
     // 教材リストや詳細情報、現在選択中の教材インデックスはグローバルで管理します。
     var materialsList = [];
@@ -963,6 +1196,15 @@
     var googleTokenClient = null;
     var googleAccessToken = null;
     var googleEvents = [];
+
+    // アカウント同期（Firebase）用の設定。Firebaseコンソールでプロジェクトを作成後、
+    // 発行される設定値に書き換えてください（apiKeyを含め秘密情報ではありません）。
+    // これはGoogleカレンダー連携のGOOGLE_CLIENT_IDとは別物・無関係です。
+    var FIREBASE_CONFIG = {
+      apiKey: 'REPLACE_WITH_FIREBASE_API_KEY',
+      authDomain: 'REPLACE_WITH_FIREBASE_AUTH_DOMAIN',
+      projectId: 'REPLACE_WITH_FIREBASE_PROJECT_ID'
+    };
     // 前回のアクセストークンが有効期限内なら復元し、リロード後の再サインインを不要にする。
     // （Googleのアクセストークンは約1時間で失効するため、それ以降は再サインインが必要）
     (function restoreGoogleToken() {
@@ -2687,6 +2929,20 @@
       return outputArray;
     }
 
+    // プッシュ通知の購読者ID。サインイン中はFirebaseのuidをそのまま使い、複数端末でも
+    // 同じアカウントとして扱う。未サインインなら端末ごとのランダムIDを生成して使い続ける。
+    // どちらも'device-id'と同様に端末ローカルのみで、クラウド同期の対象外（classifyStorageKey参照）。
+    function getSubscriberId() {
+      var user = window.appAuth && window.appAuth.getUser && window.appAuth.getUser();
+      if (user) return user.uid;
+      var deviceId = localStorage.getItem('device-id');
+      if (!deviceId) {
+        deviceId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+        localStorage.setItem('device-id', deviceId);
+      }
+      return deviceId;
+    }
+
     // 通知有効化ボタン
     var notifyEnableBtn = document.getElementById('notifyEnableBtn');
     if (notifyEnableBtn) {
@@ -2722,7 +2978,7 @@
               return fetch(NOTIFY_WORKER_URL + '/subscribe', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ subscription: subscription, hour: hour, minute: minute })
+                body: JSON.stringify({ subscriberId: getSubscriberId(), subscription: subscription, hour: hour, minute: minute })
               });
             }).then(function (res) {
               if (!res.ok) throw new Error('save failed');
@@ -2733,6 +2989,31 @@
               setStatus('設定に失敗しました。通信環境を確認してもう一度お試しください。');
             });
           });
+        });
+      });
+    }
+
+    // アカウント同期（Googleサインイン/サインアウト）
+    var accountSignInBtn = document.getElementById('accountSignInBtn');
+    if (accountSignInBtn) {
+      accountSignInBtn.addEventListener('click', function () {
+        if (!window.appAuth) {
+          setAccountSyncStatus('アカウント機能を準備中です。少し待ってからもう一度お試しください。', true);
+          return;
+        }
+        setAccountSyncStatus('サインインしています...');
+        window.appAuth.signIn().catch(function (e) {
+          console.error('サインインに失敗しました', e);
+          setAccountSyncStatus('サインインに失敗しました。', true);
+        });
+      });
+    }
+    var accountSignOutBtn = document.getElementById('accountSignOutBtn');
+    if (accountSignOutBtn) {
+      accountSignOutBtn.addEventListener('click', function () {
+        if (!window.appAuth) return;
+        window.appAuth.signOut().then(function () {
+          setAccountSyncStatus('サインアウトしました。');
         });
       });
     }
@@ -3273,6 +3554,112 @@
         }).catch(function (err) {
           if (statusEl) statusEl.textContent = err.message || '削除に失敗しました。';
         });
+      });
+    }
+  </script>
+
+  <!-- アカウント同期（Firebase）用のブリッジ。type="module"は上のscriptより後に実行されるため、
+       window.appAuth/window.appDbを直接呼ぶのはイベントハンドラの中や、このスクリプト自身が
+       window.handleAuthStateChangeを呼ぶタイミングに限る（トップレベルでの直接呼び出しは避ける）。
+       FIREBASE_CONFIGは上のscriptで定義済みのグローバル変数。 -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+    import {
+      getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+    } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+    import {
+      getFirestore, doc, getDoc, setDoc, collection, getDocs
+    } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+
+    var firebaseAuthInstance = null;
+    var firestoreDbInstance = null;
+
+    try {
+      var firebaseApp = initializeApp(window.FIREBASE_CONFIG);
+      firebaseAuthInstance = getAuth(firebaseApp);
+      firestoreDbInstance = getFirestore(firebaseApp);
+    } catch (e) {
+      console.error('Firebase初期化に失敗しました。アカウント同期は無効化されます。', e);
+    }
+
+    function signIn() {
+      if (!firebaseAuthInstance) return Promise.reject(new Error('Firebase未初期化'));
+      return signInWithPopup(firebaseAuthInstance, new GoogleAuthProvider());
+    }
+
+    function signOutUser() {
+      if (!firebaseAuthInstance) return Promise.resolve();
+      return signOut(firebaseAuthInstance);
+    }
+
+    function getUser() {
+      return firebaseAuthInstance ? firebaseAuthInstance.currentUser : null;
+    }
+
+    function settingsDocRef(uid) { return doc(firestoreDbInstance, 'users', uid, 'app', 'settings'); }
+    function materialsDocRef(uid) { return doc(firestoreDbInstance, 'users', uid, 'app', 'materials'); }
+    function dayDocRef(uid, iso) { return doc(firestoreDbInstance, 'users', uid, 'days', iso); }
+    function weeklySummaryDocRef(uid, iso) { return doc(firestoreDbInstance, 'users', uid, 'weeklySummaries', iso); }
+
+    function pushSettings(uid, data) {
+      if (!firestoreDbInstance) return Promise.resolve();
+      return setDoc(settingsDocRef(uid), data, { merge: true });
+    }
+    function pushMaterials(uid, data) {
+      if (!firestoreDbInstance) return Promise.resolve();
+      return setDoc(materialsDocRef(uid), data, { merge: true });
+    }
+    function pushDay(uid, iso, data) {
+      if (!firestoreDbInstance) return Promise.resolve();
+      return setDoc(dayDocRef(uid, iso), data, { merge: true });
+    }
+    function pushWeeklySummary(uid, iso, text) {
+      if (!firestoreDbInstance) return Promise.resolve();
+      return setDoc(weeklySummaryDocRef(uid, iso), { text: text }, { merge: true });
+    }
+
+    // uidに紐づくsettings/materials/days/weeklySummariesを全て取得する。
+    // 1件もドキュメントが無ければ empty:true を返す（初回サインイン時のシード判定に使う）。
+    function pullAll(uid) {
+      if (!firestoreDbInstance) return Promise.resolve({ empty: true });
+      return Promise.all([
+        getDoc(settingsDocRef(uid)),
+        getDoc(materialsDocRef(uid)),
+        getDocs(collection(firestoreDbInstance, 'users', uid, 'days')),
+        getDocs(collection(firestoreDbInstance, 'users', uid, 'weeklySummaries'))
+      ]).then(function (results) {
+        var settingsSnap = results[0];
+        var materialsSnap = results[1];
+        var daysSnap = results[2];
+        var summariesSnap = results[3];
+        var days = {};
+        daysSnap.forEach(function (d) { days[d.id] = d.data(); });
+        var weeklySummaries = {};
+        summariesSnap.forEach(function (d) { weeklySummaries[d.id] = (d.data() || {}).text || ''; });
+        return {
+          empty: !settingsSnap.exists() && !materialsSnap.exists() && daysSnap.empty && summariesSnap.empty,
+          settings: settingsSnap.exists() ? settingsSnap.data() : null,
+          materials: materialsSnap.exists() ? materialsSnap.data() : null,
+          days: days,
+          weeklySummaries: weeklySummaries
+        };
+      });
+    }
+
+    window.appAuth = { signIn: signIn, signOut: signOutUser, getUser: getUser };
+    window.appDb = {
+      pullAll: pullAll,
+      pushSettings: pushSettings,
+      pushMaterials: pushMaterials,
+      pushDay: pushDay,
+      pushWeeklySummary: pushWeeklySummary
+    };
+
+    if (firebaseAuthInstance) {
+      onAuthStateChanged(firebaseAuthInstance, function (user) {
+        if (typeof window.handleAuthStateChange === 'function') {
+          window.handleAuthStateChange(user);
+        }
       });
     }
   </script>

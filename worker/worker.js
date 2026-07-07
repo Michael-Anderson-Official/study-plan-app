@@ -49,13 +49,22 @@ async function handleSubscribe(request, env) {
   } catch (e) {
     return jsonResponse({ error: 'invalid json' }, 400);
   }
-  if (!body || !body.subscription || typeof body.hour !== 'number' || typeof body.minute !== 'number') {
+  if (!body || !body.subscriberId || !body.subscription || typeof body.hour !== 'number' || typeof body.minute !== 'number') {
     return jsonResponse({ error: 'invalid body' }, 400);
   }
-  await env.NOTIFY_KV.put('subscription', JSON.stringify({
+  // subscriberIdはサインイン中ならFirebaseのuid、未サインインなら端末ごとのランダムID。
+  // どちらにせよ購読者ごとにKVキーを分けるため、複数ユーザー/複数端末で購読が上書きされない。
+  var kvKey = 'sub:' + body.subscriberId;
+  var existingRaw = await env.NOTIFY_KV.get(kvKey);
+  var existingLastSentDate = null;
+  if (existingRaw) {
+    try { existingLastSentDate = JSON.parse(existingRaw).lastSentDate || null; } catch (e) {}
+  }
+  await env.NOTIFY_KV.put(kvKey, JSON.stringify({
     subscription: body.subscription,
     hour: body.hour,
-    minute: body.minute
+    minute: body.minute,
+    lastSentDate: existingLastSentDate
   }));
   return jsonResponse({ ok: true });
 }
@@ -126,31 +135,42 @@ async function handleToc(request, env) {
 }
 
 async function checkAndSend(env) {
-  const storedRaw = await env.NOTIFY_KV.get('subscription');
-  if (!storedRaw) return;
-  const stored = JSON.parse(storedRaw);
-
   // 日本時間 (UTC+9) で現在時刻を求める
   const now = new Date();
   const jstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
   const hour = jstNow.getUTCHours();
   const minute = jstNow.getUTCMinutes();
   const todayStr = jstNow.getUTCFullYear() + '-' + pad2(jstNow.getUTCMonth() + 1) + '-' + pad2(jstNow.getUTCDate());
-
-  const targetMinutes = stored.hour * 60 + stored.minute;
   const currentMinutes = hour * 60 + minute;
 
-  const lastSent = await env.NOTIFY_KV.get('lastSentDate');
-  console.log('checkAndSend: now=' + hour + ':' + minute + ' target=' + stored.hour + ':' + stored.minute + ' lastSent=' + lastSent + ' today=' + todayStr);
-  if (currentMinutes >= targetMinutes && lastSent !== todayStr) {
-    try {
-      await sendWebPush(stored.subscription, { title: '計画帳', body: '今日の成果を報告してください。' }, env);
-      console.log('push send succeeded');
-    } catch (e) {
-      console.log('push send failed: ' + (e && (e.stack || e.message)));
+  // 複数購読者（uidまたは端末ID単位）を全て走査する。
+  let cursor;
+  do {
+    const list = await env.NOTIFY_KV.list({ prefix: 'sub:', cursor });
+    for (const key of list.keys) {
+      const storedRaw = await env.NOTIFY_KV.get(key.name);
+      if (!storedRaw) continue;
+      let stored;
+      try {
+        stored = JSON.parse(storedRaw);
+      } catch (e) {
+        continue;
+      }
+      const targetMinutes = stored.hour * 60 + stored.minute;
+      console.log('checkAndSend: ' + key.name + ' now=' + hour + ':' + minute + ' target=' + stored.hour + ':' + stored.minute + ' lastSent=' + stored.lastSentDate + ' today=' + todayStr);
+      if (currentMinutes >= targetMinutes && stored.lastSentDate !== todayStr) {
+        try {
+          await sendWebPush(stored.subscription, { title: '計画帳', body: '今日の成果を報告してください。' }, env);
+          console.log('push send succeeded: ' + key.name);
+        } catch (e) {
+          console.log('push send failed for ' + key.name + ': ' + (e && (e.stack || e.message)));
+        }
+        stored.lastSentDate = todayStr;
+        await env.NOTIFY_KV.put(key.name, JSON.stringify(stored));
+      }
     }
-    await env.NOTIFY_KV.put('lastSentDate', todayStr);
-  }
+    cursor = list.list_complete ? undefined : list.cursor;
+  } while (cursor);
 }
 
 function pad2(n) {

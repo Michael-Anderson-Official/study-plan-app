@@ -1,6 +1,6 @@
 # HANDOFF.md
 
-最終更新: 2026-07-07（Claude Codeがスキャン教材の目次自動取得を追加）
+最終更新: 2026-07-07（Claude CodeがFirebaseアカウント同期の土台を追加）
 
 ## アプリの目的
 
@@ -15,7 +15,7 @@
 - アプリ本体は `index.html` にHTML/CSS/JavaScriptをまとめたVanilla JS構成。
 - PWA/通知用に `manifest.json` と `sw.js` がある。
 - Cloudflare Worker用に `worker/worker.js` と `worker/wrangler.toml` がある。
-- アプリ本体の保存は `localStorage`。通知購読はCloudflare KVに保存する設計。
+- アプリ本体の保存は `localStorage`（未サインインでも完全に動作する）。Googleでサインインすると、同じデータがFirestore（`users/{uid}/...`）にも同期される（任意・opt-in）。通知購読はCloudflare KVに保存する設計。
 - `index.html` にはISBN/バーコード教材追加用の `scanIsbnBtn`、`isbnScannerModal`、カメラ読み取り/ISBN手入力/書籍情報プレビュー/教材追加処理がある。
 - ISBN検索は openBD を先に使い、見つからない場合に Google Books の公開検索へフォールバックする。APIキーやprivate keyは使っていない。
 - 通常のnpm依存やビルド手順はない。
@@ -59,6 +59,7 @@
 - ISBN/バーコード読み取りに、Safari等 `BarcodeDetector` 非対応ブラウザ向けのフォールバックとして `@zxing/library`（CDN読み込み、`window.ZXing`）を追加した。`startIsbnScan()` はネイティブ`BarcodeDetector`→ZXing→非対応メッセージの順で分岐する。`canScanBarcode()` で両方の対応状況をまとめて判定する。
 - 教材詳細に「進捗（完了済みの単位数）」入力欄（`completedUnitsInput` → `material-details` の `completedUnits`）を追加した。目次リストの内容や単位数はそのまま保持し、`scheduleMaterial`/`scheduleMaterialDaily` が完了済み件数分だけ先頭を読み飛ばしてから予定を組む。目次入力欄には現在の行数（＝単位数）をリアルタイムに表示する（`tocCountLabel`/`updateTocCountLabel()`）。
 - Worker（`keikakuchou-notify`）に `GET /toc?isbn=...` を追加した。openBD/Google Booksには目次データが無いため、版元ドットコム（hanmoto.com）の書籍ページ（`https://www.hanmoto.com/bd/isbn/{ISBN}`）をWorker側で取得し、`HTMLRewriter` で `div[data-book-contents-name="toc"] p`（と中の `br`）から目次テキストを抽出してJSON `{ toc, source, isbn }` で返す。ブラウザから直接hanmoto.comへfetchするとCORSで拒否されるが、Worker〜hanmoto.com間はサーバー間通信なのでCORSの対象外という前提で実装した。`index.html` 側は `tryAutoFillToc(idx, isbn)` が教材詳細を開いたとき（ISBN付きかつ目次未入力の場合）にこのエンドポイントを呼び、取得できれば目次入力欄を自動で埋める（ユーザーが手入力済みなら上書きしない）。ISBNごとに1回だけ試みる（`tocFetchAttempted`、ページ内メモリのみ、`localStorage`には保存しない）。
+- 将来のAppStore公開（複数ユーザー対応）に向けた土台として、Firebase Auth（Googleサインインのみ）+ Firestoreによるアカウント同期を追加した。サインインは任意（opt-in）で、しなければ今まで通り`localStorage`のみで動く。詳細は下記「アカウント同期（Firebase）」節を参照。あわせて、Workerのプッシュ通知購読をKVキー1件の単一購読設計から `sub:<subscriberId>` 単位の複数購読対応へ変更した（`subscriberId`はサインイン中ならFirebaseのuid、未サインインなら`localStorage`の`device-id`）。
 
 ## 直近でCodexが変更した内容
 
@@ -95,6 +96,15 @@
 - Google access token一時保存: `google-token`
 - バーコード追加された教材の `material-details` には `isbn`、`bookTitle`、`authors`、`publisher`、`publishedDate`、`coverImage`、`description`、`pageCount`、`source` が入り得る。
 - `material-details` の `completedUnits` は「進捗（完了済みの単位数）」。目次リスト（`tocList`）や数値単位（`units`）はそのまま残し、スケジュール計算（`scheduleMaterial`/`scheduleMaterialDaily`）だけがこの件数分を先頭からスキップする。
+- `device-id`: プッシュ通知購読者IDとして使う端末ごとのランダムID（未サインイン時のみ使用）。クラウド同期の対象外。
+
+Firestore同期対象（サインイン時のみ、`classifyStorageKey()`が分類）:
+
+- `weekStart`、`notify-time`、`google-calendar-id`、`header-sub1..8` → `users/{uid}/app/settings`
+- `materials-list`、`material-details` → `users/{uid}/app/materials`（JSON文字列のまま）
+- `<YYYY-MM-DD>-sub<N>-content/-status` → `users/{uid}/days/{YYYY-MM-DD}`
+- `weekly-summary-<ISO>` → `users/{uid}/weeklySummaries/{ISO}`
+- 同期対象外: `google-token`、`today-trivia-*`、`device-id`
 
 移行処理:
 
@@ -163,6 +173,23 @@
 
 - 週始まり変更時に、既存入力がユーザー期待どおり別週キーとして扱われるかは網羅未確認。
 
+### アカウント同期（Firebase）
+
+コード上確認できた事実:
+
+- `FIREBASE_CONFIG`（`index.html`内、`GOOGLE_CLIENT_ID`の近く）はまだプレースホルダーの値のままで、実際のFirebaseプロジェクトの値に置き換えるまでサインインは動作しない。
+- `.account-section`（設定モーダル内）に「Googleでサインイン」ボタンがあり、`window.appAuth.signIn()`（末尾の`<script type="module">`が公開）を呼ぶ。
+- サインイン成功時は`window.handleAuthStateChange(user)`が呼ばれ、`window.appDb.pullAll(uid)`で既存のクラウドデータを確認する。空なら現在の`localStorage`をシードとしてアップロード（`seedCloudFromLocalStorage()`）、空でなければクラウドのデータを`localStorage`へ書き戻して`loadMaterials()`/`updateWeekUI()`/`updateCellsForCurrentWeek()`で再描画する（`applyCloudDataToLocalStorage()`）。
+- 以後の`localStorage`書き込みは`Storage.prototype`フック経由で自動的に検知され、1.5秒debounce後にFirestoreへ洗い替え保存される（`markCloudSyncDirty`/`flushCloudSync`）。個別の保存関数は変更していない。
+- サインインは任意。サインインしなければFirebase関連コードは一切呼ばれず、今まで通り`localStorage`のみで動く。
+
+未確認事項:
+
+- 実際のFirebaseプロジェクトを作成し`FIREBASE_CONFIG`を反映した上での、サインイン〜同期の一連の動作（自分の環境には認証操作ができるブラウザが無いため未検証）。
+- Firestoreセキュリティルール（`users/{uid}/**`に`request.auth.uid == uid`を要求）の実際の設定・公開。
+- 2台目端末でサインインした際に、意図通りクラウドのデータで`localStorage`が上書きされるか（空でないクラウドへ誤って空のシードをアップロードしていないか）。
+- Firebase Authの独自セッション永続化（IndexedDB）と`localStorage`という2つの永続化機構が長期的に問題を起こさないか。
+
 ### 今週に戻るボタン
 
 コード上確認できた事実:
@@ -181,8 +208,8 @@
 
 - Frontendの `NOTIFY_WORKER_URL` は `https://keikakuchou-notify.keikakuchou-app.workers.dev`。
 - Frontendには `VAPID_PUBLIC_KEY` だけがある。公開鍵なのでsecretではない。
-- Workerは `/subscribe` のPOSTで `{ subscription, hour, minute }` を受け取り、KV `subscription` に保存する。
-- Workerのscheduled handlerはKV `subscription` を読み、JST換算で指定時刻を過ぎていて `lastSentDate` が今日でなければpush送信する。
+- Workerは `/subscribe` のPOSTで `{ subscriberId, subscription, hour, minute }` を受け取り、KV `sub:<subscriberId>` に保存する（`lastSentDate`は既存値があれば引き継ぐ）。
+- Workerのscheduled handlerは `sub:` プレフィックスで全購読を`KV.list()`して走査し、購読ごとにJST換算で指定時刻を過ぎていて`lastSentDate`が今日でなければpush送信し、送信後に購読ごとの`lastSentDate`を更新する。
 - Workerは `VAPID_PRIVATE_JWK`、`VAPID_PUBLIC_KEY`、`VAPID_SUBJECT` をCloudflare env/secretから読む。
 - `worker/wrangler.toml` には `NOTIFY_KV` binding idと cron `* * * * *` が書かれている。
 - 公開Workerは `OPTIONS /subscribe` に200、CORS `Access-Control-Allow-Origin: *`、`Access-Control-Allow-Methods: POST, OPTIONS`、`Access-Control-Allow-Headers: Content-Type` を返した。
@@ -196,9 +223,8 @@
 
 危険箇所:
 
-- 現在のWorkerはKVキー `subscription` 1件だけの設計。複数ユーザー/複数端末では後から設定した購読が前の購読を上書きする。
-- push送信に失敗しても `lastSentDate` を書くため、その日は再送されない。
-- `lastSentDate` も全体で1つなので、複数購読対応時は購読ごとの送信状態が必要。
+- push送信に失敗しても `lastSentDate` を書くため、その日は再送されない（購読ごとの状態になったが、失敗時に再試行しない挙動自体は変わっていない）。
+- この変更をWorkerへ実際にデプロイ（`wrangler deploy`または Cloudflareダッシュボードの Quick Edit）するまでは、`index.html`が新しい `{ subscriberId, ... }` 形式で送っても本番Workerは旧形式のまま処理してしまう可能性がある。デプロイ状況を確認すること。
 
 ## secret混入確認
 
@@ -253,7 +279,7 @@
 - 教材列は実質7教材分。8列目は感想・振り返り用。
 - `sw.js` の通知クリックはURLに `index.html` を含むクライアントだけフォーカス対象にしている。ルートURLで開いているタブはフォーカスされない可能性がある。
 - `holidays2026` は固定リスト。
-- Workerは単一購読設計。
+- `FIREBASE_CONFIG`がプレースホルダーのままなので、Firebaseコンソールでプロジェクトを作成し実際の値へ置き換えるまでアカウント同期は使えない（サインインなしの既存動作には影響しない）。
 - `BarcodeDetector` はブラウザ対応差がある。Safari等の非対応環境ではCDN読み込みの `ZXing`（`@zxing/library@0.23.0`）にフォールバックする。両方使えない環境ではISBN手入力を使う。
 - openBD/Google Booksの公開API仕様、CORS、レート制限に依存する。APIキーや秘密情報は使っていない。Google Booksが429を返す場合は、検索失敗ではなく取得失敗として扱う。
 - 目次自動取得（`/toc`）は非公式スクレイピング。hanmoto.comの公式APIではなくHTML構造に依存しているため、サイト改修で無言で取れなくなる可能性がある。取得失敗時は静かに諦める設計（エラー表示せず、手入力のまま）。
@@ -262,7 +288,9 @@
 
 優先度高:
 
-- Workerを複数購読対応にする。KVキーをsubscription ID単位に分け、購読ごとの時刻と `lastSentDate` を持たせる。
+- Firebaseコンソールでプロジェクトを作成し、Authentication（Googleプロバイダ）とFirestore（Nativeモード）を有効化、`users/{uid}/**`のセキュリティルールを公開し、`FIREBASE_CONFIG`を実際の値に置き換える（ユーザー作業、詳細は`[[project-appstore-goal]]`関連のplanファイル参照）。
+- 更新した`worker/worker.js`（`/subscribe`の`subscriberId`対応）をCloudflareへデプロイする。
+- `FIREBASE_CONFIG`設定後、実機でGoogleサインイン→初回シード→2台目端末での同期の一連の流れを確認する。
 - push失敗時に `lastSentDate` を書かない、または失敗状態を記録して再試行できるようにする。
 - Cloudflareダッシュボードまたは `wrangler` でKV binding、VAPID secrets、Cron Triggerの実設定を確認する。
 - 実機で通知購読と翌分/翌日のpush送信を確認する。
