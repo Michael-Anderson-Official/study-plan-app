@@ -103,7 +103,7 @@
     th, td {
       border: 1px solid #ccc;
     }
-    thead tr:first-child th {
+    thead th {
       background: #e8f4ff;
       font-weight: bold;
       text-align: center;
@@ -111,13 +111,10 @@
       top: 0;
       z-index: 10;
     }
-    .week-year-row {
-      background: #fff;
-      text-align: center;
-      font-weight: bold;
-      font-size: 0.85rem;
-      padding: 0.3rem;
-      border-bottom: 1px solid #ccc;
+    .week-year-label {
+      font-weight: normal;
+      font-size: 0.65rem;
+      color: #666;
     }
     tbody th.row-label {
       background: #f5f5f5;
@@ -328,7 +325,7 @@
     <table id="planTable">
       <thead>
         <tr>
-          <th class="row-label">日付</th>
+          <th class="row-label">日付<br /><span id="weekYearLabel" class="week-year-label"></span></th>
           <!-- 8科目のヘッダー -->
           <th class="header-cell" contenteditable data-header="sub1">科目1</th>
           <th class="header-cell" contenteditable data-header="sub2">科目2</th>
@@ -338,9 +335,6 @@
           <th class="header-cell" contenteditable data-header="sub6">科目6</th>
           <th class="header-cell" contenteditable data-header="sub7">科目7</th>
           <th class="header-cell" contenteditable data-header="sub8">感想・振り返り</th>
-        </tr>
-        <tr>
-          <th id="weekYearLabel" class="week-year-row" colspan="9"></th>
         </tr>
       </thead>
       <tbody>
