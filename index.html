@@ -3004,7 +3004,8 @@
         setAccountSyncStatus('サインインしています...');
         window.appAuth.signIn().catch(function (e) {
           console.error('サインインに失敗しました', e);
-          setAccountSyncStatus('サインインに失敗しました。', true);
+          var detail = e && (e.code || e.message) ? (e.code || e.message) : '不明なエラー';
+          setAccountSyncStatus('サインインに失敗しました（' + detail + '）', true);
         });
       });
     }
