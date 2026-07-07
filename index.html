@@ -727,6 +727,20 @@
     var googleTokenClient = null;
     var googleAccessToken = null;
     var googleEvents = [];
+    // 前回のアクセストークンが有効期限内なら復元し、リロード後の再サインインを不要にする。
+    // （Googleのアクセストークンは約1時間で失効するため、それ以降は再サインインが必要）
+    (function restoreGoogleToken() {
+      try {
+        var saved = JSON.parse(localStorage.getItem('google-token') || 'null');
+        if (saved && saved.token && saved.expiresAt && Date.now() < saved.expiresAt) {
+          googleAccessToken = saved.token;
+        } else {
+          localStorage.removeItem('google-token');
+        }
+      } catch (e) {
+        localStorage.removeItem('google-token');
+      }
+    })();
     // 使用するカレンダーのID。選択内容は localStorage に保存して次回も引き継ぐ。
     var googleCalendarId = localStorage.getItem('google-calendar-id') || 'primary';
     // 取得済みのカレンダー一覧（予定追加時の追加先選択にも使う）
@@ -1914,6 +1928,12 @@
           var statusEl = document.getElementById('googleSyncStatus');
           if (response && response.access_token) {
             googleAccessToken = response.access_token;
+            // 有効期限（通常3600秒）の1分前までを保存有効期間とし、リロード後も再利用する
+            var expiresInMs = (parseInt(response.expires_in, 10) || 3600) * 1000;
+            localStorage.setItem('google-token', JSON.stringify({
+              token: googleAccessToken,
+              expiresAt: Date.now() + expiresInMs - 60000
+            }));
             updateGoogleSignInUI();
             fetchGoogleCalendarList();
             fetchGoogleEvents();
@@ -1954,6 +1974,7 @@
         .then(function (res) {
           if (res.status === 401) {
             googleAccessToken = null;
+            localStorage.removeItem('google-token');
             updateGoogleSignInUI();
             throw new Error('認証の有効期限が切れました。再度サインインしてください。');
           }
