@@ -190,8 +190,7 @@
     .week-google-events {
       margin: 0.15rem 0 0;
       padding-left: 1rem;
-      max-height: 4.2rem;
-      overflow: auto;
+      overflow: hidden;
       color: #555;
       font-size: 0.62rem;
       font-weight: normal;
@@ -207,6 +206,12 @@
     }
     .week-google-event-time {
       color: #777;
+    }
+    .week-google-events-more {
+      list-style: none;
+      margin-left: -1rem;
+      color: #777;
+      font-weight: bold;
     }
     /* セルのスタイル */
     .cell {
@@ -1948,7 +1953,8 @@
 
         var ul = document.createElement('ul');
         ul.className = 'week-google-events';
-        dayEvents.forEach(function (ev) {
+        var visibleEvents = dayEvents.slice(0, 2);
+        visibleEvents.forEach(function (ev) {
           var li = document.createElement('li');
           var timeSpan = document.createElement('span');
           timeSpan.className = 'week-google-event-time';
@@ -1957,6 +1963,12 @@
           li.appendChild(document.createTextNode(ev.summary || '(タイトルなし)'));
           ul.appendChild(li);
         });
+        if (dayEvents.length > visibleEvents.length) {
+          var moreLi = document.createElement('li');
+          moreLi.className = 'week-google-events-more';
+          moreLi.textContent = '＋' + (dayEvents.length - visibleEvents.length) + '件';
+          ul.appendChild(moreLi);
+        }
         labelCell.appendChild(ul);
       });
     }
