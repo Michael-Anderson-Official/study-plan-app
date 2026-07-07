@@ -253,20 +253,21 @@
     }
     #planTable {
       min-width: 1060px;
-      background:
-        repeating-linear-gradient(to bottom, rgba(34, 87, 122, 0.06) 0 1px, transparent 1px 1.45rem),
-        rgba(255, 254, 250, 0.55);
-      border: 2px solid #1f2f3d;
-      color: #1f2f3d;
+      border-collapse: separate;
+      border-spacing: 4px 5px;
+      background: transparent;
+      border: none;
+      color: #33475b;
     }
     #planTable th.row-label {
       width: 8.5rem;
       min-width: 8.5rem;
       box-sizing: border-box;
+      border-radius: 10px;
     }
     #planTable th,
     #planTable td {
-      border: 1.5px solid #263746;
+      border: none;
     }
     #planTable thead th:last-child {
       width: 12rem;
@@ -279,7 +280,7 @@
       top: 0;
       z-index: 10;
       padding: 0.35rem 0.25rem;
-      border-bottom: 2px solid #1f2f3d;
+      border-radius: 10px;
       vertical-align: bottom;
       line-height: 1.2;
     }
@@ -297,7 +298,7 @@
       position: sticky;
       left: 0;
       z-index: 5;
-      border-right: 2px solid #1f2f3d;
+      box-shadow: 0 1px 3px rgba(31, 47, 61, 0.12);
     }
     /* 行ラベルのタップで、その日だけ一時的に折りたためる */
     th.row-label {
@@ -367,6 +368,8 @@
       position: relative;
       overflow: hidden;
       background: rgba(255, 255, 255, 0.4);
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(31, 47, 61, 0.12);
     }
     .cell .section {
       position: absolute;
@@ -380,9 +383,7 @@
       font-size: 0.76rem;
       line-height: 1.35;
       text-align: center;
-      background:
-        repeating-linear-gradient(to bottom, transparent 0 1.35rem, rgba(34, 87, 122, 0.12) 1.35rem calc(1.35rem + 1px)),
-        rgba(255, 255, 255, 0.58);
+      background: rgba(255, 255, 255, 0.5);
       color: #22313f;
     }
     #planTable tbody td:last-child .section {
