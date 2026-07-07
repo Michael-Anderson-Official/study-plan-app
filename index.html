@@ -511,6 +511,20 @@
       flex-wrap: wrap;
       gap: 1rem;
     }
+    /* 今日より前の未チェック分セクション */
+    #todayTaskList li.today-past-heading {
+      border-bottom: none;
+      padding-bottom: 0.1rem;
+      margin-top: 1.2rem;
+      font-size: 0.85rem;
+      color: #a06a2c;
+      font-weight: bold;
+    }
+    .today-past-date {
+      font-size: 0.78rem;
+      color: #888;
+      font-weight: normal;
+    }
     .today-task-group {
       display: flex;
       align-items: center;
@@ -1854,6 +1868,7 @@
         });
         todayTabBtn.addEventListener('click', function () {
           showTab(todayTabBtn, todayView);
+          refreshPastPendingTasks();
           updateTodayView();
         });
         googleCalendarTabBtn.addEventListener('click', function () {
@@ -2789,6 +2804,31 @@
     }
 
     // 「今日やること」タブの表示内容を更新します。
+    // 今日より前の日付で、内容があるのに○✕が付いていないタスクの一覧。
+    // タブを開いたとき（refreshPastPendingTasks）にだけ再計算する。○✕を付けても
+    // その場ではリストから消えず、次にタブを開き直したときに消える（付け間違いをすぐ直せるように）。
+    var pastPendingTasks = [];
+
+    function refreshPastPendingTasks() {
+      pastPendingTasks = [];
+      var todayISO = toLocalISO(new Date());
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub([1-7])-content$/);
+        if (!m) continue;
+        var iso = m[1];
+        if (iso >= todayISO) continue;
+        var content = localStorage.getItem(key);
+        if (!content || !content.trim()) continue;
+        if (localStorage.getItem(iso + '-sub' + m[2] + '-status')) continue;
+        pastPendingTasks.push({ iso: iso, subNum: parseInt(m[2], 10) });
+      }
+      pastPendingTasks.sort(function (a, b) {
+        if (a.iso !== b.iso) return a.iso < b.iso ? -1 : 1;
+        return a.subNum - b.subNum;
+      });
+    }
+
     function updateTodayView() {
       var dateLabelEl = document.getElementById('todayDateLabel');
       var listEl = document.getElementById('todayTaskList');
@@ -2832,6 +2872,42 @@
         emptyLi.className = 'today-empty';
         emptyLi.textContent = '今日やることは特にありません。';
         listEl.appendChild(emptyLi);
+      }
+
+      // 今日より前の未チェック分。○✕を付けてもこの場では消さない（リスト自体は
+      // refreshPastPendingTasks を呼んだときにだけ再計算される）。
+      if (pastPendingTasks.length > 0) {
+        var heading = document.createElement('li');
+        heading.className = 'today-past-heading';
+        heading.textContent = '○✕が付いていない過去の予定';
+        listEl.appendChild(heading);
+        pastPendingTasks.forEach(function (task) {
+          var pastContent = localStorage.getItem(task.iso + '-sub' + task.subNum + '-content');
+          if (!pastContent || !pastContent.trim()) return;
+          var headerCell2 = document.querySelector('.header-cell[data-header="sub' + task.subNum + '"]');
+          var label2 = headerCell2 ? headerCell2.textContent.trim() : ('科目' + task.subNum);
+          var d = parseISOToDate(task.iso);
+          var dateText = (d.getMonth() + 1) + '/' + d.getDate() + '(' + dayNames[d.getDay()] + ')';
+
+          var li2 = document.createElement('li');
+          var textDiv2 = document.createElement('div');
+          textDiv2.className = 'today-task-text';
+          var dateSpan = document.createElement('span');
+          dateSpan.className = 'today-past-date';
+          dateSpan.textContent = dateText + '　';
+          textDiv2.appendChild(dateSpan);
+          textDiv2.appendChild(document.createTextNode(label2 + '：' + pastContent.trim().split(/\n+/).join('、')));
+          li2.appendChild(textDiv2);
+
+          var controls2 = document.createElement('div');
+          controls2.className = 'today-task-controls';
+          // 過去分の✕は記録のみで、予定の後ろ倒し（rescheduleAfterMiss）は行わない
+          // （過去日を起点に繰り越すと、すでに過ぎた日々の内容を書き換えてしまうため）
+          controls2.appendChild(buildTodayStatusGroup(task.iso + '-sub' + task.subNum + '-status'));
+          li2.appendChild(controls2);
+
+          listEl.appendChild(li2);
+        });
       }
     }
 
