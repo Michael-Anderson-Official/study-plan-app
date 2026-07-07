@@ -75,6 +75,31 @@
       position: absolute;
       opacity: 0.35;
     }
+    /* セルタップで出る○✕切り替えの吹き出し */
+    #statusBubble {
+      position: absolute;
+      z-index: 500;
+      background: #fff;
+      border: 1px solid #bbb;
+      border-radius: 10px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+      padding: 0.45rem 0.55rem;
+      display: flex;
+      gap: 0.55rem;
+    }
+    #statusBubble::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      margin-left: -6px;
+      width: 11px;
+      height: 11px;
+      background: #fff;
+      border-right: 1px solid #bbb;
+      border-bottom: 1px solid #bbb;
+      transform: rotate(45deg);
+    }
     /* 節気切り替わり日のスプラッシュ表示。タップまたは数秒で自動的に消える */
     #sekkiSplash {
       position: fixed;
@@ -653,25 +678,25 @@
         <tr>
           <th class="row-label" data-day="day1">月</th>
           <td class="cell">
-            <div class="section" contenteditable data-key="day1-sub1-content"></div>
+            <div class="section" data-key="day1-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day1-sub2-content"></div>
+            <div class="section" data-key="day1-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day1-sub3-content"></div>
+            <div class="section" data-key="day1-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day1-sub4-content"></div>
+            <div class="section" data-key="day1-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day1-sub5-content"></div>
+            <div class="section" data-key="day1-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day1-sub6-content"></div>
+            <div class="section" data-key="day1-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day1-sub7-content"></div>
+            <div class="section" data-key="day1-sub7-content"></div>
           </td>
           <td class="cell">
             <div class="section" contenteditable data-key="day1-sub8-content"></div>
@@ -680,25 +705,25 @@
         <tr>
           <th class="row-label" data-day="day2">火</th>
           <td class="cell">
-            <div class="section" contenteditable data-key="day2-sub1-content"></div>
+            <div class="section" data-key="day2-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day2-sub2-content"></div>
+            <div class="section" data-key="day2-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day2-sub3-content"></div>
+            <div class="section" data-key="day2-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day2-sub4-content"></div>
+            <div class="section" data-key="day2-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day2-sub5-content"></div>
+            <div class="section" data-key="day2-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day2-sub6-content"></div>
+            <div class="section" data-key="day2-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day2-sub7-content"></div>
+            <div class="section" data-key="day2-sub7-content"></div>
           </td>
           <td class="cell">
             <div class="section" contenteditable data-key="day2-sub8-content"></div>
@@ -707,25 +732,25 @@
         <tr>
           <th class="row-label" data-day="day3">水</th>
           <td class="cell">
-            <div class="section" contenteditable data-key="day3-sub1-content"></div>
+            <div class="section" data-key="day3-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day3-sub2-content"></div>
+            <div class="section" data-key="day3-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day3-sub3-content"></div>
+            <div class="section" data-key="day3-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day3-sub4-content"></div>
+            <div class="section" data-key="day3-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day3-sub5-content"></div>
+            <div class="section" data-key="day3-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day3-sub6-content"></div>
+            <div class="section" data-key="day3-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day3-sub7-content"></div>
+            <div class="section" data-key="day3-sub7-content"></div>
           </td>
           <td class="cell">
             <div class="section" contenteditable data-key="day3-sub8-content"></div>
@@ -734,25 +759,25 @@
         <tr>
           <th class="row-label" data-day="day4">木</th>
           <td class="cell">
-            <div class="section" contenteditable data-key="day4-sub1-content"></div>
+            <div class="section" data-key="day4-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day4-sub2-content"></div>
+            <div class="section" data-key="day4-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day4-sub3-content"></div>
+            <div class="section" data-key="day4-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day4-sub4-content"></div>
+            <div class="section" data-key="day4-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day4-sub5-content"></div>
+            <div class="section" data-key="day4-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day4-sub6-content"></div>
+            <div class="section" data-key="day4-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day4-sub7-content"></div>
+            <div class="section" data-key="day4-sub7-content"></div>
           </td>
           <td class="cell">
             <div class="section" contenteditable data-key="day4-sub8-content"></div>
@@ -761,25 +786,25 @@
         <tr>
           <th class="row-label" data-day="day5">金</th>
           <td class="cell">
-            <div class="section" contenteditable data-key="day5-sub1-content"></div>
+            <div class="section" data-key="day5-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day5-sub2-content"></div>
+            <div class="section" data-key="day5-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day5-sub3-content"></div>
+            <div class="section" data-key="day5-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day5-sub4-content"></div>
+            <div class="section" data-key="day5-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day5-sub5-content"></div>
+            <div class="section" data-key="day5-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day5-sub6-content"></div>
+            <div class="section" data-key="day5-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day5-sub7-content"></div>
+            <div class="section" data-key="day5-sub7-content"></div>
           </td>
           <td class="cell">
             <div class="section" contenteditable data-key="day5-sub8-content"></div>
@@ -788,25 +813,25 @@
         <tr>
           <th class="row-label" data-day="day6">土</th>
           <td class="cell">
-            <div class="section" contenteditable data-key="day6-sub1-content"></div>
+            <div class="section" data-key="day6-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day6-sub2-content"></div>
+            <div class="section" data-key="day6-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day6-sub3-content"></div>
+            <div class="section" data-key="day6-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day6-sub4-content"></div>
+            <div class="section" data-key="day6-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day6-sub5-content"></div>
+            <div class="section" data-key="day6-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day6-sub6-content"></div>
+            <div class="section" data-key="day6-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day6-sub7-content"></div>
+            <div class="section" data-key="day6-sub7-content"></div>
           </td>
           <td class="cell">
             <div class="section" contenteditable data-key="day6-sub8-content"></div>
@@ -815,25 +840,25 @@
         <tr>
           <th class="row-label" data-day="day7">日</th>
           <td class="cell">
-            <div class="section" contenteditable data-key="day7-sub1-content"></div>
+            <div class="section" data-key="day7-sub1-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day7-sub2-content"></div>
+            <div class="section" data-key="day7-sub2-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day7-sub3-content"></div>
+            <div class="section" data-key="day7-sub3-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day7-sub4-content"></div>
+            <div class="section" data-key="day7-sub4-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day7-sub5-content"></div>
+            <div class="section" data-key="day7-sub5-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day7-sub6-content"></div>
+            <div class="section" data-key="day7-sub6-content"></div>
           </td>
           <td class="cell">
-            <div class="section" contenteditable data-key="day7-sub7-content"></div>
+            <div class="section" data-key="day7-sub7-content"></div>
           </td>
           <td class="cell">
             <div class="section" contenteditable data-key="day7-sub8-content"></div>
@@ -2802,6 +2827,96 @@
         badge.className = 'status-badge' + (status ? ' status-' + status : '');
       });
     }
+
+    // ==== セルタップで○✕を切り替える吹き出し ====
+    // 科目1〜7のセルは直接編集を廃止したため、タップで○✕変更の吹き出しを出す。
+    var statusBubbleEl = null;
+
+    function closeStatusBubble() {
+      if (statusBubbleEl && statusBubbleEl.parentNode) {
+        statusBubbleEl.parentNode.removeChild(statusBubbleEl);
+      }
+      statusBubbleEl = null;
+    }
+
+    function openStatusBubble(cell, dateISO, subNum) {
+      closeStatusBubble();
+      var statusKey = dateISO + '-sub' + subNum + '-status';
+      var current = localStorage.getItem(statusKey);
+      var bubble = document.createElement('div');
+      bubble.id = 'statusBubble';
+      ['circle', 'cross'].forEach(function (statusVal) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = statusVal === 'circle' ? '○' : '✕';
+        btn.className = 'status-btn ' + statusVal + (current === statusVal ? ' selected' : '');
+        btn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          var existing = localStorage.getItem(statusKey);
+          if (existing === statusVal) {
+            // 同じ印をもう一度タップしたら消す（今日やることタブと同じ挙動）
+            localStorage.removeItem(statusKey);
+          } else {
+            localStorage.setItem(statusKey, statusVal);
+            // 今日以前の日付に新しく✕を付けた場合は、後ろ倒しするか確認する
+            if (statusVal === 'cross' && existing !== 'cross' && dateISO <= toLocalISO(new Date())) {
+              var d = parseISOToDate(dateISO);
+              var dateText = (d.getMonth() + 1) + '/' + d.getDate() + '(' + dayNames[d.getDay()] + ')';
+              if (confirm(dateText + 'の予定を後ろ倒ししますか？\nこの日から連続している予定が1日ずつ後ろにずれます。')) {
+                rescheduleAfterMiss(dateISO, subNum);
+                updateCellsForCurrentWeek();
+              }
+            }
+          }
+          refreshStatusRows();
+          closeStatusBubble();
+        });
+        bubble.appendChild(btn);
+      });
+      document.body.appendChild(bubble);
+      statusBubbleEl = bubble;
+      // セルの真上中央に表示する（画面の左右にはみ出す場合は内側に寄せる）
+      var rect = cell.getBoundingClientRect();
+      var left = rect.left + window.scrollX + rect.width / 2 - bubble.offsetWidth / 2;
+      var minLeft = window.scrollX + 4;
+      var maxLeft = window.scrollX + document.documentElement.clientWidth - bubble.offsetWidth - 4;
+      if (left < minLeft) left = minLeft;
+      if (left > maxLeft) left = maxLeft;
+      bubble.style.left = left + 'px';
+      bubble.style.top = (rect.top + window.scrollY - bubble.offsetHeight - 9) + 'px';
+    }
+
+    // セル（科目1〜7）のタップで吹き出しを開く。空のセル・折りたたみ行・8列目は対象外。
+    (function wireStatusBubble() {
+      var table = document.getElementById('planTable');
+      if (!table) return;
+      table.addEventListener('click', function (event) {
+        var cell = event.target && event.target.closest ? event.target.closest('td.cell') : null;
+        if (!cell) return;
+        var row = cell.closest('tr');
+        if (row && row.classList.contains('row-collapsed')) return;
+        var section = cell.querySelector('.section');
+        if (!section) return;
+        // 8列目（感想・振り返り）は直接編集のまま。吹き出しは出さない。
+        if (section.hasAttribute('contenteditable')) return;
+        var key = section.getAttribute('data-key') || '';
+        var m = key.match(/^(\d{4}-\d{2}-\d{2})-sub([1-7])-content$/);
+        if (!m) return;
+        var content = localStorage.getItem(key);
+        if (!content || !content.trim()) {
+          closeStatusBubble();
+          return;
+        }
+        event.stopPropagation();
+        openStatusBubble(cell, m[1], parseInt(m[2], 10));
+      });
+      // 吹き出しの外をタップしたら閉じる
+      document.addEventListener('click', function (event) {
+        if (statusBubbleEl && !statusBubbleEl.contains(event.target)) {
+          closeStatusBubble();
+        }
+      });
+    })();
 
     // 「今日やること」タブの表示内容を更新します。
     // 今日より前の日付で、内容があるのに○✕が付いていないタスクの一覧。
