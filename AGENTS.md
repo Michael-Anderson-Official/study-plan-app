@@ -40,7 +40,7 @@
 
 ## アカウント同期（Firebase）
 
-- バックエンドはFirebase Auth（Googleサインインのみ）+ Firestore。既存のGoogleカレンダー連携（`GOOGLE_CLIENT_ID`によるCalendar APIアクセストークン取得）とは完全に別物で、互いに依存しない。
+- バックエンドはFirebase Auth（Googleサインインのみ）+ Firestore。サインインは`google.accounts.id`（Google Identity Servicesの「サインインボタン」、`GOOGLE_CLIENT_ID`を共用）でIDトークンを取得し、`signInWithCredential`でFirebaseにサインインする方式（`renderGoogleSignInButton()`/`handleGoogleIdCredential()`）。`signInWithPopup`/`signInWithRedirect`はSafariのストレージ分離(ITP)で`firebaseapp.com`とのセッション受け渡しに失敗する（`auth/unauthorized-domain`や`missing initial state`）ことを実機で確認済みのため使わない。Googleカレンダー連携（`initGoogleAuth`によるCalendar APIアクセストークン取得）とはOAuthクライアントIDこそ共用するが、目的も戻り値も別物で、互いに依存しない。
 - `FIREBASE_CONFIG`（`index.html`内）は、Firebaseコンソールでプロジェクトを作成しWebアプリを登録した後に発行される値へ書き換える。現状はプレースホルダーが入ったままなので、実際のサインインはまだ動作しない。
 - サインインは任意（opt-in）。サインインしなくても今まで通り`localStorage`のみで完全に動作する。Firebase初期化に失敗した場合も`window.appAuth`/`window.appDb`が未定義のままになるだけで、他の機能に影響しない。
 - 実装は`index.html`の末尾にある`<script type="module">`（`window.appAuth`/`window.appDb`をwindowへ公開するブリッジ）と、先頭付近の`Storage.prototype.setItem/removeItem`フック（`classifyStorageKey`/`markCloudSyncDirty`/`flushCloudSync`）の2箇所に分かれる。`<script type="module">`は暗黙deferされ非moduleスクリプトより後に実行されるため、`window.appAuth`/`window.appDb`はイベントハンドラの中でのみ参照する（トップレベル直書きでは未定義になる）。
