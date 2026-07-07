@@ -4,24 +4,26 @@
 
 ## アプリの目的
 
-「一週間の計画帳」は、学習教材ごとの予定を1週間単位で管理する静的Webアプリです。教材の追加、教材詳細からの自動割り当て、今日やること、○/×の進捗、週の振り返り、バックアップ/復元、毎日通知、Googleカレンダー予定の表示・作成・編集・削除を扱います。
+「一週間の計画帳」は、学習教材ごとの予定を1週間単位で管理する静的Webアプリです。教材の追加、ISBN/バーコードからの教材追加、教材詳細からの自動割り当て、今日やること、○/×の進捗、週の振り返り、バックアップ/復元、毎日通知、Googleカレンダー予定の表示・作成・編集・削除を扱います。
 
 ## 現在の実装状態
 
 コード上確認できた事実:
 
-- `main` 最新コミットは `1187709820e66a17ee21f650fe364182abf7ebba`（`Persist Google sign-in across reloads`）。
-- GitHub Pages の最新 deployment は上記SHAで `success`。公開URLは `https://michael-anderson-official.github.io/study-plan-app/`。
-- 公開URLの `index.html`、`sw.js`、`manifest.json` はHTTP 200で取得できた。
+- 最新コミットは `git log -1 --oneline` で確認する。固定SHAは古くなりやすいため、この文書では管理しない。
+- 公開URLは `https://michael-anderson-official.github.io/study-plan-app/`。push後のGitHub Pages反映状態はGitHub側または公開URLで確認する。
 - アプリ本体は `index.html` にHTML/CSS/JavaScriptをまとめたVanilla JS構成。
 - PWA/通知用に `manifest.json` と `sw.js` がある。
 - Cloudflare Worker用に `worker/worker.js` と `worker/wrangler.toml` がある。
 - アプリ本体の保存は `localStorage`。通知購読はCloudflare KVに保存する設計。
+- `index.html` にはISBN/バーコード教材追加用の `scanIsbnBtn`、`isbnScannerModal`、カメラ読み取り/ISBN手入力/書籍情報プレビュー/教材追加処理がある。
+- ISBN検索は openBD を先に使い、見つからない場合に Google Books の公開検索へフォールバックする。APIキーやprivate keyは使っていない。
 - 通常のnpm依存やビルド手順はない。
 
 未確認事項:
 
 - ブラウザでの最新UI手動確認は未実施。
+- 実カメラでのバーコード読み取り、モバイルブラウザでの `BarcodeDetector` 対応状況、openBD/Google Books のCORSを含む実ブラウザ通信は未確認。
 - iPhoneのホーム画面PWA通知、実push送信、Cron Triggerの実行は未確認。
 - Cloudflareダッシュボード上のKV binding、Cron Trigger、VAPID secretsの実設定は公開エンドポイントからは未確認。
 
@@ -51,6 +53,25 @@
 - 1週間タブの日付セルにも、サインイン済みGoogleカレンダーのその日の予定を最大2件まで箇条書き表示し、残りは `＋N件` で省略するようにした。
 - 1週間タブは手書き計画帳に寄せたノート風の罫線・紙面UIにし、各日の行は初期表示で展開するようにした。
 
+## 直近でCodexが変更した内容
+
+コード上確認できた事実:
+
+- `index.html` に「バーコードで追加」ボタンと `isbnScannerModal` を追加した。
+- カメラ読み取りはブラウザ標準の `BarcodeDetector` を使う。非対応時もISBN手入力で検索できる。
+- ISBNは13桁チェックサムを検証する。10桁ISBNは13桁へ変換して検索する。
+- 書籍情報は openBD API を先に参照し、未取得なら Google Books API の公開検索へフォールバックする。
+- 検索結果はプレビュー表示し、「この教材を追加」で `materials-list` に書名、`material-details` にISBN・書名・著者・出版社・出版日・表紙URL・ページ数・取得元を保存する。
+- 教材詳細パネルに書籍メタ情報を表示する `bookMetaPanel` を追加した。
+- 教材詳細の「保存」と「毎日」は `Object.assign` で既存詳細を引き継ぎ、ISBN/書籍メタ情報を消さないようにした。
+
+未確認事項:
+
+- 実カメラでのバーコード読み取り。
+- 公開URL上でのopenBD/Google Books通信とCORS。
+- iPhone/Androidでの `BarcodeDetector` 対応。非対応時はISBN手入力にフォールバックする設計。
+- ローカルPlaywrightでのISBN手入力フロー確認は、検証環境の `playwright-core` 不足で未実施。
+
 ## 保存キー・データ構造
 
 コード上確認できた事実:
@@ -65,6 +86,7 @@
 - 今日は何の日キャッシュ: `today-trivia-YYYY-MM-DD`
 - Googleカレンダー選択: `google-calendar-id`
 - Google access token一時保存: `google-token`
+- バーコード追加された教材の `material-details` には `isbn`、`bookTitle`、`authors`、`publisher`、`publishedDate`、`coverImage`、`description`、`pageCount`、`source` が入り得る。
 
 移行処理:
 
@@ -73,6 +95,23 @@
 - 旧 `weekStart` の `monday` / `sunday` は `1` / `0` に移行される。
 
 ## 指定トピックの現在状態
+
+### ISBN/バーコード教材追加
+
+コード上確認できた事実:
+
+- `scanIsbnBtn` で `isbnScannerModal` を開く。
+- `isbnStartScanBtn` は `BarcodeDetector` と `getUserMedia` が使える場合だけカメラ読み取りを開始する。
+- `isbnManualInput` と `isbnLookupBtn` でISBN手入力検索ができる。
+- 書籍情報取得は openBD → Google Books の順。秘密鍵やAPIキーは使っていない。
+- `isbnAddBookBtn` は検索済み書籍を教材として追加し、追加後に教材詳細を開く。
+- 教材詳細保存や「毎日」を押しても、ISBN/書籍メタ情報は保持される。
+
+未確認事項:
+
+- 実カメラでバーコードを読み取れるか。
+- 公開URLでopenBD/Google Booksから期待通り取得できるか。
+- Safari/iPhone PWAなど `BarcodeDetector` 非対応環境で、手入力導線が十分わかりやすいか。
 
 ### PC版で教材追加ボタンが動かない問題
 
@@ -167,16 +206,22 @@
 コード/HTTP応答で確認済み:
 
 - `index.html` の最終 `<script>` は `new Function(script)` で構文OK。
+- ISBN/バーコード追加後の `index.html` の最終 `<script>` も `new Function(script)` で構文OK。
+- 外部HTTPSテストで openBD は `9784003101018` に対してHTTP 200、タイトル `吾輩は猫である` を返した。
+- 同じ外部HTTPSテストで Google Books はHTTP 429を返した。この環境の一時的な制限か、API側のレート制限かは未切り分け。
 - `worker/worker.js` はES moduleとしてimportできる。
 - `manifest.json` はJSON parseできる。
-- GitHub Pagesは最新SHAでdeployment success。
-- 公開 `index.html` は通知Worker URLとGoogle client IDを含む。
+- GitHub Pagesのdeployment状態は作業時点ごとにGitHub側または公開URLで確認する。
+- 公開 `index.html` が通知Worker URLとGoogle client IDを含むことは過去に確認済み。最新push後は再確認する。
 - 公開 `sw.js` はpush通知表示処理を含む。
 - 公開Workerの `/subscribe` はCORS preflightと不正bodyへの400を返す。
 
 ## 未確認の動作
 
 - PC/スマホでの最新UIの実操作。
+- 実カメラでのISBNバーコード読み取り。
+- ISBN手入力からopenBD/Google Booksで書籍情報を取得し、教材追加できるかの公開URL上での実操作。
+- ローカルPlaywrightでのブラウザ自動操作確認（検証環境の `playwright-core` 不足により未実施）。
 - 教材削除ボタンのブラウザ手動クリック。
 - 教材削除後、列の詰め替えと既存予定の見え方がユーザー期待と一致するか。
 - 教材詳細保存時に手入力セルが消える挙動が許容されるか。
@@ -196,6 +241,8 @@
 - `sw.js` の通知クリックはURLに `index.html` を含むクライアントだけフォーカス対象にしている。ルートURLで開いているタブはフォーカスされない可能性がある。
 - `holidays2026` は固定リスト。
 - Workerは単一購読設計。
+- `BarcodeDetector` はブラウザ対応差がある。非対応環境ではISBN手入力を使う前提。
+- openBD/Google Booksの公開API仕様、CORS、レート制限に依存する。APIキーや秘密情報は使っていない。Google Booksが429を返す場合は、検索失敗ではなく取得失敗として扱う。
 
 ## 次にやるべき作業
 
@@ -208,6 +255,7 @@
 
 優先度中:
 
+- ISBN手入力とバーコード読み取りを公開URLの実ブラウザで確認する。
 - 教材削除後の既存予定の扱いを仕様決定する。
 - 教材詳細保存時に手入力セルを消してよいか確認し、必要なら自動割り当て分だけを管理する設計へ変更する。
 - Googleカレンダー連携を実ブラウザで確認する。

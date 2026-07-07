@@ -4,7 +4,7 @@
 
 ## プロジェクト概要
 
-- 目的: 1週間の学習計画、今日やること、教材リスト、週の振り返り、Googleカレンダー予定、毎日通知を管理する静的Webアプリ。
+- 目的: 1週間の学習計画、今日やること、教材リスト、ISBN/バーコード教材追加、週の振り返り、Googleカレンダー予定、毎日通知を管理する静的Webアプリ。
 - 公開URL: `https://michael-anderson-official.github.io/study-plan-app/`
 - 使用技術: HTML / CSS / Vanilla JavaScript。ビルドツールやnpm依存は使わない。
 - 主要ファイル: `index.html`。PWA/通知用に `manifest.json`、`sw.js`、Cloudflare Worker 用に `worker/worker.js`、`worker/wrangler.toml` がある。
@@ -16,7 +16,7 @@
 - 起動: ルートを静的HTTPサーバーで配信する。例: `python -m http.server 8765`
 - ビルド: 不要。
 - 構文確認: `index.html` 内の最終 `<script>` を抽出して `new Function(script)` で確認する。`worker/worker.js` はES moduleとしてimportできるか確認する。`manifest.json` はJSON parseする。
-- 手動確認: PC幅とスマホ幅の両方で、教材追加、教材詳細保存、教材削除、週移動、今週へ、今日やること、週の振り返り、設定モーダル、バックアップ/復元を確認する。
+- 手動確認: PC幅とスマホ幅の両方で、教材追加、ISBN/バーコード教材追加、教材詳細保存、教材削除、週移動、今週へ、今日やること、週の振り返り、設定モーダル、バックアップ/復元を確認する。
 - 通知確認: HTTPSの公開URLまたはlocalhostでService Worker登録を確認する。実push、iPhone PWA、Cron実行はCloudflare設定と実機が必要。
 
 ## コーディング方針
@@ -45,11 +45,13 @@
 - Workerは `NOTIFY_KV`、`VAPID_PRIVATE_JWK`、`VAPID_PUBLIC_KEY`、`VAPID_SUBJECT`、Cron Trigger を必要とする。
 - 現在のWorkerはKVキー `subscription` に1件だけ保存する設計。複数ユーザー/複数端末対応ではここを変更する。
 - Google OAuth client IDは公開情報。access tokenは実行時に `localStorage` の `google-token` に短時間保存されるだけで、リポジトリに含めない。
+- ISBN/バーコード教材追加はブラウザ標準の `BarcodeDetector` を使う。非対応ブラウザではISBN手入力を使う。書籍情報は openBD を先に見て、見つからない場合に Google Books の公開検索へフォールバックする。APIキーや秘密情報は使わない。
 
 ## UI確認時の注意
 
 - カレンダー上部ヘッダーには教材名が入る。セル内に教材名を重複表示しない。
 - 「一週間をリセット」ボタンは廃止済み。
 - 教材削除は教材詳細パネル内の「削除」ボタンで行う。削除しても、カレンダーにすでに記入済みの予定は残る。
+- バーコード追加後の教材詳細には書籍メタ情報が表示される。詳細保存や「毎日」で `isbn`、`bookTitle`、`authors`、`publisher`、`coverImage` などを消さない。
 - 教材詳細保存や「毎日」は、その教材列の既存スケジュールセルを消して再割り当てする。手入力が消える可能性に注意する。
 - 今日やることの「×」は、その日以降の連続予定を1日後ろ倒しにする。

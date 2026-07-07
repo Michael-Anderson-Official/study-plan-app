@@ -96,6 +96,61 @@
     .backup-section {
       border-bottom: none;
     }
+    .book-meta-panel, .isbn-book-preview {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+      margin: 0.75rem 0;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+    }
+    .book-meta-cover, .isbn-book-cover {
+      width: 64px;
+      min-width: 64px;
+      min-height: 88px;
+      object-fit: cover;
+      background: #eee;
+      border: 1px solid #ddd;
+    }
+    .book-meta-title, .isbn-book-title {
+      font-weight: bold;
+      margin-bottom: 0.25rem;
+    }
+    .book-meta-line, .isbn-book-line {
+      font-size: 0.78rem;
+      color: #555;
+      margin: 0.1rem 0;
+    }
+    .isbn-scanner-video {
+      width: 100%;
+      max-height: 280px;
+      background: #111;
+      border-radius: 6px;
+      object-fit: cover;
+    }
+    .isbn-scanner-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 0.75rem 0;
+    }
+    .isbn-manual-row {
+      display: flex;
+      gap: 0.5rem;
+      margin: 0.75rem 0;
+    }
+    .isbn-manual-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 0.45rem;
+    }
+    .isbn-status {
+      min-height: 1.2rem;
+      font-size: 0.82rem;
+      color: #666;
+    }
     /* Googleカレンダービュー */
     .google-event-day {
       margin-bottom: 1rem;
@@ -713,12 +768,22 @@
     <input id="materialInput" type="text" placeholder="教材名を入力" style="padding:0.4rem; width: 60%; max-width:280px;" />
     <!-- type="button" を明示してフォーム送信を防ぐ -->
     <button id="addMaterialBtn" type="button" style="padding:0.4rem 0.8rem; margin-left:0.5rem;">追加</button>
+    <button id="scanIsbnBtn" type="button" class="btn-outline" style="padding:0.4rem 0.8rem; margin-left:0.5rem;">バーコードで追加</button>
     <ul id="materialsList" style="list-style:none; padding-left:0; margin-top:0.5rem;"></ul>
   </div>
 
   <!-- 教材の詳細入力欄 -->
   <div id="materialDetail" style="display:none; margin:1rem; padding:1rem; border:1px solid #ccc; border-radius:4px; background:#f9f9f9;">
     <h3 id="materialNameDetail" style="font-size:1rem; margin-top:0;">教材詳細</h3>
+    <div id="bookMetaPanel" class="book-meta-panel" style="display:none;">
+      <img id="bookMetaCover" class="book-meta-cover" alt="" />
+      <div>
+        <div id="bookMetaTitle" class="book-meta-title"></div>
+        <div id="bookMetaAuthors" class="book-meta-line"></div>
+        <div id="bookMetaPublisher" class="book-meta-line"></div>
+        <div id="bookMetaIsbn" class="book-meta-line"></div>
+      </div>
+    </div>
     <div style="margin-bottom:0.5rem;">
       <label for="unitsInput">単位数（章数やページ数など）:</label><br/>
       <input id="unitsInput" type="number" min="1" style="padding:0.3rem; width:60%; max-width:200px;" />
@@ -741,6 +806,34 @@
     <button id="dailyScheduleBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">毎日</button>
     <button id="deleteMaterialBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem; background:#d9534f;">削除</button>
     <button id="cancelDetailBtn" type="button" style="padding:0.4rem 0.8rem;">キャンセル</button>
+  </div>
+
+  <!-- バーコード/ISBNで教材を追加するモーダル -->
+  <div id="isbnScannerModal" class="settings-modal" style="display:none;">
+    <div class="settings-panel">
+      <button id="isbnScannerCloseBtn" type="button" class="settings-close-btn" aria-label="閉じる">×</button>
+      <h2 style="font-size:1rem; margin-top:0;">バーコードで教材追加</h2>
+      <video id="isbnScannerVideo" class="isbn-scanner-video" playsinline muted></video>
+      <div class="isbn-scanner-actions">
+        <button id="isbnStartScanBtn" type="button">カメラで読み取る</button>
+        <button id="isbnStopScanBtn" type="button" class="btn-outline">停止</button>
+      </div>
+      <div class="isbn-manual-row">
+        <input id="isbnManualInput" type="text" inputmode="numeric" placeholder="ISBNを手入力" />
+        <button id="isbnLookupBtn" type="button">検索</button>
+      </div>
+      <p id="isbnScannerStatus" class="isbn-status"></p>
+      <div id="isbnBookPreview" class="isbn-book-preview" style="display:none;">
+        <img id="isbnBookCover" class="isbn-book-cover" alt="" />
+        <div>
+          <div id="isbnBookTitle" class="isbn-book-title"></div>
+          <div id="isbnBookAuthors" class="isbn-book-line"></div>
+          <div id="isbnBookPublisher" class="isbn-book-line"></div>
+          <div id="isbnBookIsbn" class="isbn-book-line"></div>
+          <button id="isbnAddBookBtn" type="button" style="margin-top:0.5rem;">この教材を追加</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- 一週間の振り返り欄 -->
@@ -801,6 +894,9 @@
     var materialsList = [];
     var materialsDetails = [];
     var currentMaterialIndex = null;
+    var isbnScanStream = null;
+    var isbnScanTimer = null;
+    var isbnDetectedBook = null;
 
     // 通知用の設定。
     var NOTIFY_WORKER_URL = 'https://keikakuchou-notify.keikakuchou-app.workers.dev';
@@ -1114,6 +1210,8 @@
         });
       }
 
+      setupIsbnScannerControls();
+
       // ページ読み込み時に教材リストを読み込む
       loadMaterials();
       // ページ読み込み時: 現在の日付からその週の月曜日を計算し、
@@ -1276,12 +1374,20 @@
           var dailyGoalInput = document.getElementById('dailyGoalInput');
           var unitsVal = parseInt(unitsInput.value, 10);
           var dailyGoalVal = parseInt(dailyGoalInput.value, 10);
-          if (!materialsDetails[currentMaterialIndex]) materialsDetails[currentMaterialIndex] = {};
-          materialsDetails[currentMaterialIndex] = {
+          var existingDailyDetail = materialsDetails[currentMaterialIndex] || {};
+          var tocInputForDaily = document.getElementById('tocInput');
+          var dailyTocLines = [];
+          if (tocInputForDaily && tocInputForDaily.value) {
+            dailyTocLines = tocInputForDaily.value.split(/\n+/).map(function (line) {
+              return line.trim();
+            }).filter(function (line) { return line !== ''; });
+          }
+          materialsDetails[currentMaterialIndex] = Object.assign({}, existingDailyDetail, {
             units: isNaN(unitsVal) ? null : unitsVal,
             targetDate: null,
-            dailyGoal: isNaN(dailyGoalVal) ? null : dailyGoalVal
-          };
+            dailyGoal: isNaN(dailyGoalVal) ? null : dailyGoalVal,
+            tocList: tocInputForDaily ? (dailyTocLines.length > 0 ? dailyTocLines : null) : (existingDailyDetail.tocList || null)
+          });
           localStorage.setItem('material-details', JSON.stringify(materialsDetails));
           scheduleMaterialDaily(currentMaterialIndex);
         });
@@ -1329,8 +1435,419 @@
           fetchGoogleCalendarList();
           fetchGoogleEvents();
         }
-      });
+    });
     // DOMContentLoaded 用のクロージャを削除したため閉じカッコは不要になりました。
+
+    function setupIsbnScannerControls() {
+      var scanBtn = document.getElementById('scanIsbnBtn');
+      var modal = document.getElementById('isbnScannerModal');
+      var closeBtn = document.getElementById('isbnScannerCloseBtn');
+      var startBtn = document.getElementById('isbnStartScanBtn');
+      var stopBtn = document.getElementById('isbnStopScanBtn');
+      var lookupBtn = document.getElementById('isbnLookupBtn');
+      var input = document.getElementById('isbnManualInput');
+      var addBookBtn = document.getElementById('isbnAddBookBtn');
+
+      if (scanBtn) {
+        scanBtn.addEventListener('click', function () {
+          openIsbnScannerModal();
+        });
+      }
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function () {
+          closeIsbnScannerModal();
+        });
+      }
+      if (modal) {
+        modal.addEventListener('click', function (event) {
+          if (event.target === modal) closeIsbnScannerModal();
+        });
+      }
+      if (startBtn) {
+        startBtn.addEventListener('click', function () {
+          startIsbnScan();
+        });
+      }
+      if (stopBtn) {
+        stopBtn.addEventListener('click', function () {
+          stopIsbnScan();
+          setIsbnStatus('読み取りを停止しました。ISBNを手入力して検索することもできます。');
+        });
+      }
+      if (lookupBtn) {
+        lookupBtn.addEventListener('click', function () {
+          lookupManualIsbn();
+        });
+      }
+      if (input) {
+        input.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            lookupManualIsbn();
+          }
+        });
+      }
+      if (addBookBtn) {
+        addBookBtn.addEventListener('click', function () {
+          addDetectedIsbnBookAsMaterial();
+        });
+      }
+    }
+
+    function openIsbnScannerModal() {
+      var modal = document.getElementById('isbnScannerModal');
+      var input = document.getElementById('isbnManualInput');
+      if (!modal) return;
+      resetIsbnPreview();
+      modal.style.display = 'flex';
+      if ('BarcodeDetector' in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        setIsbnStatus('カメラでバーコードを読むか、ISBNを手入力してください。');
+      } else {
+        setIsbnStatus('このブラウザはカメラ読み取りに未対応です。ISBNを手入力してください。');
+      }
+      if (input) input.focus();
+    }
+
+    function closeIsbnScannerModal() {
+      var modal = document.getElementById('isbnScannerModal');
+      stopIsbnScan();
+      if (modal) modal.style.display = 'none';
+    }
+
+    function resetIsbnPreview() {
+      isbnDetectedBook = null;
+      var preview = document.getElementById('isbnBookPreview');
+      var cover = document.getElementById('isbnBookCover');
+      if (preview) preview.style.display = 'none';
+      if (cover) {
+        cover.removeAttribute('src');
+        cover.style.display = 'none';
+      }
+      setText('isbnBookTitle', '');
+      setText('isbnBookAuthors', '');
+      setText('isbnBookPublisher', '');
+      setText('isbnBookIsbn', '');
+    }
+
+    function setIsbnStatus(message, isError) {
+      var status = document.getElementById('isbnScannerStatus');
+      if (!status) return;
+      status.textContent = message || '';
+      status.style.color = isError ? '#b00020' : '#666';
+    }
+
+    function setText(id, value) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = value || '';
+    }
+
+    function lookupManualIsbn() {
+      var input = document.getElementById('isbnManualInput');
+      if (!input) return;
+      lookupIsbn(input.value);
+    }
+
+    function startIsbnScan() {
+      var video = document.getElementById('isbnScannerVideo');
+      if (!video) return;
+      if (!('BarcodeDetector' in window)) {
+        setIsbnStatus('このブラウザはバーコードのカメラ読み取りに未対応です。ISBNを手入力してください。', true);
+        return;
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setIsbnStatus('カメラを起動できません。ISBNを手入力してください。', true);
+        return;
+      }
+
+      stopIsbnScan();
+      setIsbnStatus('カメラを起動しています...');
+      navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      }).then(function (stream) {
+        isbnScanStream = stream;
+        video.srcObject = stream;
+        return video.play();
+      }).then(function () {
+        var detector;
+        try {
+          detector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] });
+        } catch (e) {
+          detector = new BarcodeDetector();
+        }
+        setIsbnStatus('バーコードを探しています。ISBNのバーコードをカメラに近づけてください。');
+        scanIsbnFrame(detector);
+      }).catch(function () {
+        stopIsbnScan();
+        setIsbnStatus('カメラを起動できませんでした。ブラウザの権限を確認するか、ISBNを手入力してください。', true);
+      });
+    }
+
+    function scanIsbnFrame(detector) {
+      var video = document.getElementById('isbnScannerVideo');
+      if (!isbnScanStream || !video || video.readyState < 2) {
+        if (isbnScanStream) {
+          isbnScanTimer = window.setTimeout(function () { scanIsbnFrame(detector); }, 300);
+        }
+        return;
+      }
+
+      detector.detect(video).then(function (codes) {
+        if (!isbnScanStream) return;
+        for (var i = 0; i < codes.length; i++) {
+          var isbn = normalizeIsbn(codes[i].rawValue);
+          if (isbn) {
+            stopIsbnScan();
+            setIsbnStatus('ISBN ' + isbn + ' を読み取りました。書籍情報を検索しています...');
+            lookupIsbn(isbn);
+            return;
+          }
+        }
+        isbnScanTimer = window.setTimeout(function () { scanIsbnFrame(detector); }, 350);
+      }).catch(function () {
+        if (isbnScanStream) {
+          isbnScanTimer = window.setTimeout(function () { scanIsbnFrame(detector); }, 500);
+        }
+      });
+    }
+
+    function stopIsbnScan() {
+      var video = document.getElementById('isbnScannerVideo');
+      if (isbnScanTimer) {
+        window.clearTimeout(isbnScanTimer);
+        isbnScanTimer = null;
+      }
+      if (isbnScanStream) {
+        isbnScanStream.getTracks().forEach(function (track) { track.stop(); });
+        isbnScanStream = null;
+      }
+      if (video) {
+        video.pause();
+        video.srcObject = null;
+      }
+    }
+
+    function normalizeIsbn(value) {
+      var compact = String(value || '').toUpperCase().replace(/[^0-9X]/g, '');
+      if (compact.length > 13) {
+        var match = compact.match(/97[89][0-9]{10}/);
+        if (match && isValidIsbn13(match[0])) return match[0];
+      }
+      if (compact.length === 13 && isValidIsbn13(compact)) return compact;
+      if (compact.length === 10 && isValidIsbn10(compact)) return convertIsbn10To13(compact);
+      return null;
+    }
+
+    function isValidIsbn13(isbn) {
+      if (!/^\d{13}$/.test(isbn)) return false;
+      var sum = 0;
+      for (var i = 0; i < 12; i++) {
+        var digit = parseInt(isbn.charAt(i), 10);
+        sum += (i % 2 === 0) ? digit : digit * 3;
+      }
+      var check = (10 - (sum % 10)) % 10;
+      return check === parseInt(isbn.charAt(12), 10);
+    }
+
+    function isValidIsbn10(isbn) {
+      if (!/^\d{9}[\dX]$/.test(isbn)) return false;
+      var sum = 0;
+      for (var i = 0; i < 10; i++) {
+        var ch = isbn.charAt(i);
+        var digit = ch === 'X' ? 10 : parseInt(ch, 10);
+        sum += digit * (10 - i);
+      }
+      return sum % 11 === 0;
+    }
+
+    function convertIsbn10To13(isbn) {
+      var body = '978' + isbn.slice(0, 9);
+      var sum = 0;
+      for (var i = 0; i < 12; i++) {
+        var digit = parseInt(body.charAt(i), 10);
+        sum += (i % 2 === 0) ? digit : digit * 3;
+      }
+      return body + String((10 - (sum % 10)) % 10);
+    }
+
+    function lookupIsbn(value) {
+      var isbn = normalizeIsbn(value);
+      if (!isbn) {
+        resetIsbnPreview();
+        setIsbnStatus('ISBNを確認できませんでした。13桁または10桁のISBNを入力してください。', true);
+        return;
+      }
+      resetIsbnPreview();
+      setIsbnStatus('ISBN ' + isbn + ' の書籍情報を検索しています...');
+      fetchOpenBdBook(isbn).then(function (book) {
+        if (book) return book;
+        return fetchGoogleBooksBook(isbn);
+      }).then(function (book) {
+        if (!book) {
+          setIsbnStatus('書籍情報が見つかりませんでした。教材名を手入力してください。', true);
+          return;
+        }
+        renderIsbnBookPreview(book);
+        setIsbnStatus('書籍情報を取得しました。内容を確認して追加できます。');
+      }).catch(function () {
+        setIsbnStatus('書籍情報の取得に失敗しました。通信状況やAPI制限を確認するか、教材名を手入力してください。', true);
+      });
+    }
+
+    function fetchOpenBdBook(isbn) {
+      return fetch('https://api.openbd.jp/v1/get?isbn=' + encodeURIComponent(isbn))
+        .then(function (response) {
+          if (!response.ok) return null;
+          return response.json();
+        })
+        .then(function (items) {
+          if (!items || !items[0]) return null;
+          var summary = items[0].summary || {};
+          if (!summary.title && !summary.author && !summary.publisher) return null;
+          return {
+            isbn: summary.isbn || isbn,
+            title: summary.title || ('ISBN ' + isbn),
+            authors: normalizeAuthors(summary.author),
+            publisher: summary.publisher || null,
+            publishedDate: summary.pubdate || null,
+            coverImage: summary.cover || null,
+            description: null,
+            pageCount: null,
+            source: 'openBD'
+          };
+        })
+        .catch(function () {
+          return null;
+        });
+    }
+
+    function fetchGoogleBooksBook(isbn) {
+      var url = 'https://www.googleapis.com/books/v1/volumes?q=isbn:' + encodeURIComponent(isbn) + '&maxResults=1';
+      return fetch(url)
+        .then(function (response) {
+          if (!response.ok) throw new Error('Google Books status ' + response.status);
+          return response.json();
+        })
+        .then(function (data) {
+          if (!data || !data.items || !data.items.length) return null;
+          var info = data.items[0].volumeInfo || {};
+          var imageLinks = info.imageLinks || {};
+          var cover = imageLinks.thumbnail || imageLinks.smallThumbnail || null;
+          if (cover && cover.indexOf('http://') === 0) {
+            cover = 'https://' + cover.slice(7);
+          }
+          return {
+            isbn: isbn,
+            title: info.title || ('ISBN ' + isbn),
+            authors: normalizeAuthors(info.authors),
+            publisher: info.publisher || null,
+            publishedDate: info.publishedDate || null,
+            coverImage: cover,
+            description: info.description || null,
+            pageCount: info.pageCount || null,
+            source: 'Google Books'
+          };
+        });
+    }
+
+    function normalizeAuthors(value) {
+      if (Array.isArray(value)) {
+        return value.filter(function (author) { return !!author; });
+      }
+      if (typeof value === 'string' && value.trim()) {
+        return [value.trim()];
+      }
+      return [];
+    }
+
+    function renderIsbnBookPreview(book) {
+      isbnDetectedBook = book;
+      var preview = document.getElementById('isbnBookPreview');
+      var cover = document.getElementById('isbnBookCover');
+      if (preview) preview.style.display = 'flex';
+      if (cover) {
+        if (book.coverImage) {
+          cover.src = book.coverImage;
+          cover.alt = book.title || '';
+          cover.style.display = '';
+        } else {
+          cover.removeAttribute('src');
+          cover.style.display = 'none';
+        }
+      }
+      setText('isbnBookTitle', book.title || 'タイトル不明');
+      setText('isbnBookAuthors', book.authors && book.authors.length ? '著者: ' + book.authors.join('、') : '');
+      setText('isbnBookPublisher', formatPublisherLine(book));
+      setText('isbnBookIsbn', 'ISBN: ' + (book.isbn || '') + (book.source ? ' / ' + book.source : ''));
+    }
+
+    function formatPublisherLine(book) {
+      var parts = [];
+      if (book.publisher) parts.push(book.publisher);
+      if (book.publishedDate) parts.push(book.publishedDate);
+      if (book.pageCount) parts.push(book.pageCount + 'ページ');
+      return parts.length ? '出版社: ' + parts.join(' / ') : '';
+    }
+
+    function addDetectedIsbnBookAsMaterial() {
+      if (!isbnDetectedBook) {
+        setIsbnStatus('追加する書籍情報がありません。先にISBNを検索してください。', true);
+        return;
+      }
+      var book = isbnDetectedBook;
+      var materialName = book.title || ('ISBN ' + book.isbn);
+      materialsList.push(materialName);
+      materialsDetails.push({
+        units: null,
+        targetDate: null,
+        dailyGoal: null,
+        tocList: null,
+        isbn: book.isbn || null,
+        bookTitle: book.title || null,
+        authors: normalizeAuthors(book.authors),
+        publisher: book.publisher || null,
+        publishedDate: book.publishedDate || null,
+        coverImage: book.coverImage || null,
+        description: book.description || null,
+        pageCount: book.pageCount || null,
+        source: book.source || null
+      });
+      localStorage.setItem('materials-list', JSON.stringify(materialsList));
+      localStorage.setItem('material-details', JSON.stringify(materialsDetails));
+      updateMaterialsUI();
+      var newIndex = materialsList.length - 1;
+      closeIsbnScannerModal();
+      openMaterialDetail(newIndex);
+    }
+
+    function renderBookMeta(detail) {
+      var panel = document.getElementById('bookMetaPanel');
+      var cover = document.getElementById('bookMetaCover');
+      if (!panel) return;
+      if (!detail || !(detail.bookTitle || detail.isbn || detail.coverImage || detail.publisher || detail.authors)) {
+        panel.style.display = 'none';
+        return;
+      }
+      panel.style.display = 'flex';
+      if (cover) {
+        if (detail.coverImage) {
+          cover.src = detail.coverImage;
+          cover.alt = detail.bookTitle || '';
+          cover.style.display = '';
+        } else {
+          cover.removeAttribute('src');
+          cover.style.display = 'none';
+        }
+      }
+      setText('bookMetaTitle', detail.bookTitle || (currentMaterialIndex !== null ? materialsList[currentMaterialIndex] : ''));
+      setText('bookMetaAuthors', detail.authors && detail.authors.length ? '著者: ' + detail.authors.join('、') : '');
+      setText('bookMetaPublisher', formatPublisherLine(detail));
+      setText('bookMetaIsbn', detail.isbn ? 'ISBN: ' + detail.isbn + (detail.source ? ' / ' + detail.source : '') : '');
+    }
 
     // 教材詳細を開く
     function openMaterialDetail(idx) {
@@ -1356,6 +1873,7 @@
           tocInput.value = '';
         }
       }
+      renderBookMeta(detail);
       detailDiv.style.display = 'block';
     }
 
@@ -1369,6 +1887,7 @@
       var targetDate = targetDateInput.value;
       var dailyGoal = parseInt(dailyGoalInput.value, 10);
       if (!materialsDetails[currentMaterialIndex]) materialsDetails[currentMaterialIndex] = {};
+      var existingDetail = materialsDetails[currentMaterialIndex] || {};
       // 目次入力欄の内容を取得し、空行を除外した配列にする
       var tocInputField = document.getElementById('tocInput');
       var tocLines = [];
@@ -1377,12 +1896,12 @@
           return line.trim();
         }).filter(function (line) { return line !== ''; });
       }
-      materialsDetails[currentMaterialIndex] = {
+      materialsDetails[currentMaterialIndex] = Object.assign({}, existingDetail, {
         units: isNaN(units) ? null : units,
         targetDate: targetDate || null,
         dailyGoal: isNaN(dailyGoal) ? null : dailyGoal,
         tocList: tocLines.length > 0 ? tocLines : null
-      };
+      });
       // 保存
       localStorage.setItem('material-details', JSON.stringify(materialsDetails));
       // スケジュール計算
