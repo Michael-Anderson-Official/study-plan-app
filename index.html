@@ -355,6 +355,15 @@
       font-weight: 800;
       letter-spacing: 0;
     }
+    /* 日付の下に出すその日の達成率（○の数÷予定セル数） */
+    .row-day-rate {
+      text-align: center;
+      font-size: 0.62rem;
+      font-weight: normal;
+      color: #777;
+      white-space: nowrap;
+      min-height: 0.8rem;
+    }
     .week-google-events {
       margin: 0.15rem 0 0;
       padding-left: 1rem;
@@ -1665,16 +1674,7 @@
         cell.appendChild(badge);
       });
 
-      // 各行はタップで一時的に展開・折りたたみできるようにする（今日の行も含む）
-      var planTableBody = document.querySelector('#planTable tbody');
-      if (planTableBody) {
-        planTableBody.addEventListener('click', function (event) {
-          var label = event.target.closest('th.row-label');
-          if (!label) return;
-          var row = label.closest('tr');
-          if (row) row.classList.toggle('row-collapsed');
-        });
-      }
+      // 行ラベル（曜日・日付）タップでの折りたたみは廃止した（タップで行の大きさが変わらないようにする）
 
       // 教材リストおよび詳細情報はグローバル変数を使用します。
       function loadMaterials() {
@@ -1719,6 +1719,17 @@
             cell.textContent = '科目' + (idx + 1);
           }
         });
+        // 教材が登録されていない科目列（1〜7）は非表示にする。教材を追加すると現れる。
+        // 8列目（感想・振り返り）は常に表示する。
+        for (var colN = 1; colN <= 7; colN++) {
+          var showCol = !!(materialsList[colN - 1] && String(materialsList[colN - 1]).trim());
+          var headCell = document.querySelector('.header-cell[data-header="sub' + colN + '"]');
+          if (headCell) headCell.style.display = showCol ? '' : 'none';
+          document.querySelectorAll('#planTable tbody tr').forEach(function (row) {
+            var cell = row.querySelectorAll('td.cell')[colN - 1];
+            if (cell) cell.style.display = showCol ? '' : 'none';
+          });
+        }
         // リスト表示の更新
         var listEl = document.getElementById('materialsList');
         if (listEl) {
@@ -2742,6 +2753,7 @@
           section.innerText = '';
         }
       });
+      updateDayRates();
     }
 
     // 週の表示を更新する関数。現在の週開始日 (window.currentWeekStartISO) を基準にラベルや data-key を更新します。
@@ -2776,6 +2788,9 @@
           dateText.className = 'row-date-text';
           dateText.textContent = dayName + ' ' + display;
           labelCell.appendChild(dateText);
+          var rateText = document.createElement('div');
+          rateText.className = 'row-day-rate';
+          labelCell.appendChild(rateText);
           // 今日の日付行の場合はハイライト用クラスを追加する
           if (iso === todayISO) {
             labelCell.classList.add('today');
@@ -2825,6 +2840,27 @@
         var status = localStorage.getItem(m[1] + '-sub' + m[2] + '-status');
         badge.textContent = status === 'circle' ? '○' : status === 'cross' ? '✕' : '';
         badge.className = 'status-badge' + (status ? ' status-' + status : '');
+      });
+      updateDayRates();
+    }
+
+    // 各日の達成率（○の数÷内容が入っているセルの数）を行ラベルの日付の下に表示する。
+    // 内容が1つも無い日は何も表示しない。
+    function updateDayRates() {
+      document.querySelectorAll('#planTable th.row-label').forEach(function (labelCell) {
+        var rateEl = labelCell.querySelector('.row-day-rate');
+        if (!rateEl) return;
+        var iso = labelCell.getAttribute('data-date-iso');
+        if (!iso) { rateEl.textContent = ''; return; }
+        var total = 0;
+        var done = 0;
+        for (var n = 1; n <= 7; n++) {
+          var content = localStorage.getItem(iso + '-sub' + n + '-content');
+          if (!content || !content.trim()) continue;
+          total++;
+          if (localStorage.getItem(iso + '-sub' + n + '-status') === 'circle') done++;
+        }
+        rateEl.textContent = total > 0 ? Math.round(done / total * 100) + '%' : '';
       });
     }
 
