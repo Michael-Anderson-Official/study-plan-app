@@ -1470,8 +1470,8 @@
         <button id="googleSyncBtn" type="button" style="display:none;">今すぐ同期</button>
         <button id="googleAddEventBtn" type="button" style="display:none; margin-left:0.5rem;">＋予定を追加</button>
         <div id="googleCalendarSelectRow" style="display:none; margin-top:0.5rem;">
-          <label for="googleCalendarSelect" style="font-size:0.85rem;">カレンダー:</label>
-          <select id="googleCalendarSelect" style="padding:0.3rem; margin-left:0.3rem; max-width:70%;"></select>
+          <p style="font-size:0.85rem; margin:0 0 0.2rem;">表示するカレンダー（複数選択可）:</p>
+          <div id="googleCalendarCheckboxList" style="font-size:0.85rem;"></div>
         </div>
         <p id="googleSyncStatus" style="font-size:0.8rem; color:#666; margin-bottom:0;"></p>
       </div>
@@ -1510,7 +1510,7 @@
         key === 'device-id' ||
         key.indexOf('today-trivia-') === 0
       ) return null;
-      if (key === 'weekStart' || key === 'notify-time' || key === 'google-calendar-id' || /^header-sub[1-8]$/.test(key)) {
+      if (key === 'weekStart' || key === 'notify-time' || key === 'google-calendar-ids' || /^header-sub[1-8]$/.test(key)) {
         return { type: 'settings' };
       }
       if (key === 'materials-list' || key === 'material-details') {
@@ -1553,7 +1553,7 @@
         window.appDb.pushSettings(uid, {
           weekStart: localStorage.getItem('weekStart'),
           notifyTime: localStorage.getItem('notify-time'),
-          googleCalendarId: localStorage.getItem('google-calendar-id'),
+          googleCalendarIds: localStorage.getItem('google-calendar-ids'),
           headerSub1: localStorage.getItem('header-sub1'),
           headerSub2: localStorage.getItem('header-sub2'),
           headerSub3: localStorage.getItem('header-sub3'),
@@ -1616,7 +1616,7 @@
           var s = cloud.settings;
           if (s.weekStart != null) localStorage.setItem('weekStart', s.weekStart);
           if (s.notifyTime != null) localStorage.setItem('notify-time', s.notifyTime);
-          if (s.googleCalendarId != null) localStorage.setItem('google-calendar-id', s.googleCalendarId);
+          if (s.googleCalendarIds != null) localStorage.setItem('google-calendar-ids', s.googleCalendarIds);
           for (var n = 1; n <= 8; n++) {
             var v = s['headerSub' + n];
             if (v != null) localStorage.setItem('header-sub' + n, v);
@@ -1763,8 +1763,18 @@
         localStorage.removeItem('google-token');
       }
     })();
-    // 使用するカレンダーのID。選択内容は localStorage に保存して次回も引き継ぐ。
-    var googleCalendarId = localStorage.getItem('google-calendar-id') || 'primary';
+    // 表示するカレンダーIDの一覧（複数選択可）。選択内容は localStorage に保存して次回も引き継ぐ。
+    // null は「まだ選択が確定していない」＝カレンダー一覧取得後に全カレンダーを初期選択にする。
+    var googleSelectedCalendarIds = (function () {
+      try {
+        var saved = JSON.parse(localStorage.getItem('google-calendar-ids') || 'null');
+        return Array.isArray(saved) && saved.length > 0 ? saved : null;
+      } catch (e) {
+        return null;
+      }
+    })();
+    // 編集中の予定がどのカレンダーに属するか（保存・削除時にAPIの宛先を決めるため）
+    var currentEditingGoogleCalendarId = null;
     // 取得済みのカレンダー一覧（予定追加時の追加先選択にも使う）
     var googleCalendarList = [];
     var selectedWeekDayISO = null;
@@ -4302,10 +4312,10 @@
       if (calSelectRow) calSelectRow.style.display = signedIn ? '' : 'none';
     }
 
-    // 使用可能なカレンダーの一覧を取得してセレクトボックスに反映する
+    // 使用可能なカレンダーの一覧を取得し、表示するカレンダーを選ぶチェックボックス一覧に反映する
     function fetchGoogleCalendarList() {
-      var selectEl = document.getElementById('googleCalendarSelect');
-      if (!selectEl) return;
+      var listEl = document.getElementById('googleCalendarCheckboxList');
+      if (!listEl) return;
       fetchGoogleApi('https://www.googleapis.com/calendar/v3/users/me/calendarList')
         .then(function (res) {
           if (!res.ok) throw new Error('カレンダー一覧の取得に失敗しました。');
@@ -4314,38 +4324,52 @@
         .then(function (data) {
           var items = data.items || [];
           googleCalendarList = items;
-          selectEl.innerHTML = '';
-          var found = false;
+          var validIds = items.map(function (cal) { return cal.id; });
+          if (!googleSelectedCalendarIds) {
+            // 未選択（初回）は「全て表示させたい」に合わせて全カレンダーを初期選択にする
+            googleSelectedCalendarIds = validIds.slice();
+            localStorage.setItem('google-calendar-ids', JSON.stringify(googleSelectedCalendarIds));
+          } else {
+            // 一覧から消えたカレンダーIDは選択から除く
+            var filtered = googleSelectedCalendarIds.filter(function (id) { return validIds.indexOf(id) !== -1; });
+            if (filtered.length !== googleSelectedCalendarIds.length) {
+              googleSelectedCalendarIds = filtered;
+              localStorage.setItem('google-calendar-ids', JSON.stringify(googleSelectedCalendarIds));
+            }
+          }
+          listEl.innerHTML = '';
           items.forEach(function (cal) {
             // 書き込みできないカレンダー（購読カレンダー等）は編集不可なので「(閲覧のみ)」を付ける
             var writable = cal.accessRole === 'owner' || cal.accessRole === 'writer';
-            var opt = document.createElement('option');
-            opt.value = cal.id;
-            opt.textContent = (cal.summary || cal.id) + (writable ? '' : '（閲覧のみ）');
-            if (cal.id === googleCalendarId || (googleCalendarId === 'primary' && cal.primary)) {
-              opt.selected = true;
-              found = true;
-            }
-            selectEl.appendChild(opt);
+            var label = document.createElement('label');
+            label.style.cssText = 'display:block; margin:0.15rem 0;';
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = cal.id;
+            cb.checked = googleSelectedCalendarIds.indexOf(cal.id) !== -1;
+            cb.addEventListener('change', function () {
+              if (cb.checked) {
+                if (googleSelectedCalendarIds.indexOf(cal.id) === -1) googleSelectedCalendarIds.push(cal.id);
+              } else {
+                googleSelectedCalendarIds = googleSelectedCalendarIds.filter(function (id) { return id !== cal.id; });
+              }
+              localStorage.setItem('google-calendar-ids', JSON.stringify(googleSelectedCalendarIds));
+              fetchGoogleEvents();
+            });
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(' ' + (cal.summary || cal.id) + (writable ? '' : '（閲覧のみ）')));
+            listEl.appendChild(label);
           });
-          // 保存されていたカレンダーが一覧に無くなっていた場合はprimaryに戻す
-          if (!found && items.length > 0) {
-            googleCalendarId = 'primary';
-            localStorage.setItem('google-calendar-id', googleCalendarId);
-            var primaryItem = items.filter(function (c) { return c.primary; })[0];
-            if (primaryItem) selectEl.value = primaryItem.id;
-          }
         })
         .catch(function () {
-          // 一覧が取れなくてもprimaryでの動作は継続できるため、エラー表示はしない
+          // 一覧が取れなくても既存の選択状態のまま動作を継続する
         });
     }
 
     function refreshGoogleCalendarPanel() {
       updateGoogleSignInUI();
       if (googleAccessToken || hasGoogleCalendarSession()) {
-        var selectEl = document.getElementById('googleCalendarSelect');
-        if (selectEl && selectEl.options.length === 0) fetchGoogleCalendarList();
+        if (googleCalendarList.length === 0) fetchGoogleCalendarList();
         fetchGoogleEvents();
       }
     }
@@ -4406,35 +4430,55 @@
       return { timeMin: start.toISOString(), timeMax: end.toISOString() };
     }
 
+    // 選択中の全カレンダーから、現在の週範囲の予定を並行取得してまとめる。
+    // 各予定には取得元のカレンダーID（_calendarId）を付けておき、編集・削除時に使う。
     function fetchGoogleEvents() {
       var statusEl = document.getElementById('googleSyncStatus');
+      var calIds = googleSelectedCalendarIds && googleSelectedCalendarIds.length > 0 ? googleSelectedCalendarIds : ['primary'];
       if (statusEl) statusEl.textContent = '同期中...';
       var range = getGoogleWeekRange();
-      var url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events'
-        + '?timeMin=' + encodeURIComponent(range.timeMin)
-        + '&timeMax=' + encodeURIComponent(range.timeMax)
-        + '&singleEvents=true&orderBy=startTime';
-      fetchGoogleApi(url)
-        .then(function (res) {
+      var authExpired = false;
+      var fetches = calIds.map(function (calId) {
+        var url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calId) + '/events'
+          + '?timeMin=' + encodeURIComponent(range.timeMin)
+          + '&timeMax=' + encodeURIComponent(range.timeMax)
+          + '&singleEvents=true&orderBy=startTime';
+        return fetchGoogleApi(url).then(function (res) {
           if (res.status === 401) {
-            clearGoogleCalendarAuth(true);
-            throw new Error('認証の有効期限が切れました。再度サインインしてください。');
+            authExpired = true;
+            return [];
           }
-          if (!res.ok) throw new Error('取得に失敗しました。');
-          return res.json();
-        })
-        .then(function (data) {
-          googleEvents = data.items || [];
-          renderWeekGoogleEvents();
-          if (selectedWeekDayISO) renderWeekDayPanel(selectedWeekDayISO, { keepClosed: true });
-          if (statusEl) {
-            var now = new Date();
-            statusEl.textContent = '最終同期: ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-          }
-        })
-        .catch(function (err) {
-          if (statusEl) statusEl.textContent = err.message || '同期に失敗しました。';
+          if (!res.ok) return []; // 1つのカレンダーの取得失敗で全体を止めない
+          return res.json().then(function (data) {
+            return (data.items || []).map(function (ev) {
+              ev._calendarId = calId;
+              return ev;
+            });
+          });
+        }).catch(function () {
+          return [];
         });
+      });
+      Promise.all(fetches).then(function (results) {
+        if (authExpired) {
+          clearGoogleCalendarAuth(true);
+          if (statusEl) statusEl.textContent = '認証の有効期限が切れました。再度サインインしてください。';
+          return;
+        }
+        googleEvents = [].concat.apply([], results).sort(function (a, b) {
+          var at = (a.start && (a.start.dateTime || a.start.date)) || '';
+          var bt = (b.start && (b.start.dateTime || b.start.date)) || '';
+          return at < bt ? -1 : (at > bt ? 1 : 0);
+        });
+        renderWeekGoogleEvents();
+        if (selectedWeekDayISO) renderWeekDayPanel(selectedWeekDayISO, { keepClosed: true });
+        if (statusEl) {
+          var now = new Date();
+          statusEl.textContent = '最終同期: ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        }
+      }).catch(function () {
+        if (statusEl) statusEl.textContent = '同期に失敗しました。';
+      });
     }
 
     function buildGoogleEventItem(ev) {
@@ -4492,6 +4536,9 @@
       var calendarSelect = document.getElementById('googleEventCalendarSelect');
       if (statusEl) statusEl.textContent = '';
 
+      // 既存予定の編集・削除は、取得元のカレンダー（ev._calendarId）宛てに行う。
+      currentEditingGoogleCalendarId = ev ? (ev._calendarId || 'primary') : null;
+
       // 新規作成時のみ、追加先カレンダーを選べるようにする（既存予定のカレンダー移動は非対応）。
       // 書き込みできるカレンダーだけを候補にする。
       if (calendarRow && calendarSelect) {
@@ -4506,16 +4553,16 @@
             var opt = document.createElement('option');
             opt.value = cal.id;
             opt.textContent = cal.summary || cal.id;
-            if (cal.id === googleCalendarId || (googleCalendarId === 'primary' && cal.primary)) {
+            if (cal.primary) {
               opt.selected = true;
             }
             calendarSelect.appendChild(opt);
           });
-          // 一覧が未取得の場合は現在表示中のカレンダーのみを候補にする
+          // 一覧が未取得の場合はprimaryのみを候補にする
           if (writable.length === 0) {
             var fallbackOpt = document.createElement('option');
-            fallbackOpt.value = googleCalendarId;
-            fallbackOpt.textContent = '表示中のカレンダー';
+            fallbackOpt.value = 'primary';
+            fallbackOpt.textContent = 'メインカレンダー';
             calendarSelect.appendChild(fallbackOpt);
           }
           calendarRow.style.display = '';
@@ -4557,7 +4604,7 @@
     }
 
     function createGoogleEvent(body, targetCalendarId) {
-      var calId = targetCalendarId || googleCalendarId;
+      var calId = targetCalendarId || 'primary';
       return fetchGoogleApi('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calId) + '/events', {
         method: 'POST',
         headers: {
@@ -4570,8 +4617,8 @@
       });
     }
 
-    function updateGoogleEvent(id, body) {
-      return fetchGoogleApi('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events/' + encodeURIComponent(id), {
+    function updateGoogleEvent(id, body, calId) {
+      return fetchGoogleApi('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calId || 'primary') + '/events/' + encodeURIComponent(id), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -4583,8 +4630,8 @@
       });
     }
 
-    function deleteGoogleEvent(id) {
-      return fetchGoogleApi('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(googleCalendarId) + '/events/' + encodeURIComponent(id), {
+    function deleteGoogleEvent(id, calId) {
+      return fetchGoogleApi('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calId || 'primary') + '/events/' + encodeURIComponent(id), {
         method: 'DELETE'
       }).then(function (res) {
         if (!res.ok && res.status !== 410) throw new Error('削除に失敗しました。');
@@ -4618,7 +4665,7 @@
       if (statusEl) statusEl.textContent = '保存中...';
       var calendarSelect = document.getElementById('googleEventCalendarSelect');
       var targetCalendarId = (!id && calendarSelect && calendarSelect.value) ? calendarSelect.value : null;
-      var request = id ? updateGoogleEvent(id, body) : createGoogleEvent(body, targetCalendarId);
+      var request = id ? updateGoogleEvent(id, body, currentEditingGoogleCalendarId) : createGoogleEvent(body, targetCalendarId);
       request.then(function () {
         var modal = document.getElementById('googleEventModal');
         if (modal) modal.style.display = 'none';
@@ -4634,15 +4681,6 @@
 
     var googleSyncBtn = document.getElementById('googleSyncBtn');
     if (googleSyncBtn) googleSyncBtn.addEventListener('click', fetchGoogleEvents);
-
-    var googleCalendarSelect = document.getElementById('googleCalendarSelect');
-    if (googleCalendarSelect) {
-      googleCalendarSelect.addEventListener('change', function () {
-        googleCalendarId = googleCalendarSelect.value;
-        localStorage.setItem('google-calendar-id', googleCalendarId);
-        fetchGoogleEvents();
-      });
-    }
 
     var googleAddEventBtn = document.getElementById('googleAddEventBtn');
     if (googleAddEventBtn) {
@@ -4674,7 +4712,7 @@
         if (!confirm('この予定を削除しますか？')) return;
         var statusEl = document.getElementById('googleEventStatus');
         if (statusEl) statusEl.textContent = '削除中...';
-        deleteGoogleEvent(id).then(function () {
+        deleteGoogleEvent(id, currentEditingGoogleCalendarId).then(function () {
           if (googleEventModal) googleEventModal.style.display = 'none';
           fetchGoogleEvents();
         }).catch(function (err) {
