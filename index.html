@@ -464,12 +464,6 @@
       font-size: 1.05rem;
       line-height: 1.35;
     }
-    .week-day-panel-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-      justify-content: flex-end;
-    }
     .week-day-task-list {
       display: grid;
       gap: 0.45rem;
@@ -525,6 +519,21 @@
       color: #33475b;
       font-size: 0.82rem;
       font-weight: 800;
+    }
+    .week-day-section-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin: 0.95rem 0 0.35rem;
+    }
+    .week-day-section-row .week-day-section-title {
+      margin: 0;
+    }
+    .week-day-section-row .btn-outline {
+      padding: 0.35rem 0.6rem;
+      font-size: 0.78rem;
+      white-space: nowrap;
     }
     .week-day-google-list {
       display: grid;
@@ -1092,13 +1101,12 @@
           <p id="weekDayPanelKicker" class="week-day-panel-kicker"></p>
           <h2 id="weekDayPanelTitle" class="week-day-panel-title"></h2>
         </div>
-        <div class="week-day-panel-actions">
-          <button id="weekDayAddGoogleEventBtn" type="button" class="btn-outline">予定追加</button>
-          <button id="weekDayPanelCloseBtn" type="button" class="btn-outline">閉じる</button>
-        </div>
       </div>
       <div id="weekDayTaskList" class="week-day-task-list"></div>
-      <h3 class="week-day-section-title">Googleカレンダー</h3>
+      <div class="week-day-section-row">
+        <h3 class="week-day-section-title">Googleカレンダー</h3>
+        <button id="weekDayAddGoogleEventBtn" type="button" class="btn-outline">予定追加</button>
+      </div>
       <div id="weekDayGoogleList" class="week-day-google-list"></div>
       <h3 class="week-day-section-title">感想・振り返り</h3>
       <textarea id="weekDayReflection" class="week-day-reflection"></textarea>
@@ -3317,8 +3325,6 @@
         event.stopPropagation();
         renderWeekDayPanel(iso);
       });
-      var closeBtn = document.getElementById('weekDayPanelCloseBtn');
-      if (closeBtn) closeBtn.addEventListener('click', closeWeekDayPanel);
       var overviewBtn = document.getElementById('weekOverviewToggleBtn');
       var weekView = document.getElementById('weekView');
       if (overviewBtn && weekView) {
