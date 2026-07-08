@@ -577,7 +577,7 @@
       padding: 0.55rem;
       border: 1px solid #c9d3dd;
       border-radius: 8px;
-      background: #fff;
+      background: rgba(255, 255, 255, 0.55);
       color: #22313f;
       font-size: 0.88rem;
       line-height: 1.5;
@@ -923,7 +923,7 @@
         bottom: 0.55rem;
         padding: 0.65rem;
         box-sizing: border-box;
-        background: rgba(255, 255, 255, 0.8);
+        background: rgba(255, 255, 255, 0.55);
         border: 1px solid rgba(88, 116, 145, 0.2);
         border-radius: 10px;
         box-shadow: 0 4px 18px rgba(31, 47, 61, 0.22);
@@ -1319,6 +1319,8 @@
       <div id="weekDayGoogleList" class="week-day-google-list"></div>
       <h3 class="week-day-section-title">感想・振り返り</h3>
       <textarea id="weekDayReflection" class="week-day-reflection"></textarea>
+      <h3 class="week-day-section-title">日記</h3>
+      <textarea id="weekDayDiary" class="week-day-reflection"></textarea>
     </section>
 
   <!-- 教材追加欄 -->
@@ -1518,6 +1520,8 @@
       }
       var dayMatch = key.match(/^(\d{4}-\d{2}-\d{2})-sub[1-8]-(content|status)$/);
       if (dayMatch) return { type: 'days', iso: dayMatch[1] };
+      var diaryMatch = key.match(/^(\d{4}-\d{2}-\d{2})-diary$/);
+      if (diaryMatch) return { type: 'days', iso: diaryMatch[1] };
       var summaryMatch = key.match(/^weekly-summary-(\d{4}-\d{2}-\d{2})$/);
       if (summaryMatch) return { type: 'weeklySummaries', iso: summaryMatch[1] };
       return null;
@@ -1578,6 +1582,7 @@
           dayData['sub' + n + 'Content'] = localStorage.getItem(iso + '-sub' + n + '-content') || null;
           if (n <= 7) dayData['sub' + n + 'Status'] = localStorage.getItem(iso + '-sub' + n + '-status') || null;
         }
+        dayData.diary = localStorage.getItem(iso + '-diary') || null;
         window.appDb.pushDay(uid, iso, dayData).catch(function () {});
       });
       Object.keys(cloudSyncDirty.weeklySummaries).forEach(function (iso) {
@@ -1636,6 +1641,7 @@
               if (status != null) localStorage.setItem(iso + '-sub' + n2 + '-status', status);
             }
           }
+          if (day.diary != null) localStorage.setItem(iso + '-diary', day.diary);
         });
         Object.keys(cloud.weeklySummaries || {}).forEach(function (iso) {
           localStorage.setItem('weekly-summary-' + iso, cloud.weeklySummaries[iso] || '');
@@ -3460,6 +3466,7 @@
       var taskListEl = document.getElementById('weekDayTaskList');
       var googleListEl = document.getElementById('weekDayGoogleList');
       var reflectionEl = document.getElementById('weekDayReflection');
+      var diaryEl = document.getElementById('weekDayDiary');
       var addGoogleBtn = document.getElementById('weekDayAddGoogleEventBtn');
       if (!panel || !titleEl || !taskListEl || !googleListEl || !reflectionEl) return;
 
@@ -3554,6 +3561,13 @@
         localStorage.setItem(iso + '-sub8-content', reflectionEl.value);
         updateCellsForCurrentWeek();
       };
+
+      if (diaryEl) {
+        diaryEl.value = localStorage.getItem(iso + '-diary') || '';
+        diaryEl.oninput = function () {
+          localStorage.setItem(iso + '-diary', diaryEl.value);
+        };
+      }
 
       if (!options || !options.keepClosed) {
         panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
