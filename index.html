@@ -263,6 +263,10 @@
       overflow-x: auto;
       padding: 0 0.35rem 0.35rem;
     }
+    .mobile-week-strip,
+    .mobile-week-overview-actions {
+      display: none;
+    }
     #planTable th.row-label {
       width: 8.5rem;
       min-width: 8.5rem;
@@ -539,6 +543,68 @@
       line-height: 1.5;
       resize: vertical;
     }
+    .mobile-week-strip {
+      margin: 0.75rem 0.55rem 0.35rem;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .mobile-week-days {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(5.2rem, 1fr);
+      gap: 0.45rem;
+      min-width: max-content;
+      padding: 0.1rem 0.1rem 0.45rem;
+    }
+    .mobile-week-day-card {
+      min-height: 5.2rem;
+      padding: 0.5rem 0.35rem;
+      color: #22313f;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(88, 116, 145, 0.18);
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(31, 47, 61, 0.12);
+      text-align: center;
+    }
+    .mobile-week-day-card.selected {
+      border-color: var(--theme-accent);
+      outline: 2px solid var(--theme-accent);
+      outline-offset: -2px;
+      background: #fffdf1;
+    }
+    .mobile-week-day-card.today {
+      background: var(--theme-today-bg);
+    }
+    .mobile-week-day-name {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+    .mobile-week-day-date {
+      display: block;
+      margin-top: 0.12rem;
+      font-size: 1rem;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+    .mobile-week-day-count,
+    .mobile-week-day-rate {
+      display: block;
+      margin-top: 0.18rem;
+      color: #666;
+      font-size: 0.68rem;
+      line-height: 1.2;
+    }
+    .mobile-week-overview-actions {
+      margin: 0.15rem 0.55rem 0.55rem;
+      text-align: right;
+    }
+    .mobile-week-overview-actions .btn-outline {
+      padding: 0.38rem 0.65rem;
+      font-size: 0.78rem;
+    }
     /* ヘッダー名編集のスタイル */
     .header-cell {
       background: var(--theme-table-head);
@@ -696,7 +762,15 @@
         font-size: 0.78rem;
       }
       .week-table-scroll {
+        display: none;
         padding: 0 0 0.25rem;
+      }
+      #weekView.show-overview .week-table-scroll {
+        display: block;
+      }
+      .mobile-week-strip,
+      .mobile-week-overview-actions {
+        display: block;
       }
       .cell {
         height: 80px;
@@ -791,7 +865,11 @@
     </div>
   </div>
   <div id="weekView">
-  <div class="week-table-scroll">
+    <div id="mobileWeekStrip" class="mobile-week-strip"></div>
+    <div class="mobile-week-overview-actions">
+      <button id="weekOverviewToggleBtn" type="button" class="btn-outline">週間表を表示</button>
+    </div>
+  <div id="weekTableScroll" class="week-table-scroll">
     <table id="planTable">
       <thead>
         <tr>
@@ -2964,6 +3042,7 @@
         });
       });
       renderWeekGoogleEvents();
+      renderMobileWeekSelector();
       if (selectedWeekDayISO) {
         var selectedDate = parseISOToDate(selectedWeekDayISO);
         var weekEndExclusive = new Date(startDate);
@@ -2973,6 +3052,14 @@
         } else {
           closeWeekDayPanel();
         }
+      }
+      if (!selectedWeekDayISO && isMobileWeekLayout()) {
+        var todayInWeek = todayDate >= startDate && todayDate < (function () {
+          var end = new Date(startDate);
+          end.setDate(startDate.getDate() + 7);
+          return end;
+        })();
+        renderWeekDayPanel(todayInWeek ? todayISO : window.currentWeekStartISO, { keepClosed: true });
       }
       // 一週間の振り返り欄の読み込みと保存イベントの更新
       var weeklySummaryEl = document.getElementById('weeklySummary');
@@ -3001,6 +3088,7 @@
         badge.className = 'status-badge' + (status ? ' status-' + status : '');
       });
       updateDayRates();
+      renderMobileWeekSelector();
     }
 
     // 各日の達成率（○の数÷内容が入っているセルの数）を行ラベルの日付の下に表示する。
@@ -3039,6 +3127,68 @@
       document.querySelectorAll('#planTable tbody th.row-label').forEach(function (labelCell) {
         labelCell.classList.toggle('is-selected', labelCell.getAttribute('data-date-iso') === iso);
       });
+      document.querySelectorAll('.mobile-week-day-card').forEach(function (button) {
+        button.classList.toggle('selected', button.getAttribute('data-date-iso') === iso);
+      });
+    }
+
+    function isMobileWeekLayout() {
+      return window.matchMedia && window.matchMedia('(max-width: 600px)').matches;
+    }
+
+    function getDayTaskStats(iso) {
+      var total = 0;
+      var done = 0;
+      for (var n = 1; n <= 7; n++) {
+        var content = localStorage.getItem(iso + '-sub' + n + '-content');
+        if (!content || !content.trim()) continue;
+        total++;
+        if (localStorage.getItem(iso + '-sub' + n + '-status') === 'circle') done++;
+      }
+      return { total: total, done: done, rate: total > 0 ? Math.round(done / total * 100) : null };
+    }
+
+    function renderMobileWeekSelector() {
+      var strip = document.getElementById('mobileWeekStrip');
+      if (!strip) return;
+      var startDate = parseISOToDate(window.currentWeekStartISO);
+      var todayISO = toLocalISO(new Date());
+      var wrap = document.createElement('div');
+      wrap.className = 'mobile-week-days';
+      for (var i = 0; i < 7; i++) {
+        var date = new Date(startDate);
+        date.setDate(startDate.getDate() + i);
+        var iso = toLocalISO(date);
+        var stats = getDayTaskStats(iso);
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'mobile-week-day-card' + (iso === selectedWeekDayISO ? ' selected' : '') + (iso === todayISO ? ' today' : '');
+        button.setAttribute('data-date-iso', iso);
+
+        var dayName = document.createElement('span');
+        dayName.className = 'mobile-week-day-name';
+        dayName.textContent = dayNames[date.getDay()];
+        var dayDate = document.createElement('span');
+        dayDate.className = 'mobile-week-day-date';
+        dayDate.textContent = (date.getMonth() + 1) + '/' + date.getDate();
+        var count = document.createElement('span');
+        count.className = 'mobile-week-day-count';
+        count.textContent = stats.total > 0 ? stats.total + '件' : '予定なし';
+        var rate = document.createElement('span');
+        rate.className = 'mobile-week-day-rate';
+        rate.textContent = stats.rate != null ? stats.rate + '%' : '';
+
+        button.appendChild(dayName);
+        button.appendChild(dayDate);
+        button.appendChild(count);
+        button.appendChild(rate);
+        button.addEventListener('click', (function (targetISO) {
+          return function () { renderWeekDayPanel(targetISO); };
+        })(iso));
+        wrap.appendChild(button);
+      }
+      strip.innerHTML = '';
+      strip.appendChild(wrap);
     }
 
     function renderWeekDayPanel(iso, options) {
@@ -3169,6 +3319,14 @@
       });
       var closeBtn = document.getElementById('weekDayPanelCloseBtn');
       if (closeBtn) closeBtn.addEventListener('click', closeWeekDayPanel);
+      var overviewBtn = document.getElementById('weekOverviewToggleBtn');
+      var weekView = document.getElementById('weekView');
+      if (overviewBtn && weekView) {
+        overviewBtn.addEventListener('click', function () {
+          weekView.classList.toggle('show-overview');
+          overviewBtn.textContent = weekView.classList.contains('show-overview') ? '週間表を隠す' : '週間表を表示';
+        });
+      }
     })();
 
     // ==== セルタップで○✕を切り替える吹き出し ====
