@@ -4,7 +4,7 @@
 
 ## プロジェクト概要
 
-- 目的: 1週間の学習計画、今日やること、教材リスト、ISBN/バーコード教材追加、週の振り返り、Googleカレンダー予定、毎日通知を管理する静的Webアプリ。将来的にAppStoreで公開配信することを見据えており、そのための土台としてFirebaseによるアカウント同期を導入済み（詳細は「アカウント同期（Firebase）」節を参照）。
+- 目的: 1週間の学習計画、教材リスト、ISBN/バーコード教材追加、週の振り返り、Googleカレンダー予定、毎日通知を管理する静的Webアプリ。将来的にAppStoreで公開配信することを見据えており、そのための土台としてFirebaseによるアカウント同期を導入済み（詳細は「アカウント同期（Firebase）」節を参照）。2026-07-08、「今日やること」「Googleカレンダー」の各タブは廃止し、1週間タブ1本（日付タップで開く日別詳細パネル）＋右上の通知ベル（○✕未チェックの過去分）に統合した。
 - 公開URL: `https://michael-anderson-official.github.io/study-plan-app/`
 - 使用技術: HTML / CSS / Vanilla JavaScript。ビルドツールやnpm依存は使わない。
 - 主要ファイル: `index.html`。PWA/通知用に `manifest.json`、`sw.js`、Cloudflare Worker 用に `worker/worker.js`、`worker/wrangler.toml` がある。
@@ -16,7 +16,7 @@
 - 起動: ルートを静的HTTPサーバーで配信する。例: `python -m http.server 8765`
 - ビルド: 不要。
 - 構文確認: `index.html` 内の最終 `<script>` を抽出して `new Function(script)` で確認する。`worker/worker.js` はES moduleとしてimportできるか確認する。`manifest.json` はJSON parseする。
-- 手動確認: PC幅とスマホ幅の両方で、教材追加、ISBN/バーコード教材追加、教材詳細保存、教材削除、週移動、今週へ、今日やること、週の振り返り、設定モーダル、バックアップ/復元を確認する。
+- 手動確認: PC幅とスマホ幅の両方で、教材追加、ISBN/バーコード教材追加、教材詳細保存、教材削除、週移動、今週へ、日別詳細パネル（日付タップ）、通知ベル（○✕未チェックの過去分）、週の振り返り、設定モーダル（アカウント同期・Googleカレンダー連携・バックアップ/復元）を確認する。
 - 通知確認: HTTPSの公開URLまたはlocalhostでService Worker登録を確認する。実push、iPhone PWA、Cron実行はCloudflare設定と実機が必要。
 
 ## コーディング方針
@@ -66,4 +66,6 @@
 - バーコード追加後の教材詳細には書籍メタ情報が表示される。詳細保存や「毎日」で `isbn`、`bookTitle`、`authors`、`publisher`、`coverImage` などを消さない。
 - 教材詳細保存や「毎日」は、その教材列の既存スケジュールセルを消して再割り当てする。
 - 科目1〜7のセルは直接編集不可（`contenteditable`なし）。タップすると○✕切り替えの吹き出し（`#statusBubble`、`openStatusBubble()`）が出る。8列目（感想・振り返り）だけは`contenteditable`のまま直接編集できる。
-- 今日やることの「×」は、その日以降の連続予定を1日後ろ倒しにする。過去の未チェック分や週表の吹き出しから今日以前の日付に✕を付けた場合は、後ろ倒しするかを`confirm`で確認してから実行する。
+- 今日以前の日付に新しく✕を付けた場合は、その日以降の連続予定を1日後ろ倒しするかを`confirm`で確認してから実行する（今日の分は日別パネル・週表どちらも同じ挙動、過去分も同様）。
+- 「今日やること」「Googleカレンダー」タブは2026-07-08に廃止した。日付セル（行ラベル）タップで開く日別詳細パネル（`#weekDayPanel`、`renderWeekDayPanel()`）がその日の教材予定・○✕・Google予定・感想欄をまとめて表示する。○✕が付いていない過去の予定は、右上の通知ベル（`#notifBellBtn`→`#notifModal`、`pastPendingTasks`/`refreshPastPendingTasks()`/`renderNotifList()`/`updateNotifBadge()`）にまとめた。バッジ件数とリスト内容は、ベルを開いたとき（`refreshPastPendingTasks()`実行時）にしか再計算しない設計（○✕を付けてもその場ではリストから消えない）。
+- Googleカレンダーのサインイン/カレンダー選択/今すぐ同期ボタンは設定モーダルの「Googleカレンダー連携」セクションに移設した（アカウント同期＝Firebaseとは別セクション）。「今日は何の日」（`#todayTrivia`）はタイトル下に常時表示、モバイル幅では非表示（`body.week-mobile-shell #todayTrivia { display:none; }`）。

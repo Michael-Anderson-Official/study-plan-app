@@ -116,6 +116,37 @@
       line-height: 1;
       cursor: pointer;
     }
+    .notif-bell-btn {
+      position: fixed;
+      top: 0.6rem;
+      right: 0.6rem;
+      z-index: 30;
+      width: 2.4rem;
+      height: 2.4rem;
+      padding: 0;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 50%;
+      font-size: 1.2rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .notif-bell-badge {
+      position: absolute;
+      top: -0.15rem;
+      right: -0.15rem;
+      min-width: 1.15rem;
+      height: 1.15rem;
+      padding: 0 0.25rem;
+      border-radius: 999px;
+      background: #d9534f;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: bold;
+      line-height: 1.15rem;
+      text-align: center;
+      box-sizing: border-box;
+    }
     .settings-modal {
       position: fixed;
       top: 0;
@@ -676,43 +707,23 @@
     .btn-outline:hover {
       background: var(--theme-header-bg);
     }
-    /* 表示切り替えタブ */
-    .view-tabs {
-      text-align: center;
-      padding: 0.6rem 0;
-      background: var(--theme-header-bg);
-      border-bottom: 1px solid #ccc;
-    }
-    .tab-btn {
-      background: #fff;
-      color: var(--theme-accent);
-      border: 1px solid var(--theme-accent);
-      border-radius: 4px;
-      padding: 0.5rem 1.2rem;
-      margin: 0 0.3rem;
-      font-size: 0.9rem;
-      cursor: pointer;
-    }
-    .tab-btn.active {
-      background: var(--theme-accent);
-      color: #fff;
-    }
-    /* 今日やることタブ: 教材リストと○×ボタン */
-    #todayTaskList {
+    /* 今日やることタブは廃止済み。以下のスタイルは通知パネル（#notifTaskList）と
+       日別詳細パネルで引き続き使う（today-task-*クラス名のまま流用） */
+    #notifTaskList {
       list-style: none;
       padding: 0;
       max-width: 480px;
       margin: 0 auto;
       text-align: left;
     }
-    #todayTaskList li {
+    #notifTaskList li {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
       padding: 0.6rem 0.4rem;
       border-bottom: 1px solid #eee;
     }
-    #todayTaskList li.today-empty {
+    #notifTaskList li.today-empty {
       align-items: center;
       color: #888;
     }
@@ -725,7 +736,7 @@
       gap: 1rem;
     }
     /* 今日より前の未チェック分セクション */
-    #todayTaskList li.today-past-heading {
+    #notifTaskList li.today-past-heading {
       border-bottom: none;
       padding-bottom: 0.1rem;
       margin-top: 1.2rem;
@@ -774,28 +785,15 @@
         margin: 0.35rem 0 0.25rem;
       }
       body.week-mobile-shell #sekkiLabel,
-      body.week-mobile-shell #motivationQuote {
+      body.week-mobile-shell #motivationQuote,
+      body.week-mobile-shell #todayTrivia {
         display: none;
-      }
-      .view-tabs {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 0.35rem;
-        padding: 0.55rem;
-      }
-      .tab-btn {
-        margin: 0;
-        padding: 0.5rem 0.35rem;
-        font-size: 0.78rem;
-      }
-      body.week-mobile-shell .view-tabs {
-        padding: 0.35rem;
       }
       body.week-mobile-shell #weekView {
         position: fixed;
         left: 0;
         right: 0;
-        top: 5.9rem;
+        top: 3rem;
         bottom: 0;
         display: flex;
         flex-direction: column;
@@ -1033,34 +1031,18 @@
 <body>
   <div id="seasonDecoration" aria-hidden="true"></div>
   <button id="settingsBtn" type="button" class="settings-icon-btn" aria-label="設定">⚙️</button>
+  <button id="notifBellBtn" type="button" class="notif-bell-btn" aria-label="未チェックの通知">🔔<span id="notifBellBadge" class="notif-bell-badge" style="display:none;"></span></button>
   <h1>一週間の計画帳</h1>
   <p id="sekkiLabel" class="sekki-label"></p>
   <p id="motivationQuote" class="motivation-quote"></p>
-  <!-- 表示切り替えタブ -->
-  <div class="view-tabs">
-    <button id="weekTabBtn" type="button" class="tab-btn active">1週間</button>
-    <button id="todayTabBtn" type="button" class="tab-btn">今日やること</button>
-    <button id="googleCalendarTabBtn" type="button" class="tab-btn">Googleカレンダー</button>
-  </div>
-  <!-- 今日やることビュー -->
-  <div id="todayView" style="display:none; margin:1.5rem 1rem;">
-    <p id="todayDateLabel" style="text-align:center; font-weight:bold; font-size:1.1rem; margin-bottom:0.3rem;"></p>
-    <p id="todayTrivia" style="text-align:center; font-size:0.8rem; color:#666; margin-top:0; margin-bottom:1rem;"></p>
-    <ul id="todayTaskList"></ul>
-  </div>
-  <!-- Googleカレンダービュー -->
-  <div id="googleCalendarView" style="display:none; margin:1.5rem 1rem;">
-    <div style="text-align:center; margin-bottom:1rem;">
-      <button id="googleSignInBtn" type="button">Googleでサインイン</button>
-      <button id="googleSyncBtn" type="button" style="display:none;">今すぐ同期</button>
-      <button id="googleAddEventBtn" type="button" style="display:none; margin-left:0.5rem;">＋予定を追加</button>
-      <div id="googleCalendarSelectRow" style="display:none; margin-top:0.5rem;">
-        <label for="googleCalendarSelect" style="font-size:0.85rem;">カレンダー:</label>
-        <select id="googleCalendarSelect" style="padding:0.3rem; margin-left:0.3rem; max-width:70%;"></select>
-      </div>
-      <p id="googleSyncStatus" style="font-size:0.8rem; color:#666;"></p>
+  <p id="todayTrivia" style="text-align:center; font-size:0.8rem; color:#666; margin-top:0; margin-bottom:0.5rem;"></p>
+  <!-- 未チェック通知モーダル -->
+  <div id="notifModal" class="settings-modal" style="display:none;">
+    <div class="settings-panel">
+      <button id="notifCloseBtn" type="button" class="settings-close-btn" aria-label="閉じる">×</button>
+      <h2 style="font-size:1rem; margin-top:0;">○✕が付いていない過去の予定</h2>
+      <ul id="notifTaskList"></ul>
     </div>
-    <div id="googleEventList"></div>
   </div>
   <!-- Google予定の追加・編集モーダル -->
   <div id="googleEventModal" class="settings-modal" style="display:none;">
@@ -1476,6 +1458,22 @@
           <button id="accountSignOutBtn" type="button">サインアウト</button>
         </div>
         <p id="accountSyncStatus" style="font-size:0.8rem; color:#666; margin-bottom:0;"></p>
+      </div>
+
+      <!-- Googleカレンダー連携（アカウント同期＝Firebaseとは別物。日々の予定を閲覧・編集・追加する） -->
+      <div class="google-calendar-section">
+        <h2 style="font-size:1rem; margin-top:0; margin-bottom:0.5rem;">Googleカレンダー連携</h2>
+        <p style="font-size:0.8rem; color:#666; margin-top:0;">
+          サインインすると、1週間タブの各日をタップしたときにGoogleカレンダーの予定を見たり、追加・編集したりできます。
+        </p>
+        <button id="googleSignInBtn" type="button">Googleでサインイン</button>
+        <button id="googleSyncBtn" type="button" style="display:none;">今すぐ同期</button>
+        <button id="googleAddEventBtn" type="button" style="display:none; margin-left:0.5rem;">＋予定を追加</button>
+        <div id="googleCalendarSelectRow" style="display:none; margin-top:0.5rem;">
+          <label for="googleCalendarSelect" style="font-size:0.85rem;">カレンダー:</label>
+          <select id="googleCalendarSelect" style="padding:0.3rem; margin-left:0.3rem; max-width:70%;"></select>
+        </div>
+        <p id="googleSyncStatus" style="font-size:0.8rem; color:#666; margin-bottom:0;"></p>
       </div>
 
       <!-- データのバックアップ・復元 -->
@@ -2263,6 +2261,14 @@
         updateCellsForCurrentWeek();
       })();
 
+      // 今日やること・Googleカレンダーの各タブが無くなった分、ページ読み込み時に
+      // 直接まとめて初期化する（今日は何の日、未チェック通知バッジ、サインイン済みなら
+      // Googleカレンダー予定・カレンダー一覧の取得）。
+      loadTodayTrivia();
+      refreshPastPendingTasks();
+      updateNotifBadge();
+      refreshGoogleCalendarPanel();
+
       document.querySelectorAll('.mobile-collapse-toggle').forEach(function (button) {
         button.addEventListener('click', function () {
           var section = button.closest('.mobile-collapsible');
@@ -2353,37 +2359,9 @@
         });
       }
 
-      // 表示切り替えタブのクリック処理
-      var weekTabBtn = document.getElementById('weekTabBtn');
-      var todayTabBtn = document.getElementById('todayTabBtn');
-      var googleCalendarTabBtn = document.getElementById('googleCalendarTabBtn');
-      var weekView = document.getElementById('weekView');
-      var todayView = document.getElementById('todayView');
-      var googleCalendarView = document.getElementById('googleCalendarView');
-      if (weekTabBtn && todayTabBtn && googleCalendarTabBtn && weekView && todayView && googleCalendarView) {
-        var allTabBtns = [weekTabBtn, todayTabBtn, googleCalendarTabBtn];
-        var allViews = [weekView, todayView, googleCalendarView];
-        function showTab(activeBtn, activeView) {
-          allViews.forEach(function (v) { v.style.display = 'none'; });
-          allTabBtns.forEach(function (b) { b.classList.remove('active'); });
-          activeView.style.display = '';
-          activeBtn.classList.add('active');
-          document.body.classList.toggle('week-mobile-shell', activeView === weekView);
-        }
-        document.body.classList.add('week-mobile-shell');
-        weekTabBtn.addEventListener('click', function () {
-          showTab(weekTabBtn, weekView);
-        });
-        todayTabBtn.addEventListener('click', function () {
-          showTab(todayTabBtn, todayView);
-          refreshPastPendingTasks();
-          updateTodayView();
-        });
-        googleCalendarTabBtn.addEventListener('click', function () {
-          showTab(googleCalendarTabBtn, googleCalendarView);
-          onGoogleCalendarTabShown();
-        });
-      }
+      // 今日やること・Googleカレンダーの各タブは廃止し、1週間タブのみの表示にした。
+      // week-mobile-shell はモバイル幅でのみCSS側が効くクラスなので常時付与してよい。
+      document.body.classList.add('week-mobile-shell');
 
       // 設定アイコン・設定モーダルの開閉
       var settingsBtn = document.getElementById('settingsBtn');
@@ -2393,6 +2371,7 @@
         settingsBtn.addEventListener('click', function () {
           settingsModal.style.display = 'flex';
           renderGoogleSignInButton();
+          refreshGoogleCalendarPanel();
         });
         if (settingsCloseBtn) {
           settingsCloseBtn.addEventListener('click', function () {
@@ -2402,6 +2381,29 @@
         settingsModal.addEventListener('click', function (event) {
           if (event.target === settingsModal) {
             settingsModal.style.display = 'none';
+          }
+        });
+      }
+
+      // 通知ベル（○✕が付いていない過去の予定）の開閉
+      var notifBellBtn = document.getElementById('notifBellBtn');
+      var notifModal = document.getElementById('notifModal');
+      var notifCloseBtn = document.getElementById('notifCloseBtn');
+      if (notifBellBtn && notifModal) {
+        notifBellBtn.addEventListener('click', function () {
+          refreshPastPendingTasks();
+          updateNotifBadge();
+          renderNotifList();
+          notifModal.style.display = 'flex';
+        });
+        if (notifCloseBtn) {
+          notifCloseBtn.addEventListener('click', function () {
+            notifModal.style.display = 'none';
+          });
+        }
+        notifModal.addEventListener('click', function (event) {
+          if (event.target === notifModal) {
+            notifModal.style.display = 'none';
           }
         });
       }
@@ -3693,90 +3695,63 @@
       });
     }
 
-    function updateTodayView() {
-      var dateLabelEl = document.getElementById('todayDateLabel');
-      var listEl = document.getElementById('todayTaskList');
-      if (!listEl) return;
-      var today = new Date();
-      today.setHours(0, 0, 0, 0);
-      var todayISO = toLocalISO(today);
-      var monthDay = (today.getMonth() + 1) + '月' + today.getDate() + '日';
-      var youbi = dayNames[today.getDay()] + '曜日';
-      if (dateLabelEl) dateLabelEl.textContent = monthDay + youbi + 'の今日やること';
-      loadTodayTrivia();
-
-      listEl.innerHTML = '';
-      var hasTask = false;
-      // 科目1〜7の内容欄から、今日の内容が入っているものをリスト表示する（8列目は感想・振り返り欄のため対象外）
-      for (let n = 1; n <= 7; n++) {
-        var headerCell = document.querySelector('.header-cell[data-header="sub' + n + '"]');
-        var label = headerCell ? headerCell.textContent.trim() : ('科目' + n);
-        var content = localStorage.getItem(todayISO + '-sub' + n + '-content');
-        if (!content || !content.trim()) continue;
-        hasTask = true;
-        var oneLine = content.trim().split(/\n+/).join('、');
-
-        var li = document.createElement('li');
-        var textDiv = document.createElement('div');
-        textDiv.className = 'today-task-text';
-        textDiv.textContent = label + '：' + oneLine;
-        li.appendChild(textDiv);
-
-        var controls = document.createElement('div');
-        controls.className = 'today-task-controls';
-        controls.appendChild(buildTodayStatusGroup(todayISO + '-sub' + n + '-status', function () {
-          rescheduleAfterMiss(todayISO, n);
-        }));
-        li.appendChild(controls);
-
-        listEl.appendChild(li);
+    // 通知ベルのバッジ件数を更新する。pastPendingTasksのスナップショットに基づくため、
+    // ベルを開いて refreshPastPendingTasks() が呼ばれたタイミングでしか変わらない
+    // （リストの「その場では消えない」挙動とバッジ件数を一致させるため）。
+    function updateNotifBadge() {
+      var badge = document.getElementById('notifBellBadge');
+      if (!badge) return;
+      if (pastPendingTasks.length > 0) {
+        badge.textContent = pastPendingTasks.length > 99 ? '99+' : String(pastPendingTasks.length);
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
       }
-      if (!hasTask) {
+    }
+
+    // 通知モーダルの中身（○✕が付いていない過去の予定）を描画する。
+    function renderNotifList() {
+      var listEl = document.getElementById('notifTaskList');
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      if (pastPendingTasks.length === 0) {
         var emptyLi = document.createElement('li');
         emptyLi.className = 'today-empty';
-        emptyLi.textContent = '今日やることは特にありません。';
+        emptyLi.textContent = '○✕が付いていない過去の予定はありません。';
         listEl.appendChild(emptyLi);
+        return;
       }
+      pastPendingTasks.forEach(function (task) {
+        var pastContent = localStorage.getItem(task.iso + '-sub' + task.subNum + '-content');
+        if (!pastContent || !pastContent.trim()) return;
+        var headerCell2 = document.querySelector('.header-cell[data-header="sub' + task.subNum + '"]');
+        var label2 = headerCell2 ? headerCell2.textContent.trim() : ('科目' + task.subNum);
+        var d = parseISOToDate(task.iso);
+        var dateText = (d.getMonth() + 1) + '/' + d.getDate() + '(' + dayNames[d.getDay()] + ')';
 
-      // 今日より前の未チェック分。○✕を付けてもこの場では消さない（リスト自体は
-      // refreshPastPendingTasks を呼んだときにだけ再計算される）。
-      if (pastPendingTasks.length > 0) {
-        var heading = document.createElement('li');
-        heading.className = 'today-past-heading';
-        heading.textContent = '○✕が付いていない過去の予定';
-        listEl.appendChild(heading);
-        pastPendingTasks.forEach(function (task) {
-          var pastContent = localStorage.getItem(task.iso + '-sub' + task.subNum + '-content');
-          if (!pastContent || !pastContent.trim()) return;
-          var headerCell2 = document.querySelector('.header-cell[data-header="sub' + task.subNum + '"]');
-          var label2 = headerCell2 ? headerCell2.textContent.trim() : ('科目' + task.subNum);
-          var d = parseISOToDate(task.iso);
-          var dateText = (d.getMonth() + 1) + '/' + d.getDate() + '(' + dayNames[d.getDay()] + ')';
+        var li2 = document.createElement('li');
+        var textDiv2 = document.createElement('div');
+        textDiv2.className = 'today-task-text';
+        var dateSpan = document.createElement('span');
+        dateSpan.className = 'today-past-date';
+        dateSpan.textContent = dateText + '　';
+        textDiv2.appendChild(dateSpan);
+        textDiv2.appendChild(document.createTextNode(label2 + '：' + pastContent.trim().split(/\n+/).join('、')));
+        li2.appendChild(textDiv2);
 
-          var li2 = document.createElement('li');
-          var textDiv2 = document.createElement('div');
-          textDiv2.className = 'today-task-text';
-          var dateSpan = document.createElement('span');
-          dateSpan.className = 'today-past-date';
-          dateSpan.textContent = dateText + '　';
-          textDiv2.appendChild(dateSpan);
-          textDiv2.appendChild(document.createTextNode(label2 + '：' + pastContent.trim().split(/\n+/).join('、')));
-          li2.appendChild(textDiv2);
+        var controls2 = document.createElement('div');
+        controls2.className = 'today-task-controls';
+        // 過去分の✕は、後ろ倒しするかどうかを確認してから実行する
+        // （今日の分と違い、途中の日に既に記録が入っている可能性があるため無断では動かさない）
+        controls2.appendChild(buildTodayStatusGroup(task.iso + '-sub' + task.subNum + '-status', function () {
+          if (confirm(dateText + 'の「' + label2 + '」を後ろ倒ししますか？\nこの日から連続している予定が1日ずつ後ろにずれます。')) {
+            rescheduleAfterMiss(task.iso, task.subNum);
+          }
+        }));
+        li2.appendChild(controls2);
 
-          var controls2 = document.createElement('div');
-          controls2.className = 'today-task-controls';
-          // 過去分の✕は、後ろ倒しするかどうかを確認してから実行する
-          // （今日の分と違い、途中の日に既に記録が入っている可能性があるため無断では動かさない）
-          controls2.appendChild(buildTodayStatusGroup(task.iso + '-sub' + task.subNum + '-status', function () {
-            if (confirm(dateText + 'の「' + label2 + '」を後ろ倒ししますか？\nこの日から連続している予定が1日ずつ後ろにずれます。')) {
-              rescheduleAfterMiss(task.iso, task.subNum);
-            }
-          }));
-          li2.appendChild(controls2);
-
-          listEl.appendChild(li2);
-        });
-      }
+        listEl.appendChild(li2);
+      });
     }
 
     // 「今日は何の日」を日本語版Wikipediaの「M月D日」記事から取得して表示します。
@@ -3842,7 +3817,7 @@
           if (statusVal === 'cross' && !wasCross && onCross) {
             onCross();
           }
-          updateTodayView();
+          renderNotifList();
           refreshStatusRows();
           updateCellsForCurrentWeek();
           if (selectedWeekDayISO) renderWeekDayPanel(selectedWeekDayISO, { keepClosed: true });
@@ -4180,8 +4155,8 @@
         localStorage.removeItem('google-calendar-session-secret');
       }
       updateGoogleSignInUI();
-      renderGoogleEvents();
       renderWeekGoogleEvents();
+      if (selectedWeekDayISO) renderWeekDayPanel(selectedWeekDayISO, { keepClosed: true });
     }
 
     function applyWorkerGoogleToken(data) {
@@ -4315,11 +4290,6 @@
       });
     }
 
-    function isGoogleCalendarTabVisible() {
-      var view = document.getElementById('googleCalendarView');
-      return !!view && view.style.display !== 'none';
-    }
-
     function updateGoogleSignInUI() {
       var signInBtn = document.getElementById('googleSignInBtn');
       var syncBtn = document.getElementById('googleSyncBtn');
@@ -4371,7 +4341,7 @@
         });
     }
 
-    function onGoogleCalendarTabShown() {
+    function refreshGoogleCalendarPanel() {
       updateGoogleSignInUI();
       if (googleAccessToken || hasGoogleCalendarSession()) {
         var selectEl = document.getElementById('googleCalendarSelect');
@@ -4455,7 +4425,6 @@
         })
         .then(function (data) {
           googleEvents = data.items || [];
-          renderGoogleEvents();
           renderWeekGoogleEvents();
           if (selectedWeekDayISO) renderWeekDayPanel(selectedWeekDayISO, { keepClosed: true });
           if (statusEl) {
@@ -4466,35 +4435,6 @@
         .catch(function (err) {
           if (statusEl) statusEl.textContent = err.message || '同期に失敗しました。';
         });
-    }
-
-    function renderGoogleEvents() {
-      var listEl = document.getElementById('googleEventList');
-      if (!listEl) return;
-      listEl.innerHTML = '';
-      var startDate = parseISOToDate(window.currentWeekStartISO);
-      for (var i = 0; i < 7; i++) {
-        var date = new Date(startDate);
-        date.setDate(startDate.getDate() + i);
-        var iso = toLocalISO(date);
-        var dayEvents = getGoogleEventsForISO(iso);
-        var dayDiv = document.createElement('div');
-        dayDiv.className = 'google-event-day';
-        var h3 = document.createElement('h3');
-        h3.textContent = (date.getMonth() + 1) + '/' + date.getDate() + ' ' + dayNames[date.getDay()] + '曜日';
-        dayDiv.appendChild(h3);
-        if (dayEvents.length === 0) {
-          var emptyP = document.createElement('p');
-          emptyP.style.cssText = 'font-size:0.8rem; color:#999; margin:0.2rem 0;';
-          emptyP.textContent = '予定はありません。';
-          dayDiv.appendChild(emptyP);
-        } else {
-          dayEvents.forEach(function (ev) {
-            dayDiv.appendChild(buildGoogleEventItem(ev));
-          });
-        }
-        listEl.appendChild(dayDiv);
-      }
     }
 
     function buildGoogleEventItem(ev) {
