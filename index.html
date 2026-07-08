@@ -259,6 +259,10 @@
       border: none;
       color: #33475b;
     }
+    .week-table-scroll {
+      overflow-x: auto;
+      padding: 0 0.35rem 0.35rem;
+    }
     #planTable th.row-label {
       width: 8.5rem;
       min-width: 8.5rem;
@@ -305,6 +309,11 @@
       cursor: pointer;
       touch-action: manipulation;
     }
+    tbody th.row-label.is-selected {
+      outline: 2px solid var(--theme-accent);
+      outline-offset: -2px;
+      background: #fffdf1;
+    }
     tbody tr.row-collapsed td.cell {
       height: 1.2rem;
     }
@@ -335,6 +344,14 @@
       color: #777;
       white-space: nowrap;
       min-height: 0.8rem;
+    }
+    .row-day-open {
+      display: inline-block;
+      margin-top: 0.1rem;
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--theme-accent);
+      white-space: nowrap;
     }
     .week-google-events {
       margin: 0.15rem 0 0;
@@ -412,6 +429,115 @@
     }
     .cell .section:focus {
       outline: 2px solid var(--theme-accent);
+    }
+    .week-day-panel {
+      margin: 0.75rem 1rem 1rem;
+      padding: 0.9rem;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(88, 116, 145, 0.22);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(31, 47, 61, 0.12);
+    }
+    .week-day-panel[hidden] {
+      display: none;
+    }
+    .week-day-panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .week-day-panel-kicker {
+      margin: 0 0 0.15rem;
+      color: #666;
+      font-size: 0.72rem;
+      line-height: 1.2;
+    }
+    .week-day-panel-title {
+      margin: 0;
+      color: #22313f;
+      font-size: 1.05rem;
+      line-height: 1.35;
+    }
+    .week-day-panel-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      justify-content: flex-end;
+    }
+    .week-day-task-list {
+      display: grid;
+      gap: 0.45rem;
+    }
+    .week-day-task {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.45rem;
+      align-items: center;
+      min-height: 3rem;
+      padding: 0.55rem 0.65rem;
+      background: #fff;
+      border: 1px solid rgba(88, 116, 145, 0.18);
+      border-radius: 8px;
+    }
+    .week-day-task-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.35rem;
+    }
+    .week-day-task-actions .btn-outline {
+      padding: 0.35rem 0.55rem;
+      font-size: 0.78rem;
+    }
+    .week-day-task-title {
+      margin: 0 0 0.18rem;
+      color: #1f5793;
+      font-size: 0.72rem;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+    .week-day-task-body {
+      margin: 0;
+      color: #22313f;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .week-day-empty {
+      margin: 0;
+      padding: 0.8rem;
+      color: #777;
+      font-size: 0.85rem;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.62);
+      border-radius: 8px;
+    }
+    .week-day-section-title {
+      margin: 0.95rem 0 0.35rem;
+      color: #33475b;
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+    .week-day-google-list {
+      display: grid;
+      gap: 0.35rem;
+    }
+    .week-day-reflection {
+      width: 100%;
+      min-height: 5.5rem;
+      box-sizing: border-box;
+      padding: 0.55rem;
+      border: 1px solid #c9d3dd;
+      border-radius: 8px;
+      background: #fff;
+      color: #22313f;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      resize: vertical;
     }
     /* ヘッダー名編集のスタイル */
     .header-cell {
@@ -558,11 +684,38 @@
       color: #fff;
     }
     @media (max-width: 600px) {
+      .view-tabs {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.35rem;
+        padding: 0.55rem;
+      }
+      .tab-btn {
+        margin: 0;
+        padding: 0.5rem 0.35rem;
+        font-size: 0.78rem;
+      }
+      .week-table-scroll {
+        padding: 0 0 0.25rem;
+      }
       .cell {
         height: 80px;
       }
       .cell .section {
         font-size: 0.65rem;
+      }
+      .week-day-panel {
+        margin: 0.75rem 0.55rem 1rem;
+        padding: 0.75rem;
+      }
+      .week-day-panel-header {
+        align-items: stretch;
+      }
+      .week-day-task {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .week-day-task-actions {
+        justify-content: flex-start;
       }
     }
   </style>
@@ -638,7 +791,7 @@
     </div>
   </div>
   <div id="weekView">
-  <div style="overflow-x: auto;">
+  <div class="week-table-scroll">
     <table id="planTable">
       <thead>
         <tr>
@@ -855,6 +1008,23 @@
       <!-- 今週に戻るボタン -->
       <button id="currentWeekBtn" type="button" style="margin-left:0.5rem;">今週へ</button>
     </div>
+    <section id="weekDayPanel" class="week-day-panel" hidden>
+      <div class="week-day-panel-header">
+        <div>
+          <p id="weekDayPanelKicker" class="week-day-panel-kicker"></p>
+          <h2 id="weekDayPanelTitle" class="week-day-panel-title"></h2>
+        </div>
+        <div class="week-day-panel-actions">
+          <button id="weekDayAddGoogleEventBtn" type="button" class="btn-outline">予定追加</button>
+          <button id="weekDayPanelCloseBtn" type="button" class="btn-outline">閉じる</button>
+        </div>
+      </div>
+      <div id="weekDayTaskList" class="week-day-task-list"></div>
+      <h3 class="week-day-section-title">Googleカレンダー</h3>
+      <div id="weekDayGoogleList" class="week-day-google-list"></div>
+      <h3 class="week-day-section-title">感想・振り返り</h3>
+      <textarea id="weekDayReflection" class="week-day-reflection"></textarea>
+    </section>
 
   <!-- 教材追加欄 -->
   <div class="materials-section" style="margin: 1rem;">
@@ -1280,6 +1450,7 @@
     var googleCalendarId = localStorage.getItem('google-calendar-id') || 'primary';
     // 取得済みのカレンダー一覧（予定追加時の追加先選択にも使う）
     var googleCalendarList = [];
+    var selectedWeekDayISO = null;
 
     // 2026年の日本の祝日一覧。赤字表示の対象となります。
     const holidays2026 = new Set([
@@ -2764,6 +2935,11 @@
           var rateText = document.createElement('div');
           rateText.className = 'row-day-rate';
           labelCell.appendChild(rateText);
+          var openText = document.createElement('div');
+          openText.className = 'row-day-open';
+          openText.textContent = '開く';
+          labelCell.appendChild(openText);
+          labelCell.classList.toggle('is-selected', selectedWeekDayISO === iso);
           // 今日の日付行の場合はハイライト用クラスを追加する
           if (iso === todayISO) {
             labelCell.classList.add('today');
@@ -2788,6 +2964,16 @@
         });
       });
       renderWeekGoogleEvents();
+      if (selectedWeekDayISO) {
+        var selectedDate = parseISOToDate(selectedWeekDayISO);
+        var weekEndExclusive = new Date(startDate);
+        weekEndExclusive.setDate(startDate.getDate() + 7);
+        if (selectedDate >= startDate && selectedDate < weekEndExclusive) {
+          renderWeekDayPanel(selectedWeekDayISO, { keepClosed: true });
+        } else {
+          closeWeekDayPanel();
+        }
+      }
       // 一週間の振り返り欄の読み込みと保存イベントの更新
       var weeklySummaryEl = document.getElementById('weeklySummary');
       if (weeklySummaryEl) {
@@ -2836,6 +3022,154 @@
         rateEl.textContent = total > 0 ? '達成率 ' + Math.round(done / total * 100) + '%' : '';
       });
     }
+
+    function getMaterialLabel(subNum) {
+      var materialName = materialsList[subNum - 1];
+      if (materialName && String(materialName).trim()) return materialName;
+      var headerCell = document.querySelector('.header-cell[data-header="sub' + subNum + '"]');
+      return (headerCell && headerCell.textContent.trim()) || ('科目' + subNum);
+    }
+
+    function formatWeekDayTitle(iso) {
+      var d = parseISOToDate(iso);
+      return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + dayNames[d.getDay()] + '曜日';
+    }
+
+    function setSelectedWeekDayLabel(iso) {
+      document.querySelectorAll('#planTable tbody th.row-label').forEach(function (labelCell) {
+        labelCell.classList.toggle('is-selected', labelCell.getAttribute('data-date-iso') === iso);
+      });
+    }
+
+    function renderWeekDayPanel(iso, options) {
+      var panel = document.getElementById('weekDayPanel');
+      var titleEl = document.getElementById('weekDayPanelTitle');
+      var kickerEl = document.getElementById('weekDayPanelKicker');
+      var taskListEl = document.getElementById('weekDayTaskList');
+      var googleListEl = document.getElementById('weekDayGoogleList');
+      var reflectionEl = document.getElementById('weekDayReflection');
+      var addGoogleBtn = document.getElementById('weekDayAddGoogleEventBtn');
+      if (!panel || !titleEl || !taskListEl || !googleListEl || !reflectionEl) return;
+
+      selectedWeekDayISO = iso;
+      panel.hidden = false;
+      setSelectedWeekDayLabel(iso);
+
+      var total = 0;
+      var done = 0;
+      for (var n = 1; n <= 7; n++) {
+        var c = localStorage.getItem(iso + '-sub' + n + '-content');
+        if (!c || !c.trim()) continue;
+        total++;
+        if (localStorage.getItem(iso + '-sub' + n + '-status') === 'circle') done++;
+      }
+      titleEl.textContent = formatWeekDayTitle(iso);
+      if (kickerEl) kickerEl.textContent = total > 0 ? '達成率 ' + Math.round(done / total * 100) + '% ・ ' + total + '件' : '予定なし';
+
+      taskListEl.innerHTML = '';
+      for (var subNum = 1; subNum <= 7; subNum++) {
+        var key = iso + '-sub' + subNum + '-content';
+        var content = localStorage.getItem(key);
+        if (!content || !content.trim()) continue;
+        var item = document.createElement('div');
+        item.className = 'week-day-task';
+
+        var textWrap = document.createElement('div');
+        var title = document.createElement('p');
+        title.className = 'week-day-task-title';
+        title.textContent = getMaterialLabel(subNum);
+        var body = document.createElement('p');
+        body.className = 'week-day-task-body';
+        body.textContent = content.trim();
+        textWrap.appendChild(title);
+        textWrap.appendChild(body);
+        item.appendChild(textWrap);
+
+        var actions = document.createElement('div');
+        actions.className = 'week-day-task-actions';
+        actions.appendChild(buildTodayStatusGroup(iso + '-sub' + subNum + '-status', (function (taskISO, taskSubNum) {
+          return function () {
+            var d = parseISOToDate(taskISO);
+            var dateText = (d.getMonth() + 1) + '/' + d.getDate() + '(' + dayNames[d.getDay()] + ')';
+            if (taskISO <= toLocalISO(new Date()) && confirm(dateText + 'の予定を後ろ倒ししますか？\nこの日から連続している予定が1日ずつ後ろにずれます。')) {
+              rescheduleAfterMiss(taskISO, taskSubNum);
+            }
+          };
+        })(iso, subNum)));
+        if (materialsList[subNum - 1]) {
+          var detailBtn = document.createElement('button');
+          detailBtn.type = 'button';
+          detailBtn.className = 'btn-outline';
+          detailBtn.textContent = '教材';
+          detailBtn.addEventListener('click', (function (idx) {
+            return function () {
+              openMaterialDetail(idx);
+              var detailDiv = document.getElementById('materialDetail');
+              if (detailDiv) detailDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            };
+          })(subNum - 1));
+          actions.appendChild(detailBtn);
+        }
+        item.appendChild(actions);
+        taskListEl.appendChild(item);
+      }
+      if (!taskListEl.children.length) {
+        var emptyTask = document.createElement('p');
+        emptyTask.className = 'week-day-empty';
+        emptyTask.textContent = 'この日の教材予定はありません。';
+        taskListEl.appendChild(emptyTask);
+      }
+
+      googleListEl.innerHTML = '';
+      var dayEvents = getGoogleEventsForISO(iso);
+      if (dayEvents.length) {
+        dayEvents.forEach(function (ev) {
+          googleListEl.appendChild(buildGoogleEventItem(ev));
+        });
+      } else {
+        var emptyGoogle = document.createElement('p');
+        emptyGoogle.className = 'week-day-empty';
+        emptyGoogle.textContent = googleAccessToken || hasGoogleCalendarSession() ? 'Google予定はありません。' : 'Googleカレンダー未連携です。';
+        googleListEl.appendChild(emptyGoogle);
+      }
+      if (addGoogleBtn) {
+        addGoogleBtn.style.display = (googleAccessToken || hasGoogleCalendarSession()) ? '' : 'none';
+        addGoogleBtn.onclick = function () { openGoogleEventModal(null, iso); };
+      }
+
+      reflectionEl.value = localStorage.getItem(iso + '-sub8-content') || '';
+      reflectionEl.oninput = function () {
+        localStorage.setItem(iso + '-sub8-content', reflectionEl.value);
+        updateCellsForCurrentWeek();
+      };
+
+      if (!options || !options.keepClosed) {
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function closeWeekDayPanel() {
+      var panel = document.getElementById('weekDayPanel');
+      if (panel) panel.hidden = true;
+      selectedWeekDayISO = null;
+      setSelectedWeekDayLabel(null);
+    }
+
+    (function wireWeekDayPanel() {
+      var table = document.getElementById('planTable');
+      if (!table) return;
+      table.addEventListener('click', function (event) {
+        var labelCell = event.target && event.target.closest ? event.target.closest('tbody th.row-label') : null;
+        if (!labelCell) return;
+        var iso = labelCell.getAttribute('data-date-iso');
+        if (!iso) return;
+        event.preventDefault();
+        event.stopPropagation();
+        renderWeekDayPanel(iso);
+      });
+      var closeBtn = document.getElementById('weekDayPanelCloseBtn');
+      if (closeBtn) closeBtn.addEventListener('click', closeWeekDayPanel);
+    })();
 
     // ==== セルタップで○✕を切り替える吹き出し ====
     // 科目1〜7のセルは直接編集を廃止したため、タップで○✕変更の吹き出しを出す。
@@ -3105,6 +3439,7 @@
           updateTodayView();
           refreshStatusRows();
           updateCellsForCurrentWeek();
+          if (selectedWeekDayISO) renderWeekDayPanel(selectedWeekDayISO, { keepClosed: true });
         });
         group.appendChild(btn);
       });
@@ -3716,6 +4051,7 @@
           googleEvents = data.items || [];
           renderGoogleEvents();
           renderWeekGoogleEvents();
+          if (selectedWeekDayISO) renderWeekDayPanel(selectedWeekDayISO, { keepClosed: true });
           if (statusEl) {
             var now = new Date();
             statusEl.textContent = '最終同期: ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
@@ -3797,7 +4133,7 @@
       if (timeRow) timeRow.style.display = (allDayInput && allDayInput.checked) ? 'none' : '';
     }
 
-    function openGoogleEventModal(ev) {
+    function openGoogleEventModal(ev, defaultDateISO) {
       var idInput = document.getElementById('googleEventId');
       var titleInput = document.getElementById('googleEventTitle');
       var dateInput = document.getElementById('googleEventDate');
@@ -3863,7 +4199,7 @@
         idInput.value = '';
         titleInput.value = '';
         if (locationInput) locationInput.value = '';
-        dateInput.value = toLocalISO(new Date());
+        dateInput.value = defaultDateISO || toLocalISO(new Date());
         allDayInput.checked = false;
         startInput.value = '09:00';
         endInput.value = '10:00';
