@@ -765,6 +765,18 @@
       color: #fff;
     }
     @media (max-width: 600px) {
+      body.week-mobile-shell {
+        height: 100dvh;
+        overflow: hidden;
+      }
+      body.week-mobile-shell h1 {
+        font-size: 1rem;
+        margin: 0.35rem 0 0.25rem;
+      }
+      body.week-mobile-shell #sekkiLabel,
+      body.week-mobile-shell #motivationQuote {
+        display: none;
+      }
       .view-tabs {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -776,6 +788,22 @@
         padding: 0.5rem 0.35rem;
         font-size: 0.78rem;
       }
+      body.week-mobile-shell .view-tabs {
+        padding: 0.35rem;
+      }
+      body.week-mobile-shell #weekView {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 5.9rem;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+        box-sizing: border-box;
+        padding: 0 0.45rem 4.95rem;
+      }
       .week-table-scroll {
         display: none;
         padding: 0 0 0.25rem;
@@ -783,9 +811,57 @@
       #weekView.show-overview .week-table-scroll {
         display: block;
       }
+      body.week-mobile-shell .week-table-scroll,
+      body.week-mobile-shell #weekView.show-overview .week-table-scroll,
+      body.week-mobile-shell .mobile-week-overview-actions {
+        display: none;
+      }
       .mobile-week-strip,
       .mobile-week-overview-actions {
         display: block;
+      }
+      body.week-mobile-shell .mobile-week-strip {
+        flex: 0 0 auto;
+        margin: 0.35rem 0 0.2rem;
+        overflow: hidden;
+      }
+      body.week-mobile-shell .mobile-week-days {
+        grid-auto-flow: initial;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        min-width: 0;
+        gap: 0.22rem;
+        padding: 0;
+      }
+      body.week-mobile-shell .mobile-week-day-card {
+        min-height: 3.45rem;
+        padding: 0.28rem 0.1rem;
+        border-radius: 7px;
+      }
+      body.week-mobile-shell .mobile-week-day-name {
+        font-size: 0.62rem;
+      }
+      body.week-mobile-shell .mobile-week-day-date {
+        margin-top: 0.04rem;
+        font-size: 0.82rem;
+      }
+      body.week-mobile-shell .mobile-week-day-count {
+        margin-top: 0.08rem;
+        font-size: 0.58rem;
+      }
+      body.week-mobile-shell .mobile-week-day-rate {
+        display: none;
+      }
+      body.week-mobile-shell .controls {
+        flex: 0 0 auto;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.35rem;
+        margin: 0.25rem 0;
+      }
+      body.week-mobile-shell .controls button {
+        margin: 0 !important;
+        padding: 0.4rem 0.2rem;
+        font-size: 0.76rem;
       }
       .mobile-collapse-toggle {
         display: flex;
@@ -826,6 +902,42 @@
       .mobile-collapsible-body > h2:first-child {
         display: none;
       }
+      body.week-mobile-shell .materials-section,
+      body.week-mobile-shell .weekly-summary-container {
+        position: fixed;
+        left: 0.55rem;
+        right: 0.55rem;
+        z-index: 20;
+        margin: 0 !important;
+      }
+      body.week-mobile-shell .materials-section {
+        bottom: 3rem;
+      }
+      body.week-mobile-shell .weekly-summary-container {
+        bottom: 0.55rem;
+      }
+      body.week-mobile-shell .mobile-collapse-toggle {
+        padding: 0.55rem 0.75rem;
+        box-shadow: 0 1px 5px rgba(31, 47, 61, 0.14);
+      }
+      body.week-mobile-shell .mobile-collapsible.is-open {
+        top: 5.9rem;
+        bottom: 0.55rem;
+        padding: 0.65rem;
+        box-sizing: border-box;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid rgba(88, 116, 145, 0.2);
+        border-radius: 10px;
+        box-shadow: 0 4px 18px rgba(31, 47, 61, 0.22);
+        overflow: hidden;
+      }
+      body.week-mobile-shell .mobile-collapsible.is-open .mobile-collapsible-body {
+        max-height: calc(100% - 3rem);
+        overflow: hidden;
+      }
+      body.week-mobile-shell .materials-section.is-open {
+        bottom: 0.55rem;
+      }
       .cell {
         height: 80px;
       }
@@ -836,14 +948,84 @@
         margin: 0.75rem 0.55rem 1rem;
         padding: 0.75rem;
       }
+      body.week-mobile-shell .week-day-panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        margin: 0.2rem 0 0;
+        padding: 0.5rem;
+        overflow: hidden;
+      }
       .week-day-panel-header {
         align-items: stretch;
+      }
+      body.week-mobile-shell .week-day-panel-header {
+        flex: 0 0 auto;
+        margin-bottom: 0.35rem;
+      }
+      body.week-mobile-shell .week-day-panel-kicker {
+        font-size: 0.64rem;
+      }
+      body.week-mobile-shell .week-day-panel-title {
+        font-size: 0.94rem;
+      }
+      body.week-mobile-shell .week-day-task-list {
+        flex: 0 1 auto;
+        gap: 0.3rem;
+        overflow: hidden;
       }
       .week-day-task {
         grid-template-columns: minmax(0, 1fr);
       }
+      body.week-mobile-shell .week-day-task {
+        grid-template-columns: minmax(0, 1fr) auto;
+        min-height: 0;
+        padding: 0.38rem 0.45rem;
+      }
       .week-day-task-actions {
         justify-content: flex-start;
+      }
+      body.week-mobile-shell .week-day-task-actions {
+        justify-content: flex-end;
+      }
+      body.week-mobile-shell .week-day-task-title {
+        font-size: 0.66rem;
+      }
+      body.week-mobile-shell .week-day-task-body {
+        max-height: 2.2rem;
+        overflow: hidden;
+        font-size: 0.75rem;
+        line-height: 1.25;
+      }
+      body.week-mobile-shell .status-btn {
+        width: 1.75rem;
+        height: 1.75rem;
+      }
+      body.week-mobile-shell .week-day-task-actions .btn-outline {
+        padding: 0.28rem 0.45rem;
+        font-size: 0.7rem;
+      }
+      body.week-mobile-shell .week-day-section-row {
+        flex: 0 0 auto;
+        margin: 0.4rem 0 0.18rem;
+      }
+      body.week-mobile-shell .week-day-section-title {
+        font-size: 0.74rem;
+      }
+      body.week-mobile-shell .week-day-google-list {
+        flex: 0 0 auto;
+        overflow: hidden;
+      }
+      body.week-mobile-shell .week-day-empty {
+        padding: 0.42rem;
+        font-size: 0.74rem;
+      }
+      body.week-mobile-shell .week-day-reflection {
+        flex: 1 1 auto;
+        min-height: 2.8rem;
+        resize: none;
+        font-size: 0.78rem;
       }
     }
   </style>
@@ -2186,7 +2368,9 @@
           allTabBtns.forEach(function (b) { b.classList.remove('active'); });
           activeView.style.display = '';
           activeBtn.classList.add('active');
+          document.body.classList.toggle('week-mobile-shell', activeView === weekView);
         }
+        document.body.classList.add('week-mobile-shell');
         weekTabBtn.addEventListener('click', function () {
           showTab(weekTabBtn, weekView);
         });
