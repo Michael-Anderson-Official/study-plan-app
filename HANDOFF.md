@@ -74,6 +74,7 @@
   - `fetchGoogleEvents()`は選択中の全カレンダーへ並行fetchし、結果をマージして`googleEvents`に格納する。各予定オブジェクトには取得元カレンダーID（`ev._calendarId`）を付与する。1つのカレンダーの取得に失敗しても他のカレンダーの表示は継続する（空配列にフォールバック）。401（認証切れ）はどれか1つでも起きた時点で`clearGoogleCalendarAuth(true)`を呼ぶ。
   - 既存予定の編集・削除は`ev._calendarId`に対して行う（`openGoogleEventModal(ev)`が`currentEditingGoogleCalendarId`にセットし、`updateGoogleEvent(id, body, calId)`/`deleteGoogleEvent(id, calId)`へ渡す）。新規作成時の追加先カレンダーは従来通り`googleEventCalendarSelect`（書き込み可能なカレンダーのみ、デフォルトはprimary）で選ぶ。
   - Firestore同期の`googleCalendarId`フィールド/`localStorage`キー`google-calendar-id`は`googleCalendarIds`/`google-calendar-ids`（JSON配列文字列）に名称変更した。
+- 2026-07-08、「西暦と和号入れて」との要望で、週表ヘッダー（`#weekYearLabel`、日付列の見出し下）に和暦を追加した。`formatJapaneseEra(date)`が`Intl.DateTimeFormat('ja-JP-u-ca-japanese', { era: 'long', year: 'numeric' })`で「令和8年」のような文字列を生成する。ブラウザ標準のIntl日本暦を使うため、`holidays2026`のような年ごとの手動更新は不要（改元後も自動追従する）。表示は西暦の下に`<br>`で改行して2行表示（幅の狭い見出しセルでの折り返し崩れを避けるため）。年またぎ週は西暦側と同じくその週の開始日（`startDate`）基準で計算する。
 
 ## 直近でCodexが変更した内容
 

@@ -2036,6 +2036,16 @@
     // 起動時に現在の節気テーマを適用する（toLocalISO等の関数宣言は巻き上げにより参照可能）
     applySekkiTheme();
 
+    // 和暦（元号＋年）を「令和7年」のように返す。ブラウザ標準のIntl日本暦を使うため、
+    // 将来元号が変わっても手直し不要（holidays2026のような年ごとの手動更新が要らない）。
+    function formatJapaneseEra(date) {
+      try {
+        return new Intl.DateTimeFormat('ja-JP-u-ca-japanese', { era: 'long', year: 'numeric' }).format(date);
+      } catch (e) {
+        return '';
+      }
+    }
+
     // 指定した日時をローカルタイムゾーンの ISO YYYY-MM-DD 形式に変換するヘルパー
     function toLocalISO(date) {
       var y = date.getFullYear();
@@ -3253,16 +3263,23 @@
       var todayDate = new Date();
       todayDate.setHours(0, 0, 0, 0);
       var todayISO = toLocalISO(todayDate);
-      // 表示中の週の西暦をヘッダー直下に表示する。年またぎ週は短く表示してヘッダー高を変えない。
+      // 表示中の週の西暦・和暦をヘッダー直下に表示する。年またぎ週は西暦を短く表示してヘッダー高を変えない。
       var weekYearEl = document.getElementById('weekYearLabel');
       if (weekYearEl) {
         var endDate = new Date(startDate);
         endDate.setDate(startDate.getDate() + 6);
         var startYear = startDate.getFullYear();
         var endYear = endDate.getFullYear();
-        weekYearEl.textContent = (startYear === endYear)
+        var yearText = (startYear === endYear)
           ? startYear + '年'
           : startYear + '/' + String(endYear).slice(2) + '年';
+        weekYearEl.innerHTML = '';
+        weekYearEl.appendChild(document.createTextNode(yearText));
+        var eraText = formatJapaneseEra(startDate);
+        if (eraText) {
+          weekYearEl.appendChild(document.createElement('br'));
+          weekYearEl.appendChild(document.createTextNode(eraText));
+        }
       }
       rows.forEach(function (row, idx) {
         var date = new Date(startDate);
