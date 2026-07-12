@@ -2005,6 +2005,8 @@
         <p id="gardenCount" class="garden-count"></p>
       </div>
       <div class="garden-header-actions">
+        <button id="gardenPrevBtn" type="button" class="garden-close-btn" aria-label="前の節気の庭">‹</button>
+        <button id="gardenNextBtn" type="button" class="garden-close-btn" aria-label="次の節気の庭">›</button>
         <button id="stickerBookBtn" type="button" class="garden-close-btn" aria-label="ステッカー帳">📖</button>
         <button id="gardenCloseBtn" type="button" class="garden-close-btn" aria-label="閉じる">×</button>
       </div>
@@ -3331,6 +3333,11 @@
           if (view) view.style.display = 'none';
         });
       }
+      // 節気アルバムのページ送り
+      var gardenPrevBtn = document.getElementById('gardenPrevBtn');
+      var gardenNextBtn = document.getElementById('gardenNextBtn');
+      if (gardenPrevBtn) gardenPrevBtn.addEventListener('click', function () { stepGardenPage(-1); });
+      if (gardenNextBtn) gardenNextBtn.addEventListener('click', function () { stepGardenPage(1); });
       var gardenAwardOpenBtn = document.getElementById('gardenAwardOpenBtn');
       if (gardenAwardOpenBtn) {
         gardenAwardOpenBtn.addEventListener('click', function () {
@@ -4424,21 +4431,45 @@
       '立春': 'img/garden/bg-risshun.webp'
     };
 
+    // 庭は「節気ごとの1ページ」。表示中の節気に獲得したステッカーだけを置き、
+    // ‹ › で過去・未来の節気のページをアルバムのようにめくれる（1年で24ページの絵日記になる）。
+    // フルコンプでも1節気≒15枚なので1ページに収まる密度になる。
+    var gardenViewSekkiName = null;
+
     function openGardenView() {
+      gardenViewSekkiName = getCurrentSekki().name;
+      renderGardenPage();
+      var view = document.getElementById('gardenView');
+      if (view) view.style.display = 'flex';
+    }
+
+    function gardenSekkiIndex(name) {
+      for (var i = 0; i < SEKKI_TABLE.length; i++) {
+        if (SEKKI_TABLE[i].name === name) return i;
+      }
+      return 0;
+    }
+
+    function stepGardenPage(delta) {
+      var idx = (gardenSekkiIndex(gardenViewSekkiName) + delta + SEKKI_TABLE.length) % SEKKI_TABLE.length;
+      gardenViewSekkiName = SEKKI_TABLE[idx].name;
+      renderGardenPage();
+    }
+
+    function renderGardenPage() {
       var view = document.getElementById('gardenView');
       if (!view) return;
-      var sekki = getCurrentSekki();
-      var illustrated = GARDEN_BACKGROUNDS[sekki.name] || GARDEN_BACKGROUNDS[getSeasonOfSekki(sekki.name)];
-      var img = illustrated || SEKKI_IMAGES[sekki.name];
+      var name = gardenViewSekkiName || getCurrentSekki().name;
+      var illustrated = GARDEN_BACKGROUNDS[name] || GARDEN_BACKGROUNDS[getSeasonOfSekki(name)];
+      var img = illustrated || SEKKI_IMAGES[name];
       view.style.backgroundImage = img
         ? (illustrated
             ? 'url("' + img + '")'
             : 'linear-gradient(rgba(253,253,253,0.08), rgba(253,253,253,0.08)), url("' + img + '")')
         : 'linear-gradient(180deg,#eef3f7,#dfe8ef)';
       var title = document.getElementById('gardenTitle');
-      if (title) title.textContent = 'じぶんの庭 〜' + sekki.name + '〜';
+      if (title) title.textContent = 'じぶんの庭 〜' + name + (name === getCurrentSekki().name ? '（いま）' : '') + '〜';
       renderGardenItems();
-      view.style.display = 'flex';
     }
 
     function renderGardenItems() {
@@ -4446,8 +4477,18 @@
       var countEl = document.getElementById('gardenCount');
       if (!ground) return;
       ground.innerHTML = '';
-      var items = loadGardenItems();
-      if (countEl) countEl.textContent = items.length > 0 ? 'ステッカー ' + items.length + '枚' : 'まだステッカーがありません。今日の予定を全部○にすると1枚もらえます。';
+      var name = gardenViewSekkiName || getCurrentSekki().name;
+      var all = loadGardenItems();
+      var items = all.filter(function (it) { return it.sekki === name; });
+      if (countEl) {
+        if (items.length > 0) {
+          countEl.textContent = 'この節気のステッカー ' + items.length + '枚（ぜんぶで ' + all.length + '枚）';
+        } else if (name === getCurrentSekki().name) {
+          countEl.textContent = 'まだステッカーがありません。今日の予定を全部○にすると1枚もらえます。';
+        } else {
+          countEl.textContent = 'この節気のステッカーはありません。';
+        }
+      }
       items.forEach(function (item) {
         ground.appendChild(buildGardenItemEl(item));
       });
