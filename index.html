@@ -150,6 +150,92 @@
       line-height: 1;
       cursor: pointer;
     }
+    /* ○✕のきろくボタン。通知ベルのすぐ左に並べる */
+    .stats-icon-btn {
+      position: fixed;
+      top: 0.6rem;
+      right: 3.4rem;
+      z-index: 30;
+      width: 2.4rem;
+      height: 2.4rem;
+      padding: 0;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      font-size: 1.2rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    /* ○✕のきろくモーダル。色は色覚多様性チェック済み（○緑・✕橙赤）で、
+       件数の文字ラベルを常に併記して色だけに頼らない */
+    .stats-legend {
+      margin: 0 0 0.7rem;
+      color: #666;
+      font-size: 0.72rem;
+    }
+    .stats-dot {
+      display: inline-block;
+      width: 0.6rem;
+      height: 0.6rem;
+      margin: 0 0.25rem 0 0;
+      border-radius: 3px;
+      vertical-align: -0.05rem;
+    }
+    .stats-legend .stats-dot + .stats-dot,
+    .stats-legend span + .stats-dot {
+      margin-left: 0.7rem;
+    }
+    .stats-dot-done { background: #12855a; }
+    .stats-dot-cross { background: #d45f3c; }
+    .stats-dot-pending { background: #c3c9d0; }
+    .stats-section-title {
+      margin: 1rem 0 0.45rem;
+      color: #33475b;
+      font-size: 0.85rem;
+    }
+    .stats-list {
+      display: grid;
+      gap: 0.55rem;
+    }
+    .stats-row-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.22rem;
+      font-size: 0.76rem;
+      color: #445261;
+    }
+    .stats-row-label {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .stats-row-counts {
+      flex: 1;
+      color: #5a6a78;
+    }
+    .stats-row-rate {
+      font-weight: 700;
+      color: #22313f;
+      white-space: nowrap;
+    }
+    .stats-bar {
+      display: flex;
+      gap: 2px;
+      height: 12px;
+    }
+    .stats-bar-seg {
+      min-width: 3px;
+      border-radius: 3px;
+    }
+    .stats-seg-done { background: #12855a; }
+    .stats-seg-cross { background: #d45f3c; }
+    .stats-seg-pending { background: #c3c9d0; }
+    .stats-empty {
+      margin: 0.4rem 0;
+      color: #777;
+      font-size: 0.8rem;
+    }
     .notif-bell-badge {
       position: absolute;
       top: -0.15rem;
@@ -1089,6 +1175,7 @@
   <div id="seasonDecoration" aria-hidden="true"></div>
   <button id="settingsBtn" type="button" class="settings-icon-btn" aria-label="設定">⚙️</button>
   <button id="materialsBtn" type="button" class="materials-icon-btn" aria-label="教材追加">📚</button>
+  <button id="statsBtn" type="button" class="stats-icon-btn" aria-label="○✕のきろく">📊</button>
   <button id="notifBellBtn" type="button" class="notif-bell-btn" aria-label="未チェックの通知">🔔<span id="notifBellBadge" class="notif-bell-badge" style="display:none;"></span></button>
   <h1>一週間の計画帳</h1>
   <p id="sekkiLabel" class="sekki-label"></p>
@@ -1100,6 +1187,18 @@
       <button id="notifCloseBtn" type="button" class="settings-close-btn" aria-label="閉じる">×</button>
       <h2 style="font-size:1rem; margin-top:0;">○✕が付いていない過去の予定</h2>
       <ul id="notifTaskList"></ul>
+    </div>
+  </div>
+  <!-- ○✕のきろくモーダル（週ごと・月ごとの集計） -->
+  <div id="statsModal" class="settings-modal" style="display:none;">
+    <div class="settings-panel">
+      <button id="statsCloseBtn" type="button" class="settings-close-btn" aria-label="閉じる">×</button>
+      <h2 style="font-size:1rem; margin-top:0;">○✕のきろく</h2>
+      <p class="stats-legend"><span class="stats-dot stats-dot-done"></span>○ できた<span class="stats-dot stats-dot-cross"></span>✕ できなかった<span class="stats-dot stats-dot-pending"></span>未チェック</p>
+      <h3 class="stats-section-title">週ごと</h3>
+      <div id="statsWeekList" class="stats-list"></div>
+      <h3 class="stats-section-title">月ごと</h3>
+      <div id="statsMonthList" class="stats-list"></div>
     </div>
   </div>
   <!-- Google予定の追加・編集モーダル -->
@@ -2519,6 +2618,27 @@
         });
       }
 
+      // ○✕のきろく（📊ボタン）の開閉。開くたびに集計し直す
+      var statsBtn = document.getElementById('statsBtn');
+      var statsModal = document.getElementById('statsModal');
+      var statsCloseBtn = document.getElementById('statsCloseBtn');
+      if (statsBtn && statsModal) {
+        statsBtn.addEventListener('click', function () {
+          renderStatsModal();
+          statsModal.style.display = 'flex';
+        });
+        if (statsCloseBtn) {
+          statsCloseBtn.addEventListener('click', function () {
+            statsModal.style.display = 'none';
+          });
+        }
+        statsModal.addEventListener('click', function (event) {
+          if (event.target === statsModal) {
+            statsModal.style.display = 'none';
+          }
+        });
+      }
+
       // 通知ベル（○✕が付いていない過去の予定）の開閉
       var notifBellBtn = document.getElementById('notifBellBtn');
       var notifModal = document.getElementById('notifModal');
@@ -3132,6 +3252,120 @@
     function closeMaterialsModal() {
       var modal = document.getElementById('materialsModal');
       if (modal) modal.style.display = 'none';
+    }
+
+    // ---- ○✕のきろく（週ごと・月ごとの集計モーダル） ----
+    // localStorageの YYYY-MM-DD-subN-content / -status を走査して日別の件数を集める。
+    // 集計対象は科目1〜7のみ（8列目の感想・振り返りは予定ではないので数えない）。
+    function collectDayStatusStats() {
+      var byDay = {};
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        var m = key && key.match(/^(\d{4}-\d{2}-\d{2})-sub([1-7])-content$/);
+        if (!m) continue;
+        var content = localStorage.getItem(key);
+        if (!content || !content.trim()) continue;
+        var day = byDay[m[1]] || (byDay[m[1]] = { total: 0, done: 0, cross: 0 });
+        day.total++;
+        var status = localStorage.getItem(m[1] + '-sub' + m[2] + '-status');
+        if (status === 'circle') day.done++;
+        else if (status === 'cross') day.cross++;
+      }
+      return byDay;
+    }
+
+    // 1期間ぶんの行（ラベル・件数・達成率・積み上げバー）を作る。
+    // バーの色は色覚多様性を考慮して選び、件数の文字を常に併記する。
+    function buildStatsRow(label, stat) {
+      var row = document.createElement('div');
+      row.className = 'stats-row';
+      var pending = stat.total - stat.done - stat.cross;
+      var top = document.createElement('div');
+      top.className = 'stats-row-top';
+      var labelEl = document.createElement('span');
+      labelEl.className = 'stats-row-label';
+      labelEl.textContent = label;
+      var countsEl = document.createElement('span');
+      countsEl.className = 'stats-row-counts';
+      countsEl.textContent = '○' + stat.done + ' ✕' + stat.cross + (pending > 0 ? ' 未' + pending : '');
+      var rateEl = document.createElement('span');
+      rateEl.className = 'stats-row-rate';
+      rateEl.textContent = Math.round(stat.done / stat.total * 100) + '%';
+      top.appendChild(labelEl);
+      top.appendChild(countsEl);
+      top.appendChild(rateEl);
+      row.appendChild(top);
+      var bar = document.createElement('div');
+      bar.className = 'stats-bar';
+      [['stats-seg-done', stat.done], ['stats-seg-cross', stat.cross], ['stats-seg-pending', pending]].forEach(function (seg) {
+        if (!seg[1]) return;
+        var el = document.createElement('div');
+        el.className = 'stats-bar-seg ' + seg[0];
+        el.style.flex = String(seg[1]);
+        bar.appendChild(el);
+      });
+      row.appendChild(bar);
+      return row;
+    }
+
+    function appendStatsEmpty(listEl) {
+      var p = document.createElement('p');
+      p.className = 'stats-empty';
+      p.textContent = 'まだ○✕の記録がありません。';
+      listEl.appendChild(p);
+    }
+
+    // きろくモーダルの中身を描画する。週は設定の週始まり基準、新しい順に最大12件ずつ。
+    function renderStatsModal() {
+      var weekListEl = document.getElementById('statsWeekList');
+      var monthListEl = document.getElementById('statsMonthList');
+      if (!weekListEl || !monthListEl) return;
+      var byDay = collectDayStatusStats();
+      var weekStartDay = getWeekStartDay();
+      var weeks = {};
+      var months = {};
+      Object.keys(byDay).forEach(function (iso) {
+        var stat = byDay[iso];
+        var d = parseISOToDate(iso);
+        var diff = (d.getDay() - weekStartDay + 7) % 7;
+        var ws = new Date(d);
+        ws.setDate(d.getDate() - diff);
+        var wkey = toLocalISO(ws);
+        var mkey = iso.slice(0, 7);
+        [[weeks, wkey], [months, mkey]].forEach(function (pair) {
+          var agg = pair[0][pair[1]] || (pair[0][pair[1]] = { total: 0, done: 0, cross: 0 });
+          agg.total += stat.total;
+          agg.done += stat.done;
+          agg.cross += stat.cross;
+        });
+      });
+
+      var today = new Date();
+      today.setHours(0, 0, 0, 0);
+      var todayDiff = (today.getDay() - weekStartDay + 7) % 7;
+      var thisWeekStart = new Date(today);
+      thisWeekStart.setDate(today.getDate() - todayDiff);
+      var thisWeekKey = toLocalISO(thisWeekStart);
+      var thisMonthKey = toLocalISO(today).slice(0, 7);
+
+      weekListEl.innerHTML = '';
+      Object.keys(weeks).sort().reverse().slice(0, 12).forEach(function (wkey) {
+        var start = parseISOToDate(wkey);
+        var end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        var label = (start.getMonth() + 1) + '/' + start.getDate() + '〜' + (end.getMonth() + 1) + '/' + end.getDate();
+        if (wkey === thisWeekKey) label = '今週 ' + label;
+        weekListEl.appendChild(buildStatsRow(label, weeks[wkey]));
+      });
+      if (!weekListEl.children.length) appendStatsEmpty(weekListEl);
+
+      monthListEl.innerHTML = '';
+      Object.keys(months).sort().reverse().slice(0, 12).forEach(function (mkey) {
+        var label = mkey.slice(0, 4) + '年' + parseInt(mkey.slice(5), 10) + '月';
+        if (mkey === thisMonthKey) label = '今月 ' + label;
+        monthListEl.appendChild(buildStatsRow(label, months[mkey]));
+      });
+      if (!monthListEl.children.length) appendStatsEmpty(monthListEl);
     }
 
     // 教材詳細を開く
