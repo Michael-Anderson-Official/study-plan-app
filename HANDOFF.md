@@ -130,6 +130,12 @@
   - **バックアップ促しトースト**（`#backupNudge`、`maybeShowBackupNudge()`）: 未サインイン（`currentAuthUser`がnull、`handleAuthStateChange`で更新）かつ教材あり（`hasAnyMaterial()`）のとき、画面下部（振り返りバーの上）に「記録はこの端末の中にだけあります…」を表示。「設定を開く」は却下記録後に`settingsBtn.click()`で設定モーダルへ、「あとで」は却下のみ。却下すると`backup-nudge-dismissed`（端末ローカルのみ、同期対象外）に日付を保存し14日間は再表示しない。Firebase認証の判定を待つため表示判定はload後3.5秒遅延。サインインが完了した時点で表示中でも畳む。
   - 確認状況: ローカルPlaywright（スマホ幅）でバッジ2→○タップで即1・リストからも消える・トースト表示→あとで→14日抑止→設定を開く経路、まで確認済み。実機未確認。
 
+- 2026-07-12、AppStore配信に向けたネイティブ化の土台としてCapacitor 8を導入した。
+  - 構成: `package.json`（npmはパッケージング層専用、AGENTS.mdに例外を明記）、`capacitor.config.json`（appId `jp.keikakuchou.planner`※初回提出前なら変更可、appName 一週間の計画帳、webDir `www`）、`scripts/build-www.mjs`（index.html等をwww/へコピーするだけ。変換なし。workerは含めない）、`ios/`（`npx cap add ios`で生成、SPM方式でCocoaPods不使用）。`www/`と`node_modules/`は.gitignore。GitHub Pages配信（リポジトリルートのindex.html）には無影響。
+  - `ios/App/App/Info.plist`に`NSCameraUsageDescription`（バーコード読み取り用）を追加済み。
+  - **開発機はWindowsでXcodeが無いため、iOSビルドの検証はGitHub Actions（`.github/workflows/ios-build.yml`、macos-15ランナー、公開リポジトリなので無料）が唯一の手段**。署名なしシミュレータ向けDebugビルドが通ることを確認する。web資産やios/を変更したら自動実行、手動実行も可（workflow_dispatch）。
+  - 未対応（次の段階）: プッシュ通知のAPNs化（Web Pushはラッパー内で動かない）、ラッパー内Google OAuth（GISは埋め込みWebViewを拒否する）、アカウント削除、アプリアイコン（Assets.xcassetsはCapacitorのプレースホルダーのまま。icon-512.pngは512pxで@capacitor/assetsの要求（1024px）に足りないため元画像が要る）、TestFlight配布（Apple Developer Program加入と署名設定が必要）。
+
 ## 直近でCodexが変更した内容
 
 コード上確認できた事実:

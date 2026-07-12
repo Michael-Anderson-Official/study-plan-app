@@ -1,0 +1,8 @@
+{
+  "appId": "jp.keikakuchou.planner",
+  "appName": "一週間の計画帳",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "automatic"
+  }
+}

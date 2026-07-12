@@ -1,0 +1,16 @@
+# npm（Capacitorネイティブ化用。アプリ本体はビルド不要のまま）
+node_modules/
+
+# build-www.mjs が生成するCapacitor用のweb資産コピー
+www/
+
+# iOSネイティブプロジェクトの生成物
+ios/App/Pods/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/DerivedData/
+ios/App/output/
+
+# OSごみ
+.DS_Store
+Thumbs.db

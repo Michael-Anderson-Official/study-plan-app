@@ -1,0 +1,51 @@
+# iOSアプリがビルドできることをMacランナーで検証する。
+# 開発機がWindowsでXcodeを持たないため、ビルド確認はこのCIが唯一の手段。
+# 署名なしのシミュレータ向けDebugビルドまで（TestFlight配布は署名設定を追加してから）。
+name: iOS Build Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - manifest.json
+      - sw.js
+      - 'img/**'
+      - 'ios/**'
+      - capacitor.config.json
+      - package.json
+      - package-lock.json
+      - 'scripts/**'
+      - .github/workflows/ios-build.yml
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web assets into www/
+        run: npm run build-www
+
+      - name: Capacitor sync
+        run: npx cap sync ios
+
+      - name: Build iOS app (simulator, unsigned)
+        run: >
+          xcodebuild build
+          -project ios/App/App.xcodeproj
+          -scheme App
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO

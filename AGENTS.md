@@ -22,7 +22,8 @@
 
 ## コーディング方針
 
-- 依存関係を増やさない。必要がなければ単一HTML中心の構成を維持する。ビルド不要のCDN読み込み（`<script src>`または`<script type="module">`によるバージョン固定importのみ）に限り、明確な理由（ブラウザAPIの非対応を補うフォールバック、アカウント基盤等）がある場合のみ例外を許容する（例: Google Identity Services、`@zxing/library`、Firebase SDK）。npm/ビルドツール導入は不可。
+- 依存関係を増やさない。必要がなければ単一HTML中心の構成を維持する。ビルド不要のCDN読み込み（`<script src>`または`<script type="module">`によるバージョン固定importのみ）に限り、明確な理由（ブラウザAPIの非対応を補うフォールバック、アカウント基盤等）がある場合のみ例外を許容する（例: Google Identity Services、`@zxing/library`、Firebase SDK）。**アプリ本体（`index.html`）へのnpm/ビルドツール導入は不可。**
+- 例外（2026-07-12追加）: AppStore配信のためのネイティブ化（Capacitor）に限り、**パッケージング層として**npmを使う。`package.json`/`capacitor.config.json`/`ios/`はネイティブラッパー専用で、`index.html`のVanilla JS構成・GitHub Pagesでの配信には一切影響させない。web資産は`scripts/build-www.mjs`が`www/`へコピーするだけ（変換・バンドルはしない）。
 - 既存の素朴なVanilla JSスタイルに合わせる。大きな抽象化やフレームワーク化は避ける。
 - `localStorage` から読むJSONは `try/catch` と `Array.isArray` などで型を確認する。
 - 既存データを壊す変更を避ける。保存キーを変える場合は移行処理を書く。

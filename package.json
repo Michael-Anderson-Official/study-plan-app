@@ -1,0 +1,31 @@
+{
+  "name": "keikakuchou",
+  "version": "0.1.0",
+  "description": "一週間の計画帳 - Capacitorネイティブラッパー",
+  "main": "sw.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-www": "node scripts/build-www.mjs",
+    "sync": "node scripts/build-www.mjs && cap sync"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Michael-Anderson-Official/study-plan-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Michael-Anderson-Official/study-plan-app/issues"
+  },
+  "homepage": "https://github.com/Michael-Anderson-Official/study-plan-app#readme",
+  "private": "true",
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.1"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/ios": "^8.4.1"
+  }
+}
