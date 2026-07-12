@@ -986,24 +986,19 @@
     }
     .machi-item {
       position: absolute;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      /* left/topは「足元（フットプリント中心のマス）」を指す。建物はそこから立ち上がる */
+      transform: translate(-50%, -85%);
       line-height: 1;
       cursor: grab;
       user-select: none;
       -webkit-user-select: none;
       touch-action: none;
-      filter: drop-shadow(0 2px 4px rgba(31, 47, 61, 0.3));
+      filter: drop-shadow(0 3px 5px rgba(31, 47, 61, 0.35));
     }
     .machi-item.dragging {
       cursor: grabbing;
-      z-index: 5;
-      filter: drop-shadow(0 6px 10px rgba(31, 47, 61, 0.45));
-    }
-    .machi-item.machi-home {
-      background: rgba(255, 253, 241, 0.4);
-      border-radius: 10px;
+      z-index: 999 !important;
+      filter: drop-shadow(0 8px 12px rgba(31, 47, 61, 0.45));
     }
     /* アイテム獲得トースト */
     .garden-award-toast {
@@ -4953,10 +4948,65 @@
       renderMachiGrid();
     }
 
-    function machiCellSize() {
+    // ---- アイソメトリック投影（斜め見下ろし・ダイヤ型マス） ----
+    // データは(col,row)のマス番地のまま、画面上の見た目だけ2.5Dにする。
+    // 2:1ダイヤ（tileW = tileH×2）。マス(col,row)の上端コーナーの画面座標は
+    //   x = originX + (col - row) × tileW/2
+    //   y = originY + (col + row) × tileH/2
+    function machiIsoParams() {
       var scroller = document.getElementById('machiScroller');
-      if (!scroller) return 48;
-      return Math.floor(scroller.clientHeight / MACHI_GRID_ROWS);
+      var usable = scroller ? Math.max(scroller.clientHeight - 70, 220) : 420;
+      var tileH = Math.floor(usable * 2 / (MACHI_GRID_COLS + MACHI_GRID_ROWS));
+      var tileW = tileH * 2;
+      return {
+        tileW: tileW,
+        tileH: tileH,
+        originX: MACHI_GRID_ROWS * tileW / 2,
+        originY: 40,
+        width: (MACHI_GRID_COLS + MACHI_GRID_ROWS) * tileW / 2,
+        height: (MACHI_GRID_COLS + MACHI_GRID_ROWS) * tileH / 2 + 80
+      };
+    }
+
+    function machiCornerToScreen(iso, col, row) {
+      return {
+        x: iso.originX + (col - row) * iso.tileW / 2,
+        y: iso.originY + (col + row) * iso.tileH / 2
+      };
+    }
+
+    // 画面座標（ground基準）→マスの連続値。スナップ側で丸める
+    function machiScreenToCell(iso, x, y) {
+      var a = (x - iso.originX) / (iso.tileW / 2);
+      var b = (y - iso.originY) / (iso.tileH / 2);
+      return { col: (a + b) / 2, row: (b - a) / 2 };
+    }
+
+    // 地面（緑のひし形）とマス目線をSVGで描いて背景にする
+    function machiGridBackground(iso) {
+      var corners = [
+        machiCornerToScreen(iso, 0, 0),
+        machiCornerToScreen(iso, MACHI_GRID_COLS, 0),
+        machiCornerToScreen(iso, MACHI_GRID_COLS, MACHI_GRID_ROWS),
+        machiCornerToScreen(iso, 0, MACHI_GRID_ROWS)
+      ];
+      var poly = corners.map(function (p) { return p.x + ',' + p.y; }).join(' ');
+      var lines = '';
+      var c, r, p1, p2;
+      for (c = 0; c <= MACHI_GRID_COLS; c++) {
+        p1 = machiCornerToScreen(iso, c, 0);
+        p2 = machiCornerToScreen(iso, c, MACHI_GRID_ROWS);
+        lines += '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '"/>';
+      }
+      for (r = 0; r <= MACHI_GRID_ROWS; r++) {
+        p1 = machiCornerToScreen(iso, 0, r);
+        p2 = machiCornerToScreen(iso, MACHI_GRID_COLS, r);
+        lines += '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '"/>';
+      }
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + iso.width + '" height="' + iso.height + '">' +
+        '<polygon points="' + poly + '" fill="#c8dfba" stroke="#a9c69a" stroke-width="2"/>' +
+        '<g stroke="rgba(90,120,80,0.28)" stroke-width="1">' + lines + '</g></svg>';
+      return 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svg) + '")';
     }
 
     function renderMachiGrid() {
@@ -4964,11 +5014,10 @@
       var countEl = document.getElementById('machiCount');
       var scroller = document.getElementById('machiScroller');
       if (!ground || !scroller) return;
-      var cell = machiCellSize();
-      ground.style.width = (cell * MACHI_GRID_COLS) + 'px';
-      ground.style.height = (cell * MACHI_GRID_ROWS) + 'px';
-      // マス目を薄く描く（背景イラストが入るまでの暫定。入ったら配置モード時のみに変更予定）
-      ground.style.backgroundSize = cell + 'px ' + cell + 'px';
+      var iso = machiIsoParams();
+      ground.style.width = iso.width + 'px';
+      ground.style.height = iso.height + 'px';
+      ground.style.backgroundImage = machiGridBackground(iso);
       ground.innerHTML = '';
       var items = loadMachiItems();
       if (countEl) {
@@ -4976,22 +5025,30 @@
         countEl.textContent = buildings > 0 ? '建物 ' + buildings + '件' : 'まだ自宅だけの街。今日の予定を全部○にして「街に置く」を選ぶと建物が増えます。';
       }
       items.forEach(function (item) {
-        ground.appendChild(buildMachiItemEl(item, cell));
+        ground.appendChild(buildMachiItemEl(item, iso));
       });
-      // 初期位置は自宅が見えるあたり（中央）
-      scroller.scrollLeft = Math.max(0, (cell * MACHI_GRID_COLS - scroller.clientWidth) / 2);
+      // 初期位置は街の中央
+      scroller.scrollLeft = Math.max(0, (iso.width - scroller.clientWidth) / 2);
     }
 
-    function buildMachiItemEl(item, cell) {
+    // アイテムの足元（フットプリント中心のマス）の画面座標に置く
+    function machiPlaceEl(el, iso, entry, col, row) {
+      var c = col + (entry.w - 1) / 2;
+      var r = row + (entry.h - 1) / 2;
+      var center = machiCornerToScreen(iso, c, r);
+      el.style.left = center.x + 'px';
+      el.style.top = (center.y + iso.tileH / 2) + 'px';
+      // 奥の建物ほど下に描かれるよう並べ替え（画家のアルゴリズム）
+      el.style.zIndex = 10 + col + row;
+    }
+
+    function buildMachiItemEl(item, iso) {
       var entry = machiCatalogEntry(item.type) || { name: item.type, emoji: '🏗️', w: 1, h: 1 };
       var el = document.createElement('div');
       el.className = 'machi-item' + (item.type === 'home' ? ' machi-home' : '');
-      el.style.left = (item.col * cell) + 'px';
-      el.style.top = (item.row * cell) + 'px';
-      el.style.width = (entry.w * cell) + 'px';
-      el.style.height = (entry.h * cell) + 'px';
-      el.style.fontSize = (cell * (entry.w > 1 ? 1.4 : 0.72)) + 'px';
+      el.style.fontSize = Math.round(iso.tileW * (entry.w > 1 ? 0.95 : 0.55)) + 'px';
       el.textContent = entry.emoji;
+      machiPlaceEl(el, iso, entry, item.col, item.row);
 
       var dragging = false;
       var moved = false;
@@ -5028,10 +5085,13 @@
           }
           return;
         }
-        // ドラッグ: 一番近いマスへスナップ。置けない場所なら元に戻す
+        // ドラッグ: 足元の座標を逆投影して一番近いマスへスナップ。置けなければ差し戻し
         var items = loadMachiItems();
-        var col = Math.round(parseFloat(el.style.left) / cell);
-        var row = Math.round(parseFloat(el.style.top) / cell);
+        var anchorX = parseFloat(el.style.left);
+        var anchorY = parseFloat(el.style.top) - iso.tileH / 2;
+        var cell = machiScreenToCell(iso, anchorX, anchorY);
+        var col = Math.round(cell.col - (entry.w - 1) / 2);
+        var row = Math.round(cell.row - (entry.h - 1) / 2);
         if (machiCanPlace(items, col, row, entry.w, entry.h, item.uid)) {
           item.col = col;
           item.row = row;
@@ -5042,12 +5102,8 @@
             }
           }
           saveMachiItems(items);
-          el.style.left = (col * cell) + 'px';
-          el.style.top = (row * cell) + 'px';
-        } else {
-          el.style.left = (item.col * cell) + 'px';
-          el.style.top = (item.row * cell) + 'px';
         }
+        machiPlaceEl(el, iso, entry, item.col, item.row);
       });
       return el;
     }
