@@ -1003,6 +1003,16 @@
       touch-action: none;
       filter: drop-shadow(0 3px 5px rgba(31, 47, 61, 0.35));
     }
+    .machi-item img {
+      display: block;
+      object-fit: contain;
+      pointer-events: none;
+      -webkit-user-drag: none;
+    }
+    /* 本物の建物画像はフチまで絵なので、足元アンカーに絵の底辺を合わせる */
+    .machi-item.has-img {
+      transform: translate(-50%, -94%);
+    }
     .machi-item.dragging {
       cursor: grabbing;
       z-index: 999 !important;
@@ -4803,7 +4813,14 @@
         row.className = 'sticker-book-row' + (locked ? ' locked' : '');
         var emoji = document.createElement('span');
         emoji.className = 'sticker-book-emoji';
-        emoji.textContent = it.emoji;
+        if (it.img) {
+          var thumb = document.createElement('img');
+          thumb.src = it.img;
+          thumb.alt = it.name;
+          emoji.appendChild(thumb);
+        } else {
+          emoji.textContent = it.emoji;
+        }
         var name = document.createElement('span');
         name.textContent = it.name + (it.w > 1 ? '（' + it.w + '×' + it.h + '）' : '');
         row.appendChild(emoji);
@@ -5102,8 +5119,20 @@
       var entry = machiCatalogEntry(item.type) || { name: item.type, emoji: '🏗️', w: 1, h: 1 };
       var el = document.createElement('div');
       el.className = 'machi-item' + (item.type === 'home' ? ' machi-home' : '');
-      el.style.fontSize = Math.round(iso.tileW * (entry.w > 1 ? 0.95 : 0.55)) + 'px';
-      el.textContent = entry.emoji;
+      if (entry.img) {
+        // 本物の建物画像がある場合はそれを描画（無ければ絵文字プレースホルダー）。
+        // 幅はフットプリント（マスw個ぶんのダイヤ幅）に合わせる
+        var buildingImg = document.createElement('img');
+        buildingImg.src = entry.img;
+        buildingImg.alt = entry.name;
+        buildingImg.draggable = false;
+        buildingImg.style.width = Math.round(iso.tileW * entry.w) + 'px';
+        el.appendChild(buildingImg);
+        el.classList.add('has-img');
+      } else {
+        el.style.fontSize = Math.round(iso.tileW * (entry.w > 1 ? 0.95 : 0.55)) + 'px';
+        el.textContent = entry.emoji;
+      }
       machiPlaceEl(el, iso, entry, item.col, item.row);
 
       var dragging = false;
