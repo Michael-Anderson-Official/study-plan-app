@@ -720,6 +720,55 @@
       line-height: 1.5;
       resize: vertical;
     }
+    /* 初回起動オンボーディング */
+    .onboarding-panel {
+      max-width: 340px;
+    }
+    .onboarding-lead {
+      margin: 0.4rem 0 0.8rem;
+      color: #33475b;
+      font-size: 0.86rem;
+      line-height: 1.6;
+    }
+    .onboarding-steps {
+      display: grid;
+      gap: 0.55rem;
+      margin: 0 0 0.8rem;
+      padding: 0;
+      list-style: none;
+    }
+    .onboarding-steps li {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      color: #22313f;
+      font-size: 0.85rem;
+    }
+    .onboarding-step-icon {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.1rem;
+      height: 2.1rem;
+      background: var(--theme-header-bg);
+      border-radius: 50%;
+      font-size: 0.9rem;
+    }
+    .onboarding-note {
+      margin: 0 0 0.9rem;
+      color: #666;
+      font-size: 0.74rem;
+    }
+    .materials-help {
+      margin: 0.4rem 0 0;
+      color: #666;
+      font-size: 0.75rem;
+      line-height: 1.5;
+    }
+    .week-day-add-material-btn {
+      margin-top: 0.4rem;
+    }
     /* 一週間の目標バー。決定後はその週の間ずっと固定表示 */
     .week-goal-bar {
       margin: 0.35rem 1rem;
@@ -1537,6 +1586,7 @@
       <button id="addMaterialBtn" type="button" style="padding:0.4rem 0.8rem; margin-left:0.5rem;">追加</button>
       <button id="scanIsbnBtn" type="button" class="btn-outline" style="padding:0.4rem 0.8rem; margin-top:0.5rem;">バーコードで追加</button>
       <ul id="materialsList" style="list-style:none; padding-left:0; margin-top:0.5rem;"></ul>
+      <p class="materials-help">「バーコードで追加」が一番かんたん。追加した教材の「詳細」から目次を入れると、毎日の予定が自動で組まれます。</p>
 
   <!-- 教材の詳細入力欄（教材追加モーダル内） -->
   <div id="materialDetail" style="display:none; margin:0.75rem 0 0; padding:1rem; border:1px solid #ccc; border-radius:4px; background:#f9f9f9;">
@@ -1618,6 +1668,22 @@
       <div id="weeklySummary" contenteditable style="border: 1px solid #ccc; padding: 0.5rem; min-height: 80px;"></div>
     </div>
   </div>
+  </div>
+
+  <!-- 初回起動オンボーディング。教材が1件も無い初見ユーザーにだけ出す -->
+  <div id="onboardingModal" class="settings-modal" style="display:none;">
+    <div class="settings-panel onboarding-panel">
+      <h2 style="margin-top:0; font-size:1.05rem;">ようこそ 🌸</h2>
+      <p class="onboarding-lead">「一週間の計画帳」は、教材を登録すると毎日の勉強予定を自動で組んでくれる計画帳です。</p>
+      <ol class="onboarding-steps">
+        <li><span class="onboarding-step-icon">📷</span>教材のバーコードを撮って登録</li>
+        <li><span class="onboarding-step-icon">📅</span>目次から毎日の予定が自動でできる</li>
+        <li><span class="onboarding-step-icon">○✕</span>あとは毎日○✕をつけるだけ</li>
+      </ol>
+      <p class="onboarding-note">できなかった日の分は、自動で翌日以降に繰り越されます。</p>
+      <button id="onboardingStartBtn" type="button" style="width:100%; padding:0.6rem;">📚 教材を追加して始める</button>
+      <button id="onboardingSkipBtn" type="button" class="btn-outline" style="width:100%; padding:0.5rem; margin-top:0.5rem;">あとで自分で見てみる</button>
+    </div>
   </div>
 
   <!-- 設定モーダル -->
@@ -2634,6 +2700,30 @@
       document.body.classList.add('week-mobile-shell');
 
       // 設定アイコン・設定モーダルの開閉
+      // 初回起動オンボーディングの開閉。「始める」は教材追加モーダルへ直行する
+      var onboardingModal = document.getElementById('onboardingModal');
+      var onboardingStartBtn = document.getElementById('onboardingStartBtn');
+      var onboardingSkipBtn = document.getElementById('onboardingSkipBtn');
+      function closeOnboarding() {
+        localStorage.setItem('onboarding-done', '1');
+        if (onboardingModal) onboardingModal.style.display = 'none';
+      }
+      if (onboardingStartBtn) {
+        onboardingStartBtn.addEventListener('click', function () {
+          closeOnboarding();
+          var modal = document.getElementById('materialsModal');
+          if (modal) modal.style.display = 'flex';
+        });
+      }
+      if (onboardingSkipBtn) {
+        onboardingSkipBtn.addEventListener('click', closeOnboarding);
+      }
+      if (onboardingModal) {
+        onboardingModal.addEventListener('click', function (event) {
+          if (event.target === onboardingModal) closeOnboarding();
+        });
+      }
+
       // 左上メニュー（☰）の開閉。項目タップや画面の他の場所タップで閉じる
       var menuBtn = document.getElementById('menuBtn');
       var menuDropdown = document.getElementById('menuDropdown');
@@ -2817,6 +2907,8 @@
           fetchGoogleCalendarList();
           fetchGoogleEvents();
         }
+        // 教材の読み込みが終わってから初回オンボーディングの表示可否を判定する
+        maybeShowOnboarding();
     });
     // DOMContentLoaded 用のクロージャを削除したため閉じカッコは不要になりました。
 
@@ -3327,6 +3419,28 @@
     function closeMaterialsModal() {
       var modal = document.getElementById('materialsModal');
       if (modal) modal.style.display = 'none';
+    }
+
+    // ---- 初回起動オンボーディング ----
+    // 教材が1件も無く、まだ一度も表示していないときだけ出す。?onboarding=1 で強制プレビュー。
+    // フラグ onboarding-done は端末ローカルのみ（classifyStorageKeyの対象外なので同期されない）。
+    function hasAnyMaterial() {
+      return materialsList.some(function (m) { return m && String(m).trim(); });
+    }
+
+    function maybeShowOnboarding() {
+      var modal = document.getElementById('onboardingModal');
+      if (!modal) return;
+      var force = /[?&]onboarding=1/.test(location.search);
+      if (!force) {
+        if (localStorage.getItem('onboarding-done')) return;
+        if (hasAnyMaterial()) {
+          // 既存ユーザーには出さない。フラグを立てて今後も出さない
+          localStorage.setItem('onboarding-done', '1');
+          return;
+        }
+      }
+      modal.style.display = 'flex';
     }
 
     // ---- 一週間の目標 ----
@@ -4075,6 +4189,18 @@
         emptyTask.className = 'week-day-empty';
         emptyTask.textContent = 'この日の教材予定はありません。';
         taskListEl.appendChild(emptyTask);
+        // 教材が1件も無い初見ユーザーには、その場から教材追加へ飛べる導線を出す
+        if (!hasAnyMaterial()) {
+          var addMaterialBtn = document.createElement('button');
+          addMaterialBtn.type = 'button';
+          addMaterialBtn.className = 'btn-outline week-day-add-material-btn';
+          addMaterialBtn.textContent = '📚 教材を追加する';
+          addMaterialBtn.addEventListener('click', function () {
+            var modal = document.getElementById('materialsModal');
+            if (modal) modal.style.display = 'flex';
+          });
+          taskListEl.appendChild(addMaterialBtn);
+        }
       }
 
       googleListEl.innerHTML = '';
