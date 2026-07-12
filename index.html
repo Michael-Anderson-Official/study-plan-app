@@ -898,10 +898,24 @@
       font-size: 1.25rem;
       line-height: 1;
     }
-    .garden-ground {
-      position: relative;
+    /* 庭は横長パノラマ。scrollerが横スクロールを担い、groundが広いキャンバス本体 */
+    .garden-scroller {
       flex: 1 1 auto;
       min-height: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .garden-scroller::-webkit-scrollbar {
+      display: none;
+    }
+    .garden-ground {
+      position: relative;
+      height: 100%;
+      min-width: 100%;
+      background-size: cover;
+      background-position: center;
     }
     .garden-item {
       position: absolute;
@@ -2011,8 +2025,10 @@
         <button id="gardenCloseBtn" type="button" class="garden-close-btn" aria-label="閉じる">×</button>
       </div>
     </div>
-    <div id="gardenGround" class="garden-ground"></div>
-    <p class="garden-hint">ステッカーはドラッグで好きな場所に置けます。タップで思い出を表示。</p>
+    <div id="gardenScroller" class="garden-scroller">
+      <div id="gardenGround" class="garden-ground"></div>
+    </div>
+    <p class="garden-hint">横にスライドすると庭の続きが見えます。ステッカーはドラッグで自由に配置、タップで思い出。</p>
     <div id="gardenItemInfo" class="garden-item-info" style="display:none;"></div>
   </div>
 
@@ -4458,18 +4474,47 @@
 
     function renderGardenPage() {
       var view = document.getElementById('gardenView');
-      if (!view) return;
+      var scroller = document.getElementById('gardenScroller');
+      var ground = document.getElementById('gardenGround');
+      if (!view || !scroller || !ground) return;
       var name = gardenViewSekkiName || getCurrentSekki().name;
       var illustrated = GARDEN_BACKGROUNDS[name] || GARDEN_BACKGROUNDS[getSeasonOfSekki(name)];
-      var img = illustrated || SEKKI_IMAGES[name];
-      view.style.backgroundImage = img
-        ? (illustrated
-            ? 'url("' + img + '")'
-            : 'linear-gradient(rgba(253,253,253,0.08), rgba(253,253,253,0.08)), url("' + img + '")')
-        : 'linear-gradient(180deg,#eef3f7,#dfe8ef)';
+      var src = illustrated || SEKKI_IMAGES[name];
+      // viewは無地フォールバック。背景本体は横スクロールするground側に敷く
+      view.style.backgroundImage = 'linear-gradient(180deg,#eef3f7,#dfe8ef)';
       var title = document.getElementById('gardenTitle');
       if (title) title.textContent = 'じぶんの庭 〜' + name + (name === getCurrentSekki().name ? '（いま）' : '') + '〜';
-      renderGardenItems();
+
+      if (!src) {
+        ground.style.backgroundImage = '';
+        ground.style.width = '100%';
+        renderGardenItems();
+        return;
+      }
+      // 画像のアスペクト比から庭の幅を決める。横長の絵なら画面高さ基準で
+      // 2〜3画面ぶんに広がり、縦長の写真フォールバックならmin-width:100%で従来通り。
+      // ページ送り連打で古い画像のonloadが後着しないよう、対象の節気名を照合する。
+      var loadingFor = name;
+      var probe = new Image();
+      probe.onload = function () {
+        if (loadingFor !== (gardenViewSekkiName || getCurrentSekki().name)) return;
+        var aspect = probe.naturalWidth / probe.naturalHeight;
+        var width = Math.max(scroller.clientWidth, Math.round(scroller.clientHeight * aspect));
+        ground.style.width = width + 'px';
+        ground.style.backgroundImage = illustrated
+          ? 'url("' + src + '")'
+          : 'linear-gradient(rgba(253,253,253,0.08), rgba(253,253,253,0.08)), url("' + src + '")';
+        renderGardenItems();
+        // 初期位置は庭の中央
+        scroller.scrollLeft = Math.max(0, (width - scroller.clientWidth) / 2);
+      };
+      probe.onerror = function () {
+        if (loadingFor !== (gardenViewSekkiName || getCurrentSekki().name)) return;
+        ground.style.backgroundImage = '';
+        ground.style.width = '100%';
+        renderGardenItems();
+      };
+      probe.src = src;
     }
 
     function renderGardenItems() {
