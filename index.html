@@ -1021,9 +1021,11 @@
       -webkit-user-drag: none;
       -webkit-touch-callout: none;
     }
-    /* 本物の建物画像はフチまで絵なので、足元アンカーに絵の底辺を合わせる */
+    /* 本物の建物画像: 要素の底辺中央=アンカー（フットプリント中心）。
+       絵の底の頂点はimg側のtranslateでフットプリントの底へ落とす（buildMachiItemEl参照） */
     .machi-item.has-img {
-      transform: translate(-50%, -94%);
+      transform: translate(-50%, -100%);
+      transform-origin: 50% 100%;
     }
     /* 長押しで「持ち上がった」状態。少し浮いて大きくなる */
     .machi-item.dragging {
@@ -1033,7 +1035,7 @@
       filter: drop-shadow(0 10px 14px rgba(31, 47, 61, 0.45));
     }
     .machi-item.has-img.dragging {
-      transform: translate(-50%, -101%) scale(1.06);
+      transform: translate(-50%, calc(-100% - 8px)) scale(1.04);
     }
     #machiCellHighlight {
       position: absolute;
@@ -4902,7 +4904,10 @@
 
     var MACHI_ITEM_CATALOG = [
       // スターター（抽選に出ない。最初から街の中心にある）
-      { type: 'home', name: '自宅', emoji: '🏠', w: 2, h: 2, starter: true, img: 'img/machi/home.webp' },
+      // imgScale: 表示幅 = tileW×w×imgScale（絵の底辺ダイヤがフットプリント幅に合うよう実測から算出）
+      // imgBaseX: 絵の「底の頂点」のX位置（画像幅に対する割合。実測値）
+      // imgFringe: 白フチの厚みぶん絵を沈める補正（画像幅に対する割合）
+      { type: 'home', name: '自宅', emoji: '🏠', w: 2, h: 2, starter: true, img: 'img/machi/home.webp', imgScale: 1.12, imgBaseX: 0.586, imgFringe: 0.014 },
       // 無料（1×1）
       { type: 'konbini', name: 'コンビニ', emoji: '🏪', w: 1, h: 1 },
       { type: 'mansion', name: 'マンション', emoji: '🏢', w: 1, h: 1 },
@@ -5385,12 +5390,17 @@
       el.className = 'machi-item' + (item.type === 'home' ? ' machi-home' : '');
       if (entry.img) {
         // 本物の建物画像がある場合はそれを描画（無ければ絵文字プレースホルダー）。
-        // 幅はフットプリント（マスw個ぶんのダイヤ幅）に合わせる
+        // 位置合わせ: elのアンカーはフットプリント中心。画像は「絵の底辺ダイヤの底の頂点」が
+        // フットプリントの底の頂点（中心のtileH×h/2下）に来るよう、実測メタデータでずらす
         var buildingImg = document.createElement('img');
         buildingImg.src = entry.img;
         buildingImg.alt = entry.name;
         buildingImg.draggable = false;
-        buildingImg.style.width = Math.round(iso.tileW * entry.w) + 'px';
+        var dispW = Math.round(iso.tileW * entry.w * (entry.imgScale || 1));
+        buildingImg.style.width = dispW + 'px';
+        var baseX = (entry.imgBaseX != null ? entry.imgBaseX : 0.5);
+        var dropY = Math.round(iso.tileH * entry.h / 2 + dispW * (entry.imgFringe || 0));
+        buildingImg.style.transform = 'translate(' + ((0.5 - baseX) * 100).toFixed(2) + '%, ' + dropY + 'px)';
         el.appendChild(buildingImg);
         el.classList.add('has-img');
       } else {
