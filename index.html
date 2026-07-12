@@ -720,6 +720,43 @@
       line-height: 1.5;
       resize: vertical;
     }
+    /* 一週間の目標バー。決定後はその週の間ずっと固定表示 */
+    .week-goal-bar {
+      margin: 0.35rem 1rem;
+      text-align: center;
+    }
+    .week-goal-bar:empty {
+      display: none;
+    }
+    .week-goal-text {
+      display: inline-block;
+      max-width: 100%;
+      box-sizing: border-box;
+      padding: 0.32rem 0.75rem;
+      background: rgba(255, 255, 255, 0.5);
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      border-radius: 999px;
+      color: #22313f;
+      font-size: 0.8rem;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+    .week-goal-input {
+      width: 58%;
+      max-width: 300px;
+      box-sizing: border-box;
+      padding: 0.38rem 0.55rem;
+      border: 1px solid rgba(139, 156, 173, 0.5);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.8);
+      font-size: 0.8rem;
+    }
+    .week-goal-bar .btn-outline {
+      padding: 0.35rem 0.7rem;
+      font-size: 0.78rem;
+    }
     .mobile-week-strip {
       margin: 0.75rem 0.55rem 0.35rem;
       overflow-x: auto;
@@ -999,6 +1036,13 @@
         margin: 0 !important;
         padding: 0.4rem 0.2rem;
         font-size: 0.76rem;
+      }
+      body.week-mobile-shell .week-goal-bar {
+        flex: 0 0 auto;
+        margin: 0.05rem 0 0.25rem;
+      }
+      body.week-mobile-shell .week-goal-text {
+        font-size: 0.74rem;
       }
       .mobile-collapse-toggle {
         display: flex;
@@ -1462,6 +1506,8 @@
       <!-- 今週に戻るボタン -->
       <button id="currentWeekBtn" type="button" style="margin-left:0.5rem;">今週へ</button>
     </div>
+    <!-- 一週間の目標。未設定なら決定ボタン、設定済みなら固定表示（その週は変更不可） -->
+    <div id="weekGoalBar" class="week-goal-bar"></div>
     <section id="weekDayPanel" class="week-day-panel" hidden>
       <div class="week-day-panel-header">
         <div>
@@ -1682,6 +1728,9 @@
       if (diaryMatch) return { type: 'days', iso: diaryMatch[1] };
       var summaryMatch = key.match(/^weekly-summary-(\d{4}-\d{2}-\d{2})$/);
       if (summaryMatch) return { type: 'weeklySummaries', iso: summaryMatch[1] };
+      // 一週間の目標も weeklySummaries/{iso} ドキュメントの goal フィールドに相乗りさせる
+      var goalMatch = key.match(/^weekly-goal-(\d{4}-\d{2}-\d{2})$/);
+      if (goalMatch) return { type: 'weeklySummaries', iso: goalMatch[1] };
       return null;
     }
 
@@ -1745,7 +1794,12 @@
       });
       Object.keys(cloudSyncDirty.weeklySummaries).forEach(function (iso) {
         delete cloudSyncDirty.weeklySummaries[iso];
-        window.appDb.pushWeeklySummary(uid, iso, localStorage.getItem('weekly-summary-' + iso) || '').catch(function () {});
+        window.appDb.pushWeeklySummary(
+          uid,
+          iso,
+          localStorage.getItem('weekly-summary-' + iso) || '',
+          localStorage.getItem('weekly-goal-' + iso) || ''
+        ).catch(function () {});
       });
     }
 
@@ -1802,7 +1856,9 @@
           if (day.diary != null) localStorage.setItem(iso + '-diary', day.diary);
         });
         Object.keys(cloud.weeklySummaries || {}).forEach(function (iso) {
-          localStorage.setItem('weekly-summary-' + iso, cloud.weeklySummaries[iso] || '');
+          var weekData = cloud.weeklySummaries[iso] || {};
+          localStorage.setItem('weekly-summary-' + iso, weekData.text || '');
+          if (weekData.goal) localStorage.setItem('weekly-goal-' + iso, weekData.goal);
         });
 
         // header-subN由来の見出しを反映（教材が割り当たっている列は直後のloadMaterials()で上書きされる。
@@ -3273,6 +3329,82 @@
       if (modal) modal.style.display = 'none';
     }
 
+    // ---- 一週間の目標 ----
+    // 保存キーは weekly-goal-<週開始ISO>。週の区切りは設定の「週の始まり」に合わせる
+    // （週表・週の振り返りと同じ基準）。一度決めたらその週の目標は変更できない。
+    function renderWeekGoal() {
+      var bar = document.getElementById('weekGoalBar');
+      if (!bar) return;
+      var weekISO = window.currentWeekStartISO;
+      if (!weekISO) return;
+      var goal = localStorage.getItem('weekly-goal-' + weekISO);
+      bar.innerHTML = '';
+      if (goal && goal.trim()) {
+        var label = document.createElement('span');
+        label.className = 'week-goal-text';
+        label.textContent = '🎯 ' + goal.trim();
+        bar.appendChild(label);
+        return;
+      }
+      // 過去の週にさかのぼって目標は立てられない（決めた瞬間から守るものなので）。
+      // 表示中の週が今週以降のときだけ決定ボタンを出す。
+      var today = new Date();
+      today.setHours(0, 0, 0, 0);
+      var diff = (today.getDay() - getWeekStartDay() + 7) % 7;
+      var thisWeekStart = new Date(today);
+      thisWeekStart.setDate(today.getDate() - diff);
+      if (weekISO < toLocalISO(thisWeekStart)) return;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-outline';
+      btn.textContent = '🎯 この週の目標を決める';
+      btn.addEventListener('click', function () {
+        openWeekGoalEditor(bar, weekISO);
+      });
+      bar.appendChild(btn);
+    }
+
+    // 目標の入力欄と決定ボタンを表示する。決定時にconfirmで念押ししてから保存する。
+    function openWeekGoalEditor(bar, weekISO) {
+      bar.innerHTML = '';
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'week-goal-input';
+      input.placeholder = '例: 民法を6章まで進める';
+      input.maxLength = 60;
+      var okBtn = document.createElement('button');
+      okBtn.type = 'button';
+      okBtn.textContent = '決定';
+      okBtn.style.marginLeft = '0.4rem';
+      okBtn.addEventListener('click', function () {
+        var value = input.value.trim();
+        if (!value) {
+          input.focus();
+          return;
+        }
+        // 二重チェック: すでに設定済みなら上書きしない（別タブで先に決めた場合など）
+        var key = 'weekly-goal-' + weekISO;
+        var existing = localStorage.getItem(key);
+        if (!existing || !existing.trim()) {
+          if (!confirm('この目標で決定しますか？\nこの週の目標は後から変更できません。\n\n「' + value + '」')) return;
+          localStorage.setItem(key, value);
+        }
+        renderWeekGoal();
+      });
+      var cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'btn-outline';
+      cancelBtn.textContent = 'やめる';
+      cancelBtn.style.marginLeft = '0.4rem';
+      cancelBtn.addEventListener('click', function () {
+        renderWeekGoal();
+      });
+      bar.appendChild(input);
+      bar.appendChild(okBtn);
+      bar.appendChild(cancelBtn);
+      input.focus();
+    }
+
     // ---- ○✕のきろく（週ごと・月ごとの集計モーダル） ----
     // localStorageの YYYY-MM-DD-subN-content / -status を走査して日別の件数を集める。
     // 集計対象は科目1〜7のみ（8列目の感想・振り返りは予定ではないので数えない）。
@@ -3713,6 +3845,8 @@
         })();
         renderWeekDayPanel(todayInWeek ? todayISO : window.currentWeekStartISO, { keepClosed: true });
       }
+      // 一週間の目標バーの描画（週送りのたびにその週の目標を出す）
+      renderWeekGoal();
       // 一週間の振り返り欄の読み込みと保存イベントの更新
       var weeklySummaryEl = document.getElementById('weeklySummary');
       if (weeklySummaryEl) {
@@ -5202,9 +5336,9 @@
       if (!firestoreDbInstance) return Promise.resolve();
       return setDoc(dayDocRef(uid, iso), data, { merge: true });
     }
-    function pushWeeklySummary(uid, iso, text) {
+    function pushWeeklySummary(uid, iso, text, goal) {
       if (!firestoreDbInstance) return Promise.resolve();
-      return setDoc(weeklySummaryDocRef(uid, iso), { text: text }, { merge: true });
+      return setDoc(weeklySummaryDocRef(uid, iso), { text: text, goal: goal || '' }, { merge: true });
     }
 
     // uidに紐づくsettings/materials/days/weeklySummariesを全て取得する。
@@ -5224,7 +5358,10 @@
         var days = {};
         daysSnap.forEach(function (d) { days[d.id] = d.data(); });
         var weeklySummaries = {};
-        summariesSnap.forEach(function (d) { weeklySummaries[d.id] = (d.data() || {}).text || ''; });
+        summariesSnap.forEach(function (d) {
+          var data = d.data() || {};
+          weeklySummaries[d.id] = { text: data.text || '', goal: data.goal || '' };
+        });
         return {
           empty: !settingsSnap.exists() && !materialsSnap.exists() && daysSnap.empty && summariesSnap.empty,
           settings: settingsSnap.exists() ? settingsSnap.data() : null,
