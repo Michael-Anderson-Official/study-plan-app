@@ -970,6 +970,41 @@
       text-overflow: ellipsis;
       box-shadow: 0 3px 12px rgba(31, 47, 61, 0.25);
     }
+    /* じぶんのまち（グリッド）。庭（z-index:44）より下にして、
+       自宅タップで開いた庭が街の上に重なるようにする */
+    .machi-view {
+      z-index: 43;
+      background: linear-gradient(180deg, #eaf3e6, #dcebd5);
+    }
+    .machi-ground {
+      position: relative;
+      /* マス目（背景イラストが入るまでの暫定表示） */
+      background-image:
+        linear-gradient(to right, rgba(100, 130, 100, 0.16) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(100, 130, 100, 0.16) 1px, transparent 1px);
+      background-color: #cfe3c2;
+    }
+    .machi-item {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      filter: drop-shadow(0 2px 4px rgba(31, 47, 61, 0.3));
+    }
+    .machi-item.dragging {
+      cursor: grabbing;
+      z-index: 5;
+      filter: drop-shadow(0 6px 10px rgba(31, 47, 61, 0.45));
+    }
+    .machi-item.machi-home {
+      background: rgba(255, 253, 241, 0.4);
+      border-radius: 10px;
+    }
     /* アイテム獲得トースト */
     .garden-award-toast {
       position: fixed;
@@ -1590,6 +1625,7 @@
     <button id="materialsBtn" type="button">📚 教材追加</button>
     <button id="statsBtn" type="button">📊 ○✕のきろく</button>
     <button id="gardenBtn" type="button">🏡 じぶんの庭</button>
+    <button id="machiBtn" type="button">🏙 じぶんのまち</button>
   </div>
   <button id="notifBellBtn" type="button" class="notif-bell-btn" aria-label="未チェックの通知">🔔<span id="notifBellBadge" class="notif-bell-badge" style="display:none;"></span></button>
   <h1>一週間の計画帳</h1>
@@ -2042,12 +2078,31 @@
     </div>
   </div>
 
-  <!-- アイテム獲得トースト（その日の予定を全部○にしたとき） -->
-  <div id="gardenAwardToast" class="garden-award-toast" style="display:none;">
-    <p id="gardenAwardText" class="garden-award-text"></p>
+  <!-- じぶんのまち（グリッド配置）。自宅タップで庭へ -->
+  <div id="machiView" class="garden-view machi-view" style="display:none;">
+    <div class="garden-header">
+      <div>
+        <h2 class="garden-title">じぶんのまち</h2>
+        <p id="machiCount" class="garden-count"></p>
+      </div>
+      <div class="garden-header-actions">
+        <button id="machiCloseBtn" type="button" class="garden-close-btn" aria-label="閉じる">×</button>
+      </div>
+    </div>
+    <div id="machiScroller" class="garden-scroller">
+      <div id="machiGround" class="machi-ground"></div>
+    </div>
+    <p class="garden-hint">建物はドラッグでマス目に置けます。🏠をタップすると庭へ。</p>
+    <div id="machiItemInfo" class="garden-item-info" style="display:none;"></div>
+  </div>
+
+  <!-- ごほうびステッカー獲得トースト（庭に置くか街に置くかを選ぶ） -->
+  <div id="awardChoiceToast" class="garden-award-toast" style="display:none;">
+    <p class="garden-award-text">🎉 今日の予定を全部やりきった！ごほうびのステッカーをどこに置く？</p>
     <div class="garden-award-actions">
-      <button id="gardenAwardOpenBtn" type="button">庭に置く</button>
-      <button id="gardenAwardCloseBtn" type="button" class="btn-outline">あとで</button>
+      <button id="awardChoiceGardenBtn" type="button">🌸 庭に置く</button>
+      <button id="awardChoiceMachiBtn" type="button">🏙 街に置く</button>
+      <button id="awardChoiceLaterBtn" type="button" class="btn-outline">あとで</button>
     </div>
   </div>
 
@@ -2163,7 +2218,8 @@
         key === 'device-id' ||
         key.indexOf('today-trivia-') === 0
       ) return null;
-      if (key === 'weekStart' || key === 'notify-time' || key === 'google-calendar-ids' || key === 'garden-items' || /^header-sub[1-8]$/.test(key)) {
+      if (key === 'weekStart' || key === 'notify-time' || key === 'google-calendar-ids' || key === 'garden-items' ||
+          key === 'machi-items' || key === 'award-choice-garden' || key === 'award-choice-machi' || /^header-sub[1-8]$/.test(key)) {
         return { type: 'settings' };
       }
       if (key === 'materials-list' || key === 'material-details') {
@@ -2213,6 +2269,9 @@
           notifyTime: localStorage.getItem('notify-time'),
           googleCalendarIds: localStorage.getItem('google-calendar-ids'),
           gardenItems: localStorage.getItem('garden-items'),
+          machiItems: localStorage.getItem('machi-items'),
+          awardChoiceGarden: localStorage.getItem('award-choice-garden'),
+          awardChoiceMachi: localStorage.getItem('award-choice-machi'),
           headerSub1: localStorage.getItem('header-sub1'),
           headerSub2: localStorage.getItem('header-sub2'),
           headerSub3: localStorage.getItem('header-sub3'),
@@ -2283,6 +2342,9 @@
           if (s.notifyTime != null) localStorage.setItem('notify-time', s.notifyTime);
           if (s.googleCalendarIds != null) localStorage.setItem('google-calendar-ids', s.googleCalendarIds);
           if (s.gardenItems != null) localStorage.setItem('garden-items', s.gardenItems);
+          if (s.machiItems != null) localStorage.setItem('machi-items', s.machiItems);
+          if (s.awardChoiceGarden != null) localStorage.setItem('award-choice-garden', s.awardChoiceGarden);
+          if (s.awardChoiceMachi != null) localStorage.setItem('award-choice-machi', s.awardChoiceMachi);
           for (var n = 1; n <= 8; n++) {
             var v = s['headerSub' + n];
             if (v != null) localStorage.setItem('header-sub' + n, v);
@@ -3354,17 +3416,28 @@
       var gardenNextBtn = document.getElementById('gardenNextBtn');
       if (gardenPrevBtn) gardenPrevBtn.addEventListener('click', function () { stepGardenPage(-1); });
       if (gardenNextBtn) gardenNextBtn.addEventListener('click', function () { stepGardenPage(1); });
-      var gardenAwardOpenBtn = document.getElementById('gardenAwardOpenBtn');
-      if (gardenAwardOpenBtn) {
-        gardenAwardOpenBtn.addEventListener('click', function () {
-          hideGardenAwardToast();
-          openGardenView();
+      // じぶんのまちの開閉
+      var machiBtn = document.getElementById('machiBtn');
+      if (machiBtn) {
+        machiBtn.addEventListener('click', function () {
+          openMachiView();
         });
       }
-      var gardenAwardCloseBtn = document.getElementById('gardenAwardCloseBtn');
-      if (gardenAwardCloseBtn) {
-        gardenAwardCloseBtn.addEventListener('click', hideGardenAwardToast);
+      var machiCloseBtn = document.getElementById('machiCloseBtn');
+      if (machiCloseBtn) {
+        machiCloseBtn.addEventListener('click', function () {
+          var view = document.getElementById('machiView');
+          if (view) view.style.display = 'none';
+        });
       }
+
+      // ごほうびステッカーの2択トースト
+      var awardChoiceGardenBtn = document.getElementById('awardChoiceGardenBtn');
+      var awardChoiceMachiBtn = document.getElementById('awardChoiceMachiBtn');
+      var awardChoiceLaterBtn = document.getElementById('awardChoiceLaterBtn');
+      if (awardChoiceGardenBtn) awardChoiceGardenBtn.addEventListener('click', function () { chooseAwardCanvas('garden'); });
+      if (awardChoiceMachiBtn) awardChoiceMachiBtn.addEventListener('click', function () { chooseAwardCanvas('machi'); });
+      if (awardChoiceLaterBtn) awardChoiceLaterBtn.addEventListener('click', hideAwardChoiceToast);
       // ステッカー帳の開閉
       var stickerBookBtn = document.getElementById('stickerBookBtn');
       var stickerBookModal = document.getElementById('stickerBookModal');
@@ -3503,6 +3576,16 @@
         maybeShowOnboarding();
         // バックアップ促しはFirebase認証の判定を待ってから（サインイン済みなら出さない）
         setTimeout(maybeShowBackupNudge, 3500);
+        // 未選択のごほうびステッカーが今日の分なら再提示する（古い日付は破棄）
+        var pendingAward = localStorage.getItem('award-pending');
+        if (pendingAward) {
+          var todayForAward = toLocalISO(new Date());
+          if (pendingAward === todayForAward && dayFullyDone(todayForAward) && !hasAwardForDate(todayForAward)) {
+            showAwardChoiceToast();
+          } else if (pendingAward !== todayForAward) {
+            localStorage.removeItem('award-pending');
+          }
+        }
     });
     // DOMContentLoaded 用のクロージャを削除したため閉じカッコは不要になりました。
 
@@ -4395,15 +4478,59 @@
       localStorage.setItem('garden-items', JSON.stringify(items));
     }
 
-    // その日の予定をその日のうちに全部○にしたか判定し、条件を満たせばアイテムを1個授与する
-    function maybeAwardGardenItem(iso) {
-      // 過去日への遡り○では出ない（きろく・進捗表には反映されるが、庭は「今日をやりきった」報酬）
-      if (iso !== toLocalISO(new Date())) return;
+    // ---- ごほうびステッカーの獲得（庭/街の2択） ----
+    // その日の予定をその日のうちに全部○にすると1枚獲得（庭・街あわせて1日1枚）。
+    // どちらのキャンバスに置くかをユーザーが選び、選ばれた側のプールから抽選する
+    // （どちらが人気かはカウンタで計測）。選ぶ前にアプリを閉じても award-pending に
+    // 日付が残り、次回起動時に再提示する。
+    function dayFullyDone(iso) {
       var stats = getDayTaskStats(iso);
-      if (stats.total === 0 || stats.done !== stats.total) return;
+      return stats.total > 0 && stats.done === stats.total;
+    }
+
+    function hasAwardForDate(iso) {
+      return loadGardenItems().some(function (it) { return it.earnedDate === iso; }) ||
+        loadMachiItems().some(function (it) { return it.earnedDate === iso; });
+    }
+
+    function maybeAwardSticker(iso) {
+      // 過去日への遡り○では出ない（きろく・進捗表には反映される。ごほうびは「今日をやりきった」報酬）
+      if (iso !== toLocalISO(new Date())) return;
+      if (!dayFullyDone(iso)) return;
+      if (hasAwardForDate(iso)) return;
+      localStorage.setItem('award-pending', iso);
+      showAwardChoiceToast();
+    }
+
+    function showAwardChoiceToast() {
+      var toast = document.getElementById('awardChoiceToast');
+      if (toast) toast.style.display = 'flex';
+    }
+
+    function hideAwardChoiceToast() {
+      var toast = document.getElementById('awardChoiceToast');
+      if (toast) toast.style.display = 'none';
+    }
+
+    // 獲得の2択が確定したとき。canvas は 'garden' | 'machi'
+    function chooseAwardCanvas(canvas) {
+      var iso = localStorage.getItem('award-pending');
+      hideAwardChoiceToast();
+      if (!iso) return;
+      localStorage.removeItem('award-pending');
+      if (hasAwardForDate(iso)) return;
+      // 人気計測: どちらが選ばれているかを数える
+      var counterKey = canvas === 'machi' ? 'award-choice-machi' : 'award-choice-garden';
+      localStorage.setItem(counterKey, String(parseInt(localStorage.getItem(counterKey) || '0', 10) + 1));
+      if (canvas === 'machi') {
+        awardMachiSticker(iso);
+      } else {
+        awardGardenSticker(iso);
+      }
+    }
+
+    function awardGardenSticker(iso) {
       var items = loadGardenItems();
-      // 1日1個まで。○→✕→○を繰り返しても重複獲得しない（没収もしない）
-      if (items.some(function (it) { return it.earnedDate === iso; })) return;
       var sekki = getCurrentSekki();
       var season = getSeasonOfSekki(sekki.name);
       var pool = GARDEN_ITEM_CATALOG.filter(function (it) {
@@ -4411,31 +4538,19 @@
       });
       if (!pool.length) pool = GARDEN_ITEM_CATALOG.filter(function (it) { return !it.premium || isPremiumUser(); });
       var picked = pool[Math.floor(Math.random() * pool.length)];
-      items.push({
+      var newItem = {
         uid: 'g' + Date.now(),
         type: picked.type,
         earnedDate: iso,
         sekki: sekki.name,
         x: 15 + Math.random() * 70,
         y: 40 + Math.random() * 50
-      });
+      };
+      items.push(newItem);
       saveGardenItems(items);
-      showGardenAwardToast(picked);
-      var view = document.getElementById('gardenView');
-      if (view && view.style.display !== 'none') renderGardenItems();
-    }
-
-    function showGardenAwardToast(catalogItem) {
-      var toast = document.getElementById('gardenAwardToast');
-      var text = document.getElementById('gardenAwardText');
-      if (!toast || !text) return;
-      text.textContent = '🎉 今日の予定を全部やりきった！ ' + catalogItem.emoji + '「' + catalogItem.name + '」のステッカーを獲得しました。';
-      toast.style.display = 'flex';
-    }
-
-    function hideGardenAwardToast() {
-      var toast = document.getElementById('gardenAwardToast');
-      if (toast) toast.style.display = 'none';
+      // 獲得した瞬間を見せる: 庭を開いて新しいステッカーの思い出チップを表示
+      openGardenView();
+      showGardenItemInfo(newItem, picked);
     }
 
     // ---- 庭画面 ----
@@ -4618,6 +4733,10 @@
       loadGardenItems().forEach(function (item) {
         owned[item.type] = (owned[item.type] || 0) + 1;
       });
+      var machiOwned = {};
+      loadMachiItems().forEach(function (item) {
+        machiOwned[item.type] = (machiOwned[item.type] || 0) + 1;
+      });
       var seasonNames = { spring: '春（立春〜穀雨）', summer: '夏（立夏〜大暑）', autumn: '秋（立秋〜霜降）', winter: '冬（立冬〜大寒）' };
       ['spring', 'summer', 'autumn', 'winter'].forEach(function (season) {
         var head = document.createElement('p');
@@ -4655,6 +4774,40 @@
           listEl.appendChild(row);
         });
       });
+
+      // まちの建物ステッカー
+      var machiHead = document.createElement('p');
+      machiHead.className = 'sticker-book-season';
+      machiHead.textContent = 'まち';
+      listEl.appendChild(machiHead);
+      MACHI_ITEM_CATALOG.forEach(function (it) {
+        var row = document.createElement('div');
+        var locked = it.premium && !isPremiumUser();
+        row.className = 'sticker-book-row' + (locked ? ' locked' : '');
+        var emoji = document.createElement('span');
+        emoji.className = 'sticker-book-emoji';
+        emoji.textContent = it.emoji;
+        var name = document.createElement('span');
+        name.textContent = it.name + (it.w > 1 ? '（' + it.w + '×' + it.h + '）' : '');
+        row.appendChild(emoji);
+        row.appendChild(name);
+        if (it.starter) {
+          var starterBadge = document.createElement('span');
+          starterBadge.className = 'sticker-book-badge';
+          starterBadge.textContent = 'はじめから';
+          row.appendChild(starterBadge);
+        } else if (it.premium) {
+          var badge = document.createElement('span');
+          badge.className = 'sticker-book-badge';
+          badge.textContent = locked ? '🔒 プレミアム' : 'プレミアム';
+          row.appendChild(badge);
+        }
+        var count = document.createElement('span');
+        count.className = 'sticker-book-count';
+        count.textContent = machiOwned[it.type] ? (machiOwned[it.type] + '件') : (it.starter ? '' : '未獲得');
+        row.appendChild(count);
+        listEl.appendChild(row);
+      });
     }
 
     // タップで「いつ・どの節気に獲得したか」の思い出を表示する
@@ -4667,6 +4820,252 @@
       info.style.display = 'block';
       clearTimeout(showGardenItemInfo._timer);
       showGardenItemInfo._timer = setTimeout(function () {
+        info.style.display = 'none';
+      }, 3500);
+    }
+
+    // ---- じぶんのまち（グリッド配置） ----
+    // 詳細設計は MACHI_DESIGN.md。庭=自由配置（情緒）に対して、街=マス目（構造）。
+    // グリッド16列×10行。建物は1×1と2×2の2種類。自宅（2×2）は最初から中央にあり、
+    // タップすると庭に入る（庭は自宅の庭、という世界観）。データは 'machi-items'
+    // （{uid,type,earnedDate,col,row}）でFirestoreのapp/settingsに同期する。
+    var MACHI_GRID_COLS = 16;
+    var MACHI_GRID_ROWS = 10;
+
+    var MACHI_ITEM_CATALOG = [
+      // スターター（抽選に出ない。最初から街の中心にある）
+      { type: 'home', name: '自宅', emoji: '🏠', w: 2, h: 2, starter: true },
+      // 無料（1×1）
+      { type: 'konbini', name: 'コンビニ', emoji: '🏪', w: 1, h: 1 },
+      { type: 'mansion', name: 'マンション', emoji: '🏢', w: 1, h: 1 },
+      { type: 'hospital', name: '病院', emoji: '🏥', w: 1, h: 1 },
+      { type: 'park', name: '公園', emoji: '🌳', w: 1, h: 1 },
+      { type: 'sento', name: '銭湯', emoji: '♨️', w: 1, h: 1 },
+      { type: 'ramen', name: 'ラーメン屋', emoji: '🍜', w: 1, h: 1 },
+      { type: 'honya', name: '本屋', emoji: '📕', w: 1, h: 1 },
+      { type: 'school', name: '学校', emoji: '🏫', w: 1, h: 1 },
+      { type: 'post', name: '郵便局', emoji: '🏣', w: 1, h: 1 },
+      { type: 'koban', name: '交番', emoji: '🚓', w: 1, h: 1 },
+      { type: 'namiki', name: '桜並木', emoji: '🌷', w: 1, h: 1 },
+      { type: 'jihanki', name: '自動販売機', emoji: '🥤', w: 1, h: 1 },
+      // プレミアム（🔒、課金実装まで抽選に出ない）
+      { type: 'tokyo-tower', name: '東京タワー', emoji: '🗼', w: 2, h: 2, premium: true },
+      { type: 'skytree', name: 'スカイツリー', emoji: '🌃', w: 2, h: 2, premium: true },
+      { type: 'kaminarimon', name: '雷門', emoji: '⛩️', w: 2, h: 2, premium: true },
+      { type: 'ferris-wheel', name: '観覧車', emoji: '🎡', w: 2, h: 2, premium: true },
+      { type: 'castle', name: '城', emoji: '🏯', w: 2, h: 2, premium: true },
+      { type: 'station', name: '新幹線の駅', emoji: '🚅', w: 2, h: 2, premium: true }
+    ];
+
+    function machiCatalogEntry(type) {
+      for (var i = 0; i < MACHI_ITEM_CATALOG.length; i++) {
+        if (MACHI_ITEM_CATALOG[i].type === type) return MACHI_ITEM_CATALOG[i];
+      }
+      return null;
+    }
+
+    function loadMachiItems() {
+      try {
+        var parsed = JSON.parse(localStorage.getItem('machi-items') || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveMachiItems(items) {
+      localStorage.setItem('machi-items', JSON.stringify(items));
+    }
+
+    // 自宅がまだ無ければ中央に建てる（初回のみ）。撤去は不可、移動は可。
+    function ensureMachiHome() {
+      var items = loadMachiItems();
+      if (items.some(function (it) { return it.type === 'home'; })) return items;
+      items.push({ uid: 'home', type: 'home', earnedDate: null, col: 7, row: 4 });
+      saveMachiItems(items);
+      return items;
+    }
+
+    // 占有マスの集合を作る（"col,row" の文字列キー）
+    function machiOccupiedCells(items, excludeUid) {
+      var occupied = {};
+      items.forEach(function (it) {
+        if (it.uid === excludeUid) return;
+        var entry = machiCatalogEntry(it.type) || { w: 1, h: 1 };
+        for (var dc = 0; dc < (entry.w || 1); dc++) {
+          for (var dr = 0; dr < (entry.h || 1); dr++) {
+            occupied[(it.col + dc) + ',' + (it.row + dr)] = true;
+          }
+        }
+      });
+      return occupied;
+    }
+
+    // (col,row) に w×h の建物を置けるか（枠内かつ空きマスか）
+    function machiCanPlace(items, col, row, w, h, excludeUid) {
+      if (col < 0 || row < 0 || col + w > MACHI_GRID_COLS || row + h > MACHI_GRID_ROWS) return false;
+      var occupied = machiOccupiedCells(items, excludeUid);
+      for (var dc = 0; dc < w; dc++) {
+        for (var dr = 0; dr < h; dr++) {
+          if (occupied[(col + dc) + ',' + (row + dr)]) return false;
+        }
+      }
+      return true;
+    }
+
+    // 新しい建物の置き場所をランダムに探す（見つからなければnull）
+    function findMachiSpot(items, w, h) {
+      for (var attempt = 0; attempt < 200; attempt++) {
+        var col = Math.floor(Math.random() * (MACHI_GRID_COLS - w + 1));
+        var row = Math.floor(Math.random() * (MACHI_GRID_ROWS - h + 1));
+        if (machiCanPlace(items, col, row, w, h, null)) return { col: col, row: row };
+      }
+      return null;
+    }
+
+    function awardMachiSticker(iso) {
+      var items = ensureMachiHome();
+      var pool = MACHI_ITEM_CATALOG.filter(function (it) {
+        return !it.starter && (!it.premium || isPremiumUser());
+      });
+      var picked = pool[Math.floor(Math.random() * pool.length)];
+      var spot = findMachiSpot(items, picked.w, picked.h);
+      if (!spot) spot = { col: 0, row: 0 }; // 満杯時の保険（重なっても後で動かせる）
+      var newItem = {
+        uid: 'm' + Date.now(),
+        type: picked.type,
+        earnedDate: iso,
+        col: spot.col,
+        row: spot.row
+      };
+      items.push(newItem);
+      saveMachiItems(items);
+      openMachiView();
+      showMachiItemInfo(newItem, picked);
+    }
+
+    // ---- 街画面 ----
+    function openMachiView() {
+      ensureMachiHome();
+      // 先に表示してから描画する（非表示中はscrollerの高さが0でマスサイズが計算できない）
+      var view = document.getElementById('machiView');
+      if (view) view.style.display = 'flex';
+      renderMachiGrid();
+    }
+
+    function machiCellSize() {
+      var scroller = document.getElementById('machiScroller');
+      if (!scroller) return 48;
+      return Math.floor(scroller.clientHeight / MACHI_GRID_ROWS);
+    }
+
+    function renderMachiGrid() {
+      var ground = document.getElementById('machiGround');
+      var countEl = document.getElementById('machiCount');
+      var scroller = document.getElementById('machiScroller');
+      if (!ground || !scroller) return;
+      var cell = machiCellSize();
+      ground.style.width = (cell * MACHI_GRID_COLS) + 'px';
+      ground.style.height = (cell * MACHI_GRID_ROWS) + 'px';
+      // マス目を薄く描く（背景イラストが入るまでの暫定。入ったら配置モード時のみに変更予定）
+      ground.style.backgroundSize = cell + 'px ' + cell + 'px';
+      ground.innerHTML = '';
+      var items = loadMachiItems();
+      if (countEl) {
+        var buildings = items.filter(function (it) { return it.type !== 'home'; }).length;
+        countEl.textContent = buildings > 0 ? '建物 ' + buildings + '件' : 'まだ自宅だけの街。今日の予定を全部○にして「街に置く」を選ぶと建物が増えます。';
+      }
+      items.forEach(function (item) {
+        ground.appendChild(buildMachiItemEl(item, cell));
+      });
+      // 初期位置は自宅が見えるあたり（中央）
+      scroller.scrollLeft = Math.max(0, (cell * MACHI_GRID_COLS - scroller.clientWidth) / 2);
+    }
+
+    function buildMachiItemEl(item, cell) {
+      var entry = machiCatalogEntry(item.type) || { name: item.type, emoji: '🏗️', w: 1, h: 1 };
+      var el = document.createElement('div');
+      el.className = 'machi-item' + (item.type === 'home' ? ' machi-home' : '');
+      el.style.left = (item.col * cell) + 'px';
+      el.style.top = (item.row * cell) + 'px';
+      el.style.width = (entry.w * cell) + 'px';
+      el.style.height = (entry.h * cell) + 'px';
+      el.style.fontSize = (cell * (entry.w > 1 ? 1.4 : 0.72)) + 'px';
+      el.textContent = entry.emoji;
+
+      var dragging = false;
+      var moved = false;
+      var startLeft = 0, startTop = 0, startX = 0, startY = 0;
+      el.addEventListener('pointerdown', function (ev) {
+        dragging = true;
+        moved = false;
+        startLeft = parseFloat(el.style.left);
+        startTop = parseFloat(el.style.top);
+        startX = ev.clientX;
+        startY = ev.clientY;
+        el.classList.add('dragging');
+        el.setPointerCapture(ev.pointerId);
+        ev.preventDefault();
+      });
+      el.addEventListener('pointermove', function (ev) {
+        if (!dragging) return;
+        if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 6) moved = true;
+        el.style.left = (startLeft + ev.clientX - startX) + 'px';
+        el.style.top = (startTop + ev.clientY - startY) + 'px';
+      });
+      el.addEventListener('pointerup', function () {
+        if (!dragging) return;
+        dragging = false;
+        el.classList.remove('dragging');
+        if (!moved) {
+          // タップ: 自宅なら庭へ「帰宅」、それ以外は思い出チップ
+          el.style.left = startLeft + 'px';
+          el.style.top = startTop + 'px';
+          if (item.type === 'home') {
+            openGardenView();
+          } else {
+            showMachiItemInfo(item, entry);
+          }
+          return;
+        }
+        // ドラッグ: 一番近いマスへスナップ。置けない場所なら元に戻す
+        var items = loadMachiItems();
+        var col = Math.round(parseFloat(el.style.left) / cell);
+        var row = Math.round(parseFloat(el.style.top) / cell);
+        if (machiCanPlace(items, col, row, entry.w, entry.h, item.uid)) {
+          item.col = col;
+          item.row = row;
+          for (var i = 0; i < items.length; i++) {
+            if (items[i].uid === item.uid) {
+              items[i].col = col;
+              items[i].row = row;
+            }
+          }
+          saveMachiItems(items);
+          el.style.left = (col * cell) + 'px';
+          el.style.top = (row * cell) + 'px';
+        } else {
+          el.style.left = (item.col * cell) + 'px';
+          el.style.top = (item.row * cell) + 'px';
+        }
+      });
+      return el;
+    }
+
+    function showMachiItemInfo(item, entry) {
+      var info = document.getElementById('machiItemInfo');
+      if (!info) return;
+      var text = (entry ? entry.emoji + ' ' + entry.name : item.type);
+      if (item.earnedDate) {
+        var d = parseISOToDate(item.earnedDate);
+        text += '：' + (d.getMonth() + 1) + '月' + d.getDate() + '日にやりきった日の思い出';
+      } else {
+        text += '：はじめからある、じぶんの家。タップで庭へ';
+      }
+      info.textContent = text;
+      info.style.display = 'block';
+      clearTimeout(showMachiItemInfo._timer);
+      showMachiItemInfo._timer = setTimeout(function () {
         info.style.display = 'none';
       }, 3500);
     }
@@ -5670,8 +6069,8 @@
           var wasCircle = oldVal === 'circle';
           if (becameCircle && !wasCircle) {
             recordProgressFromDay(m[1], parseInt(m[2], 10));
-            // その日の予定を全部○にしていれば、庭のアイテムを1個授与する
-            maybeAwardGardenItem(m[1]);
+            // その日の予定を全部○にしていれば、ごほうびステッカー（庭/街の2択）を提示する
+            maybeAwardSticker(m[1]);
           } else if (!becameCircle && wasCircle) {
             unrecordProgressFromDay(m[1], parseInt(m[2], 10));
           }

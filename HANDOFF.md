@@ -203,6 +203,14 @@
   - **背景の生成プロンプトは横長（1536×1024）・俯瞰パノラマ構図に変更**してユーザーへ伝達。立春の絵は横長版で作り直し予定（現状の縦長bg-risshun.webpはそれまで暫定使用、coverで中央部分が表示される）。
   - 確認状況: ローカルPlaywright（横長テスト画像）でパン可能幅・中央開始・スクロール中ドラッグの座標保存・リロード後の位置・写真フォールバック・ページ送りを確認済み。実機のスワイプ感触は未確認。
 
+- 2026-07-12、**「じぶんのまち」の骨組みを前倒しで実装した**（ユーザー指示で庭完成前に着手。仕様はMACHI_DESIGN.md、画像は絵文字プレースホルダー）。
+  - **グリッドエンジン**: 16列×10行、建物は1×1/2×2（`MACHI_ITEM_CATALOG`: スターター自宅＋無料12種＋プレミアム6種）。ドラッグで自由に動かし、離すと最寄りマスへスナップ（`machiCanPlace`で枠内・占有判定、置けなければ差し戻し）。自宅（2×2）は初回に中央(7,4)へ自動配置（`ensureMachiHome`）、移動可・撤去不可、**タップすると庭が開く**（庭z-index:44＞街43で上に重なり、庭を閉じると街に戻る）。
+  - **獲得フローを2択化**: 旧`maybeAwardGardenItem`→`maybeAwardSticker`。全部○達成で`award-pending`に日付を保存し、2択トースト（`#awardChoiceToast`「🌸庭に置く/🏙街に置く/あとで」）を表示。選択で`chooseAwardCanvas()`→該当プールから抽選・配置・その画面を開いて思い出チップ表示。**庭・街あわせて1日1枚**（`hasAwardForDate`が両方を見る）。選択前に閉じてもload時に今日の分なら再提示（古いpendingは破棄）。人気計測カウンタ`award-choice-*`を加算。
+  - ステッカー帳に「まち」セクション追加（サイズ表記・スターター/プレミアムバッジ・所持件数）。マス目は背景イラストが無い間は常時表示（入ったら配置モード時のみに変える予定）。
+  - **直したバグ**: `openMachiView`が表示前に描画してマスサイズ0になる問題（表示→描画の順に修正）。庭と街のz-index重なり。
+  - 未実装（設計書のスコープ通り）: 街の背景イラスト、建物ステッカー画像、自宅アップグレード、季節スキン。
+  - 確認状況: ローカルPlaywright（スマホ幅）で2択トースト→街に配置→カウンタ→スナップ移動→占有差し戻し→自宅タップで庭→庭を閉じて街→同日再獲得なし、まで確認済み。実機未確認。
+
 ## 直近でCodexが変更した内容
 
 コード上確認できた事実:
@@ -245,6 +253,8 @@
 - 通知時刻: `notify-time`
 - 今日は何の日キャッシュ: `today-trivia-YYYY-MM-DD`
 - Googleカレンダー選択: `google-calendar-ids`
+- じぶんのまちの建物（2026-07-12追加）: `machi-items`（JSON配列 `{uid,type,earnedDate,col,row}`。グリッド16×10のマス番地）。獲得の人気計測: `award-choice-garden`/`award-choice-machi`（数値文字列）。3キームとも`app/settings`同期（`machiItems`/`awardChoiceGarden`/`awardChoiceMachi`フィールド）。
+- 未選択のごほうび: `award-pending`（ISO日付。庭/街の2択を選ぶ前にアプリを閉じた場合の再提示用。端末ローカルのみ・同期対象外）
 - じぶんの庭のアイテム（2026-07-12追加）: `garden-items`（JSON配列 `{uid,type,earnedDate,sekki,x,y}`。x/yは庭に対する%座標）。Firestore同期は`app/settings`ドキュメントの`gardenItems`フィールド。
 - Google access token一時保存: `google-token`
 - Googleカレンダー長期連携セッション: `google-calendar-session-id`、`google-calendar-session-secret`（端末ローカルのみ。Firestore同期対象外）
