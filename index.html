@@ -104,7 +104,8 @@
       transform: rotate(45deg);
     }
     /* 設定アイコン・設定モーダル */
-    .settings-icon-btn {
+    /* 左上のメニューボタン（☰）。設定・教材追加・○✕のきろくをまとめる */
+    .menu-icon-btn {
       position: fixed;
       top: 0.6rem;
       left: 0.6rem;
@@ -115,46 +116,42 @@
       background: rgba(255, 255, 255, 0.7);
       border: 1px solid rgba(255, 255, 255, 0.6);
       border-radius: 50%;
-      font-size: 1.2rem;
+      color: #33475b;
+      font-size: 1.15rem;
       line-height: 1;
       cursor: pointer;
     }
-    /* 教材追加ボタン。設定ボタンのすぐ右に並べる */
-    .materials-icon-btn {
+    .menu-dropdown {
       position: fixed;
-      top: 0.6rem;
-      left: 3.4rem;
-      z-index: 30;
-      width: 2.4rem;
-      height: 2.4rem;
-      padding: 0;
-      background: rgba(255, 255, 255, 0.7);
+      top: 3.3rem;
+      left: 0.6rem;
+      z-index: 35;
+      display: grid;
+      min-width: 11rem;
+      padding: 0.3rem;
+      background: rgba(255, 255, 255, 0.92);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.6);
-      border-radius: 50%;
-      font-size: 1.2rem;
-      line-height: 1;
-      cursor: pointer;
+      border-radius: 12px;
+      box-shadow: 0 6px 22px rgba(31, 47, 61, 0.25);
+    }
+    .menu-dropdown button {
+      padding: 0.65rem 0.8rem;
+      background: none;
+      color: #22313f;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      text-align: left;
+    }
+    .menu-dropdown button:hover {
+      background: rgba(88, 116, 145, 0.12);
     }
     .notif-bell-btn {
       position: fixed;
       top: 0.6rem;
       right: 0.6rem;
-      z-index: 30;
-      width: 2.4rem;
-      height: 2.4rem;
-      padding: 0;
-      background: rgba(255, 255, 255, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      border-radius: 50%;
-      font-size: 1.2rem;
-      line-height: 1;
-      cursor: pointer;
-    }
-    /* ○✕のきろくボタン。通知ベルのすぐ左に並べる */
-    .stats-icon-btn {
-      position: fixed;
-      top: 0.6rem;
-      right: 3.4rem;
       z-index: 30;
       width: 2.4rem;
       height: 2.4rem;
@@ -1173,9 +1170,13 @@
 </head>
 <body>
   <div id="seasonDecoration" aria-hidden="true"></div>
-  <button id="settingsBtn" type="button" class="settings-icon-btn" aria-label="設定">⚙️</button>
-  <button id="materialsBtn" type="button" class="materials-icon-btn" aria-label="教材追加">📚</button>
-  <button id="statsBtn" type="button" class="stats-icon-btn" aria-label="○✕のきろく">📊</button>
+  <!-- 左上のメニュー（☰）。通知ベル以外のヘッダー機能はここに統合 -->
+  <button id="menuBtn" type="button" class="menu-icon-btn" aria-label="メニュー">☰</button>
+  <div id="menuDropdown" class="menu-dropdown" style="display:none;">
+    <button id="settingsBtn" type="button">⚙️ 設定</button>
+    <button id="materialsBtn" type="button">📚 教材追加</button>
+    <button id="statsBtn" type="button">📊 ○✕のきろく</button>
+  </div>
   <button id="notifBellBtn" type="button" class="notif-bell-btn" aria-label="未チェックの通知">🔔<span id="notifBellBadge" class="notif-bell-badge" style="display:none;"></span></button>
   <h1>一週間の計画帳</h1>
   <p id="sekkiLabel" class="sekki-label"></p>
@@ -2577,6 +2578,24 @@
       document.body.classList.add('week-mobile-shell');
 
       // 設定アイコン・設定モーダルの開閉
+      // 左上メニュー（☰）の開閉。項目タップや画面の他の場所タップで閉じる
+      var menuBtn = document.getElementById('menuBtn');
+      var menuDropdown = document.getElementById('menuDropdown');
+      if (menuBtn && menuDropdown) {
+        menuBtn.addEventListener('click', function (event) {
+          event.stopPropagation();
+          menuDropdown.style.display = menuDropdown.style.display === 'none' ? 'grid' : 'none';
+        });
+        menuDropdown.addEventListener('click', function () {
+          menuDropdown.style.display = 'none';
+        });
+        document.addEventListener('click', function (event) {
+          if (menuDropdown.style.display !== 'none' && !menuDropdown.contains(event.target)) {
+            menuDropdown.style.display = 'none';
+          }
+        });
+      }
+
       var settingsBtn = document.getElementById('settingsBtn');
       var settingsModal = document.getElementById('settingsModal');
       var settingsCloseBtn = document.getElementById('settingsCloseBtn');
