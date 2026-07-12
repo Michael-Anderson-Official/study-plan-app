@@ -805,6 +805,134 @@
       color: #777;
       font-size: 0.8rem;
     }
+    /* じぶんの庭 */
+    .garden-view {
+      position: fixed;
+      inset: 0;
+      z-index: 44;
+      display: flex;
+      flex-direction: column;
+      background-size: cover;
+      background-position: center;
+    }
+    .garden-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex: 0 0 auto;
+      padding: 0.8rem 0.9rem 0.4rem;
+    }
+    .garden-title {
+      display: inline-block;
+      margin: 0;
+      padding: 0.3rem 0.7rem;
+      background: rgba(255, 255, 255, 0.55);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+      border-radius: 999px;
+      color: #22313f;
+      font-size: 1rem;
+    }
+    .garden-count {
+      display: inline-block;
+      margin: 0.3rem 0 0;
+      padding: 0.15rem 0.55rem;
+      background: rgba(255, 255, 255, 0.45);
+      border-radius: 999px;
+      color: #33475b;
+      font-size: 0.72rem;
+    }
+    .garden-close-btn {
+      width: 2.3rem;
+      height: 2.3rem;
+      padding: 0;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      color: #33475b;
+      font-size: 1.25rem;
+      line-height: 1;
+    }
+    .garden-ground {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .garden-item {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      font-size: 2.5rem;
+      line-height: 1;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      filter: drop-shadow(0 2px 4px rgba(31, 47, 61, 0.35));
+    }
+    .garden-item.dragging {
+      cursor: grabbing;
+      filter: drop-shadow(0 6px 10px rgba(31, 47, 61, 0.45));
+    }
+    .garden-hint {
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 0.4rem 0.9rem 0.9rem;
+      color: #fff;
+      font-size: 0.72rem;
+      text-align: center;
+      text-shadow: 0 1px 3px rgba(31, 47, 61, 0.6);
+    }
+    .garden-item-info {
+      position: absolute;
+      left: 50%;
+      bottom: 3.2rem;
+      transform: translateX(-50%);
+      max-width: 88%;
+      padding: 0.45rem 0.85rem;
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 999px;
+      color: #22313f;
+      font-size: 0.76rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      box-shadow: 0 3px 12px rgba(31, 47, 61, 0.25);
+    }
+    /* アイテム獲得トースト */
+    .garden-award-toast {
+      position: fixed;
+      left: 0.8rem;
+      right: 0.8rem;
+      bottom: 3.6rem;
+      z-index: 46;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-width: 26rem;
+      margin: 0 auto;
+      padding: 0.75rem 0.9rem;
+      background: rgba(255, 255, 255, 0.95);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 14px;
+      box-shadow: 0 8px 26px rgba(31, 47, 61, 0.3);
+    }
+    .garden-award-text {
+      margin: 0;
+      color: #22313f;
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+    .garden-award-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+    .garden-award-actions button {
+      padding: 0.38rem 0.85rem;
+      font-size: 0.8rem;
+    }
     /* バックアップ促しトースト */
     .backup-nudge {
       position: fixed;
@@ -1389,6 +1517,7 @@
     <button id="settingsBtn" type="button">⚙️ 設定</button>
     <button id="materialsBtn" type="button">📚 教材追加</button>
     <button id="statsBtn" type="button">📊 ○✕のきろく</button>
+    <button id="gardenBtn" type="button">🏡 じぶんの庭</button>
   </div>
   <button id="notifBellBtn" type="button" class="notif-bell-btn" aria-label="未チェックの通知">🔔<span id="notifBellBadge" class="notif-bell-badge" style="display:none;"></span></button>
   <h1>一週間の計画帳</h1>
@@ -1810,6 +1939,29 @@
     </div>
   </div>
 
+  <!-- じぶんの庭（Forest型モチベーター）。獲得アイテムをドラッグで自由配置する -->
+  <div id="gardenView" class="garden-view" style="display:none;">
+    <div class="garden-header">
+      <div>
+        <h2 id="gardenTitle" class="garden-title">じぶんの庭</h2>
+        <p id="gardenCount" class="garden-count"></p>
+      </div>
+      <button id="gardenCloseBtn" type="button" class="garden-close-btn" aria-label="閉じる">×</button>
+    </div>
+    <div id="gardenGround" class="garden-ground"></div>
+    <p class="garden-hint">アイテムはドラッグで好きな場所に置けます。タップで思い出を表示。</p>
+    <div id="gardenItemInfo" class="garden-item-info" style="display:none;"></div>
+  </div>
+
+  <!-- アイテム獲得トースト（その日の予定を全部○にしたとき） -->
+  <div id="gardenAwardToast" class="garden-award-toast" style="display:none;">
+    <p id="gardenAwardText" class="garden-award-text"></p>
+    <div class="garden-award-actions">
+      <button id="gardenAwardOpenBtn" type="button">庭に置く</button>
+      <button id="gardenAwardCloseBtn" type="button" class="btn-outline">あとで</button>
+    </div>
+  </div>
+
   <!-- 初回起動オンボーディング。教材が1件も無い初見ユーザーにだけ出す -->
   <div id="onboardingModal" class="settings-modal" style="display:none;">
     <div class="settings-panel onboarding-panel">
@@ -1922,7 +2074,7 @@
         key === 'device-id' ||
         key.indexOf('today-trivia-') === 0
       ) return null;
-      if (key === 'weekStart' || key === 'notify-time' || key === 'google-calendar-ids' || /^header-sub[1-8]$/.test(key)) {
+      if (key === 'weekStart' || key === 'notify-time' || key === 'google-calendar-ids' || key === 'garden-items' || /^header-sub[1-8]$/.test(key)) {
         return { type: 'settings' };
       }
       if (key === 'materials-list' || key === 'material-details') {
@@ -1971,6 +2123,7 @@
           weekStart: localStorage.getItem('weekStart'),
           notifyTime: localStorage.getItem('notify-time'),
           googleCalendarIds: localStorage.getItem('google-calendar-ids'),
+          gardenItems: localStorage.getItem('garden-items'),
           headerSub1: localStorage.getItem('header-sub1'),
           headerSub2: localStorage.getItem('header-sub2'),
           headerSub3: localStorage.getItem('header-sub3'),
@@ -2040,6 +2193,7 @@
           if (s.weekStart != null) localStorage.setItem('weekStart', s.weekStart);
           if (s.notifyTime != null) localStorage.setItem('notify-time', s.notifyTime);
           if (s.googleCalendarIds != null) localStorage.setItem('google-calendar-ids', s.googleCalendarIds);
+          if (s.gardenItems != null) localStorage.setItem('garden-items', s.gardenItems);
           for (var n = 1; n <= 8; n++) {
             var v = s['headerSub' + n];
             if (v != null) localStorage.setItem('header-sub' + n, v);
@@ -3092,6 +3246,32 @@
         });
       }
 
+      // じぶんの庭の開閉と獲得トースト
+      var gardenBtn = document.getElementById('gardenBtn');
+      if (gardenBtn) {
+        gardenBtn.addEventListener('click', function () {
+          openGardenView();
+        });
+      }
+      var gardenCloseBtn = document.getElementById('gardenCloseBtn');
+      if (gardenCloseBtn) {
+        gardenCloseBtn.addEventListener('click', function () {
+          var view = document.getElementById('gardenView');
+          if (view) view.style.display = 'none';
+        });
+      }
+      var gardenAwardOpenBtn = document.getElementById('gardenAwardOpenBtn');
+      if (gardenAwardOpenBtn) {
+        gardenAwardOpenBtn.addEventListener('click', function () {
+          hideGardenAwardToast();
+          openGardenView();
+        });
+      }
+      var gardenAwardCloseBtn = document.getElementById('gardenAwardCloseBtn');
+      if (gardenAwardCloseBtn) {
+        gardenAwardCloseBtn.addEventListener('click', hideGardenAwardToast);
+      }
+
       // 進捗表モーダルの閉じる操作
       var progressModalEl = document.getElementById('progressModal');
       var progressCloseBtn = document.getElementById('progressCloseBtn');
@@ -4024,6 +4204,201 @@
       });
       table.appendChild(tbody);
       wrap.appendChild(table);
+    }
+
+    // ---- じぶんの庭（Forest型モチベーター） ----
+    // その日の予定をその日のうちに全部○にすると、いまの季節のアイテムを1個獲得する。
+    // ルール: 1日1個まで／過去日への遡り○では出ない／獲得後の没収なし。
+    // アイテムは庭画面（☰→じぶんの庭）でドラッグして自由に配置できる（箱庭）。
+    // データはlocalStorage 'garden-items'（JSON配列 {uid,type,earnedDate,sekki,x,y}、
+    // x/yは庭に対する%座標）で、Firestoreのapp/settingsにも同期される。
+    // 画像は将来ChatGPT生成の透過PNGに差し替える想定（catalogにimgを足しemojiの代わりに描画）。
+    // 未実装TODO: 週の目標達成のレアアイテム（目標の達成判定UIが先に必要）。
+
+    var GARDEN_ITEM_CATALOG = [
+      { type: 'sakura', name: '桜の苗木', emoji: '🌸', season: 'spring' },
+      { type: 'butterfly', name: 'ちょうちょ', emoji: '🦋', season: 'spring' },
+      { type: 'tulip', name: 'チューリップ', emoji: '🌷', season: 'spring' },
+      { type: 'dango', name: '花見だんご', emoji: '🍡', season: 'spring' },
+      { type: 'uguisu', name: 'うぐいす', emoji: '🐦', season: 'spring' },
+      { type: 'suika', name: 'スイカ', emoji: '🍉', season: 'summer' },
+      { type: 'furin', name: '風鈴', emoji: '🎐', season: 'summer' },
+      { type: 'kakigori', name: 'かき氷', emoji: '🍧', season: 'summer' },
+      { type: 'himawari', name: 'ひまわり', emoji: '🌻', season: 'summer' },
+      { type: 'kaeru', name: 'カエル', emoji: '🐸', season: 'summer' },
+      { type: 'chochin', name: '提灯', emoji: '🏮', season: 'summer' },
+      { type: 'momiji', name: 'もみじ', emoji: '🍁', season: 'autumn' },
+      { type: 'tsukimi', name: '月見だんご', emoji: '🎑', season: 'autumn' },
+      { type: 'kinoko', name: 'きのこ', emoji: '🍄', season: 'autumn' },
+      { type: 'tanuki', name: 'たぬき', emoji: '🦝', season: 'autumn' },
+      { type: 'inaho', name: '稲穂', emoji: '🌾', season: 'autumn' },
+      { type: 'yukidaruma', name: '雪だるま', emoji: '⛄', season: 'winter' },
+      { type: 'mikan', name: 'こたつみかん', emoji: '🍊', season: 'winter' },
+      { type: 'penguin', name: 'ペンギン', emoji: '🐧', season: 'winter' },
+      { type: 'kadomatsu', name: '門松', emoji: '🎍', season: 'winter' },
+      { type: 'yukiusagi', name: '雪うさぎ', emoji: '🐇', season: 'winter' }
+    ];
+
+    // 節気名 → 季節。立春〜穀雨=春、立夏〜大暑=夏、立秋〜霜降=秋、立冬〜大寒=冬
+    function getSeasonOfSekki(name) {
+      if (['立春', '雨水', '啓蟄', '春分', '清明', '穀雨'].indexOf(name) >= 0) return 'spring';
+      if (['立夏', '小満', '芒種', '夏至', '小暑', '大暑'].indexOf(name) >= 0) return 'summer';
+      if (['立秋', '処暑', '白露', '秋分', '寒露', '霜降'].indexOf(name) >= 0) return 'autumn';
+      return 'winter';
+    }
+
+    function gardenCatalogEntry(type) {
+      for (var i = 0; i < GARDEN_ITEM_CATALOG.length; i++) {
+        if (GARDEN_ITEM_CATALOG[i].type === type) return GARDEN_ITEM_CATALOG[i];
+      }
+      return null;
+    }
+
+    function loadGardenItems() {
+      try {
+        var parsed = JSON.parse(localStorage.getItem('garden-items') || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveGardenItems(items) {
+      localStorage.setItem('garden-items', JSON.stringify(items));
+    }
+
+    // その日の予定をその日のうちに全部○にしたか判定し、条件を満たせばアイテムを1個授与する
+    function maybeAwardGardenItem(iso) {
+      // 過去日への遡り○では出ない（きろく・進捗表には反映されるが、庭は「今日をやりきった」報酬）
+      if (iso !== toLocalISO(new Date())) return;
+      var stats = getDayTaskStats(iso);
+      if (stats.total === 0 || stats.done !== stats.total) return;
+      var items = loadGardenItems();
+      // 1日1個まで。○→✕→○を繰り返しても重複獲得しない（没収もしない）
+      if (items.some(function (it) { return it.earnedDate === iso; })) return;
+      var sekki = getCurrentSekki();
+      var season = getSeasonOfSekki(sekki.name);
+      var pool = GARDEN_ITEM_CATALOG.filter(function (it) { return it.season === season; });
+      if (!pool.length) pool = GARDEN_ITEM_CATALOG;
+      var picked = pool[Math.floor(Math.random() * pool.length)];
+      items.push({
+        uid: 'g' + Date.now(),
+        type: picked.type,
+        earnedDate: iso,
+        sekki: sekki.name,
+        x: 15 + Math.random() * 70,
+        y: 40 + Math.random() * 50
+      });
+      saveGardenItems(items);
+      showGardenAwardToast(picked);
+      var view = document.getElementById('gardenView');
+      if (view && view.style.display !== 'none') renderGardenItems();
+    }
+
+    function showGardenAwardToast(catalogItem) {
+      var toast = document.getElementById('gardenAwardToast');
+      var text = document.getElementById('gardenAwardText');
+      if (!toast || !text) return;
+      text.textContent = '🎉 今日の予定を全部やりきった！ ' + catalogItem.emoji + '「' + catalogItem.name + '」を獲得しました。';
+      toast.style.display = 'flex';
+    }
+
+    function hideGardenAwardToast() {
+      var toast = document.getElementById('gardenAwardToast');
+      if (toast) toast.style.display = 'none';
+    }
+
+    // ---- 庭画面 ----
+    function openGardenView() {
+      var view = document.getElementById('gardenView');
+      if (!view) return;
+      var sekki = getCurrentSekki();
+      var img = SEKKI_IMAGES[sekki.name];
+      view.style.backgroundImage = img
+        ? 'linear-gradient(rgba(253,253,253,0.08), rgba(253,253,253,0.08)), url("' + img + '")'
+        : 'linear-gradient(180deg,#eef3f7,#dfe8ef)';
+      var title = document.getElementById('gardenTitle');
+      if (title) title.textContent = 'じぶんの庭 〜' + sekki.name + '〜';
+      renderGardenItems();
+      view.style.display = 'flex';
+    }
+
+    function renderGardenItems() {
+      var ground = document.getElementById('gardenGround');
+      var countEl = document.getElementById('gardenCount');
+      if (!ground) return;
+      ground.innerHTML = '';
+      var items = loadGardenItems();
+      if (countEl) countEl.textContent = items.length > 0 ? 'アイテム ' + items.length + '個' : 'まだアイテムがありません。今日の予定を全部○にすると1個もらえます。';
+      items.forEach(function (item) {
+        ground.appendChild(buildGardenItemEl(item));
+      });
+    }
+
+    // アイテム1個ぶんの要素。ドラッグで移動（%座標で保存）、タップで思い出を表示
+    function buildGardenItemEl(item) {
+      var catalogItem = gardenCatalogEntry(item.type);
+      var el = document.createElement('div');
+      el.className = 'garden-item';
+      el.textContent = catalogItem ? catalogItem.emoji : '🎁';
+      el.style.left = item.x + '%';
+      el.style.top = item.y + '%';
+
+      var dragging = false;
+      var moved = false;
+      el.addEventListener('pointerdown', function (ev) {
+        dragging = true;
+        moved = false;
+        el.classList.add('dragging');
+        el.setPointerCapture(ev.pointerId);
+        ev.preventDefault();
+      });
+      el.addEventListener('pointermove', function (ev) {
+        if (!dragging) return;
+        moved = true;
+        var ground = document.getElementById('gardenGround');
+        if (!ground) return;
+        var rect = ground.getBoundingClientRect();
+        var x = ((ev.clientX - rect.left) / rect.width) * 100;
+        var y = ((ev.clientY - rect.top) / rect.height) * 100;
+        item.x = Math.min(98, Math.max(2, x));
+        item.y = Math.min(98, Math.max(2, y));
+        el.style.left = item.x + '%';
+        el.style.top = item.y + '%';
+      });
+      el.addEventListener('pointerup', function () {
+        if (!dragging) return;
+        dragging = false;
+        el.classList.remove('dragging');
+        if (moved) {
+          // 配置を保存（loadGardenItemsの配列とは別インスタンスなので、uidで書き戻す）
+          var items = loadGardenItems();
+          for (var i = 0; i < items.length; i++) {
+            if (items[i].uid === item.uid) {
+              items[i].x = item.x;
+              items[i].y = item.y;
+            }
+          }
+          saveGardenItems(items);
+        } else {
+          showGardenItemInfo(item, catalogItem);
+        }
+      });
+      return el;
+    }
+
+    // タップで「いつ・どの節気に獲得したか」の思い出を表示する
+    function showGardenItemInfo(item, catalogItem) {
+      var info = document.getElementById('gardenItemInfo');
+      if (!info) return;
+      var d = parseISOToDate(item.earnedDate);
+      info.textContent = (catalogItem ? catalogItem.emoji + ' ' + catalogItem.name : item.type) +
+        '：' + (d.getMonth() + 1) + '月' + d.getDate() + '日（' + (item.sekki || '') + '）にやりきった日の思い出';
+      info.style.display = 'block';
+      clearTimeout(showGardenItemInfo._timer);
+      showGardenItemInfo._timer = setTimeout(function () {
+        info.style.display = 'none';
+      }, 3500);
     }
 
     // ---- 初回起動オンボーディング ----
@@ -5023,8 +5398,13 @@
         if (m) {
           var becameCircle = newVal === 'circle';
           var wasCircle = oldVal === 'circle';
-          if (becameCircle && !wasCircle) recordProgressFromDay(m[1], parseInt(m[2], 10));
-          else if (!becameCircle && wasCircle) unrecordProgressFromDay(m[1], parseInt(m[2], 10));
+          if (becameCircle && !wasCircle) {
+            recordProgressFromDay(m[1], parseInt(m[2], 10));
+            // その日の予定を全部○にしていれば、庭のアイテムを1個授与する
+            maybeAwardGardenItem(m[1]);
+          } else if (!becameCircle && wasCircle) {
+            unrecordProgressFromDay(m[1], parseInt(m[2], 10));
+          }
         }
       }
       refreshPastPendingTasks();

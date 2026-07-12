@@ -171,6 +171,14 @@
   - 将来の「写真から目次読み取り」（プレミアム、未実装）でも同じ`normalizeAutoToc()`を通す想定。
   - 確認状況: 単体テスト（混在・全行部の安全弁）と、Playwrightで`/toc`をモックした自動取得→#付与→カウント表示まで確認済み。
 
+- 2026-07-12、Forest型モチベーター**「じぶんの庭」**の骨組みを実装した（画像は絵文字プレースホルダー。ChatGPT生成の透過PNGに差し替え予定）。
+  - **獲得ルール（ユーザーと合意済み）**: ①その日の予定をその日のうちに全部○ → いまの季節のアイテム1個獲得（`maybeAwardGardenItem()`、`onTaskStatusChanged`の○付与時に呼ぶ）。②1日1個まで（`earnedDate`重複チェック。○→✕→○でも重複しない）。③過去日への遡り○では出ない（きろく・進捗表には反映される。庭は「今日をやりきった」報酬）。④獲得後の没収なし。⑤ズル対策の設計思想=「罰を軽くする」（✕でも何も失わない）。
+  - カタログ: `GARDEN_ITEM_CATALOG`（21種、季節spring/summer/autumn/winterごとのプール。`getSeasonOfSekki()`が節気→季節を対応）。獲得時トースト`#gardenAwardToast`（「庭に置く」→庭画面）。
+  - 庭画面: `#gardenView`（☰メニュー「🏡 じぶんの庭」から。背景=現在の節気写真、タイトルに節気名）。アイテムはPointer Eventsで**ドラッグ自由配置**（%座標、離した時に保存）、タップで「◯月◯日（節気）にやりきった日の思い出」チップ表示。
+  - データ: `garden-items`（上記キー一覧参照）。`classifyStorageKey`/`pushSettings`/クラウド適用に`gardenItems`を追加済み。
+  - **未実装TODO**: 週の目標達成のレアアイテム（目標の達成判定UIが先に必要）、画像差し替え（catalogに`img`フィールドを足して絵文字の代わりに`<img>`描画）、庭背景の専用イラスト化（現状は節気写真を流用）。
+  - 確認状況: ローカルPlaywright（スマホ幅）で、全部○→獲得トースト→庭表示→ドラッグ保存→タップで思い出→重複なし→遡り○で出ない、まで確認済み。実機（タッチドラッグ）未確認。
+
 ## 直近でCodexが変更した内容
 
 コード上確認できた事実:
@@ -213,6 +221,7 @@
 - 通知時刻: `notify-time`
 - 今日は何の日キャッシュ: `today-trivia-YYYY-MM-DD`
 - Googleカレンダー選択: `google-calendar-ids`
+- じぶんの庭のアイテム（2026-07-12追加）: `garden-items`（JSON配列 `{uid,type,earnedDate,sekki,x,y}`。x/yは庭に対する%座標）。Firestore同期は`app/settings`ドキュメントの`gardenItems`フィールド。
 - Google access token一時保存: `google-token`
 - Googleカレンダー長期連携セッション: `google-calendar-session-id`、`google-calendar-session-secret`（端末ローカルのみ。Firestore同期対象外）
 - バーコード追加された教材の `material-details` には `isbn`、`bookTitle`、`authors`、`publisher`、`publishedDate`、`coverImage`、`description`、`pageCount`、`source` が入り得る。
