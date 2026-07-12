@@ -910,6 +910,14 @@
     .garden-scroller::-webkit-scrollbar {
       display: none;
     }
+    /* 街は横だけでなく縦横自由にパンできる（地図のように見わたす） */
+    #machiScroller {
+      overflow: auto;
+      cursor: grab;
+    }
+    #machiScroller.panning {
+      cursor: grabbing;
+    }
     .garden-ground {
       position: relative;
       height: 100%;
@@ -2087,7 +2095,7 @@
     <div id="machiScroller" class="garden-scroller">
       <div id="machiGround" class="machi-ground"></div>
     </div>
-    <p class="garden-hint">建物はドラッグでマス目に置けます。🏠をタップすると庭へ。</p>
+    <p class="garden-hint">スライドで街を見わたせます。建物はドラッグでマス目に置けます。🏠をタップすると庭へ。</p>
     <div id="machiItemInfo" class="garden-item-info" style="display:none;"></div>
   </div>
 
@@ -4969,7 +4977,11 @@
     //   y = originY + (col + row) × tileH/2
     function machiIsoParams() {
       var scroller = document.getElementById('machiScroller');
-      var usable = scroller ? Math.max(scroller.clientHeight - 70, 220) : 420;
+      // 画面より一回り大きいキャンバスにして、縦横自由にパンして見わたす。
+      // usableはキャンバス高さの目安（width = 2×usable になる）。縦1.5画面・横2画面ぶんの大きい方
+      var vh = scroller ? Math.max(scroller.clientHeight, 320) : 560;
+      var vw = scroller ? Math.max(scroller.clientWidth, 280) : 390;
+      var usable = Math.max(vh * 1.5, vw);
       var tileH = Math.floor(usable * 2 / (MACHI_GRID_COLS + MACHI_GRID_ROWS));
       var tileW = tileH * 2;
       return {
@@ -5041,9 +5053,39 @@
       items.forEach(function (item) {
         ground.appendChild(buildMachiItemEl(item, iso));
       });
-      // 初期位置は街の中央
+      // 初期位置は街の中央（縦横とも）
       scroller.scrollLeft = Math.max(0, (iso.width - scroller.clientWidth) / 2);
+      scroller.scrollTop = Math.max(0, (iso.height - scroller.clientHeight) / 2);
     }
+
+    // 街のマウス用ドラッグパン。タッチはoverflow:autoのネイティブスクロールに任せ、
+    // 建物のドラッグ（.machi-item側でpointer capture）とはターゲット判定で棲み分ける
+    (function () {
+      var scroller = document.getElementById('machiScroller');
+      if (!scroller) return;
+      var panning = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+      scroller.addEventListener('pointerdown', function (ev) {
+        if (ev.pointerType !== 'mouse' || ev.target.closest('.machi-item')) return;
+        panning = true;
+        startX = ev.clientX;
+        startY = ev.clientY;
+        startLeft = scroller.scrollLeft;
+        startTop = scroller.scrollTop;
+        scroller.classList.add('panning');
+        scroller.setPointerCapture(ev.pointerId);
+      });
+      scroller.addEventListener('pointermove', function (ev) {
+        if (!panning) return;
+        scroller.scrollLeft = startLeft - (ev.clientX - startX);
+        scroller.scrollTop = startTop - (ev.clientY - startY);
+      });
+      function endPan() {
+        panning = false;
+        scroller.classList.remove('panning');
+      }
+      scroller.addEventListener('pointerup', endPan);
+      scroller.addEventListener('pointercancel', endPan);
+    })();
 
     // アイテムの足元（フットプリント中心のマス）の画面座標に置く
     function machiPlaceEl(el, iso, entry, col, row) {
