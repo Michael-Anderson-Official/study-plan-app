@@ -1010,6 +1010,7 @@
       cursor: grab;
       user-select: none;
       -webkit-user-select: none;
+      -webkit-touch-callout: none; /* 長押しで持ち上げるので、iOSの長押しメニューを止める */
       touch-action: none;
       filter: drop-shadow(0 3px 5px rgba(31, 47, 61, 0.35));
     }
@@ -1018,15 +1019,28 @@
       object-fit: contain;
       pointer-events: none;
       -webkit-user-drag: none;
+      -webkit-touch-callout: none;
     }
     /* 本物の建物画像はフチまで絵なので、足元アンカーに絵の底辺を合わせる */
     .machi-item.has-img {
       transform: translate(-50%, -94%);
     }
+    /* 長押しで「持ち上がった」状態。少し浮いて大きくなる */
     .machi-item.dragging {
       cursor: grabbing;
       z-index: 999 !important;
-      filter: drop-shadow(0 8px 12px rgba(31, 47, 61, 0.45));
+      transform: translate(-50%, -92%) scale(1.06);
+      filter: drop-shadow(0 10px 14px rgba(31, 47, 61, 0.45));
+    }
+    .machi-item.has-img.dragging {
+      transform: translate(-50%, -101%) scale(1.06);
+    }
+    #machiCellHighlight {
+      position: absolute;
+      left: 0;
+      top: 0;
+      pointer-events: none;
+      z-index: 5; /* 地面(背景)より上、建物(zIndex 10+)より下 */
     }
     /* アイテム獲得トースト */
     .garden-award-toast {
@@ -2116,7 +2130,7 @@
     <div id="machiScroller" class="garden-scroller">
       <div id="machiGround" class="machi-ground"></div>
     </div>
-    <p id="machiHint" class="garden-hint">スライドとピンチで街を見わたせます。建物はドラッグでマス目に。🏠をタップすると庭へ。</p>
+    <p id="machiHint" class="garden-hint">スライドとピンチで街を見わたせます。建物は長押しでつかんで移動。🏠をタップすると庭へ。</p>
     <div id="machiItemInfo" class="garden-item-info" style="display:none;"></div>
   </div>
 
@@ -5089,8 +5103,9 @@
       return { col: (a + b) / 2, row: (b - a) / 2 };
     }
 
-    // 地面（緑のひし形）・マス目線・道路をSVGで描いて背景にする
-    function machiGridBackground(iso, roads) {
+    // 地面（緑のひし形）・マス目線・道路をSVGで描いて背景にする。
+    // emphasizeGrid=true（建物の移動中）はマス目線を濃く太くする
+    function machiGridBackground(iso, roads, emphasizeGrid) {
       var corners = [
         machiCornerToScreen(iso, 0, 0),
         machiCornerToScreen(iso, MACHI_GRID_COLS, 0),
@@ -5134,9 +5149,11 @@
           });
         });
       }
+      var gridStroke = emphasizeGrid ? 'rgba(60,95,55,0.55)' : 'rgba(90,120,80,0.28)';
+      var gridWidth = emphasizeGrid ? 1.6 : 1;
       var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + iso.width + '" height="' + iso.height + '">' +
         '<polygon points="' + poly + '" fill="#c8dfba" stroke="#a9c69a" stroke-width="2"/>' +
-        '<g stroke="rgba(90,120,80,0.28)" stroke-width="1">' + lines + '</g>' + roadShapes + '</svg>';
+        '<g stroke="' + gridStroke + '" stroke-width="' + gridWidth + '">' + lines + '</g>' + roadShapes + '</svg>';
       return 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svg) + '")';
     }
 
@@ -5168,7 +5185,7 @@
 
     // ---- 道路モード ----
     var machiRoadMode = false;
-    var MACHI_HINT_DEFAULT = 'スライドとピンチで街を見わたせます。建物はドラッグでマス目に。🏠をタップすると庭へ。';
+    var MACHI_HINT_DEFAULT = 'スライドとピンチで街を見わたせます。建物は長押しでつかんで移動。🏠をタップすると庭へ。';
 
     function toggleMachiRoadMode(forceOff) {
       machiRoadMode = forceOff ? false : !machiRoadMode;
@@ -5319,6 +5336,38 @@
       }, { passive: false });
     })();
 
+    // 建物移動中のスナップ先マスをひし形でハイライトする（ok=緑:置ける / 赤:置けない）
+    function machiShowCellHighlight(iso, col, row, w, h, ok) {
+      var ground = document.getElementById('machiGround');
+      if (!ground) return;
+      var hl = document.getElementById('machiCellHighlight');
+      if (!hl) {
+        hl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        hl.id = 'machiCellHighlight';
+        ground.appendChild(hl);
+      } else if (hl.parentNode !== ground) {
+        // renderMachiGridのinnerHTMLクリアで外れていたら付け直す
+        ground.appendChild(hl);
+      }
+      hl.setAttribute('width', iso.width);
+      hl.setAttribute('height', iso.height);
+      hl.style.display = 'block';
+      var pts = [
+        machiCornerToScreen(iso, col, row),
+        machiCornerToScreen(iso, col + w, row),
+        machiCornerToScreen(iso, col + w, row + h),
+        machiCornerToScreen(iso, col, row + h)
+      ].map(function (p) { return p.x + ',' + p.y; }).join(' ');
+      hl.innerHTML = '<polygon points="' + pts + '" fill="' +
+        (ok ? 'rgba(80,170,90,0.35)' : 'rgba(205,80,70,0.4)') + '" stroke="' +
+        (ok ? '#3f8f4f' : '#b0483d') + '" stroke-width="2.5"/>';
+    }
+
+    function machiHideCellHighlight() {
+      var hl = document.getElementById('machiCellHighlight');
+      if (hl) hl.style.display = 'none';
+    }
+
     // アイテムの足元（フットプリント中心のマス）の画面座標に置く
     function machiPlaceEl(el, iso, entry, col, row) {
       var c = col + (entry.w - 1) / 2;
@@ -5350,31 +5399,101 @@
       }
       machiPlaceEl(el, iso, entry, item.col, item.row);
 
-      var dragging = false;
-      var moved = false;
+      // 操作: タップ=情報/庭へ、すぐ動かす=パン（建物は動かない）、長押し450ms=持ち上げて移動。
+      // 移動中はマス目を強調し、スナップ先のマスを緑（置ける）/赤（置けない）でハイライトする
+      var HOLD_MS = 450, MOVE_TOL = 8;
+      var mode = null; // 'pending' | 'pan' | 'drag'
+      var holdTimer = 0;
       var startLeft = 0, startTop = 0, startX = 0, startY = 0;
+      var panStart = null;
+      var blockedCells = null; // 持ち上げ時に作る、置けないマスのマップ（自分以外の建物＋道路）
+
+      function beginDrag() {
+        mode = 'drag';
+        el.classList.add('dragging');
+        if (navigator.vibrate) navigator.vibrate(15);
+        var roads = loadMachiRoads();
+        blockedCells = machiOccupiedCells(loadMachiItems(), item.uid);
+        Object.keys(roads).forEach(function (k) { blockedCells[k] = true; });
+        var ground = document.getElementById('machiGround');
+        if (ground) ground.style.backgroundImage = machiGridBackground(iso, roads, true);
+        updateHighlight();
+      }
+
+      function snapTarget() {
+        var anchorX = parseFloat(el.style.left);
+        var anchorY = parseFloat(el.style.top) - iso.tileH / 2;
+        var cell = machiScreenToCell(iso, anchorX, anchorY);
+        return {
+          col: Math.round(cell.col - (entry.w - 1) / 2),
+          row: Math.round(cell.row - (entry.h - 1) / 2)
+        };
+      }
+
+      function targetPlaceable(col, row) {
+        if (col < 0 || row < 0 || col + entry.w > MACHI_GRID_COLS || row + entry.h > MACHI_GRID_ROWS) return false;
+        for (var dc = 0; dc < entry.w; dc++) {
+          for (var dr = 0; dr < entry.h; dr++) {
+            if (blockedCells[(col + dc) + ',' + (row + dr)]) return false;
+          }
+        }
+        return true;
+      }
+
+      function updateHighlight() {
+        var t = snapTarget();
+        machiShowCellHighlight(iso, t.col, t.row, entry.w, entry.h, targetPlaceable(t.col, t.row));
+      }
+
+      function endDragVisuals() {
+        el.classList.remove('dragging');
+        machiHideCellHighlight();
+        var ground = document.getElementById('machiGround');
+        if (ground) ground.style.backgroundImage = machiGridBackground(iso, loadMachiRoads());
+      }
+
       el.addEventListener('pointerdown', function (ev) {
-        dragging = true;
-        moved = false;
+        var scrollerEl = document.getElementById('machiScroller');
+        mode = 'pending';
         startLeft = parseFloat(el.style.left);
         startTop = parseFloat(el.style.top);
         startX = ev.clientX;
         startY = ev.clientY;
-        el.classList.add('dragging');
-        el.setPointerCapture(ev.pointerId);
+        panStart = scrollerEl ? { el: scrollerEl, sl: scrollerEl.scrollLeft, st: scrollerEl.scrollTop } : null;
+        try { el.setPointerCapture(ev.pointerId); } catch (e) { /* 合成イベント等 */ }
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(function () {
+          if (mode === 'pending') beginDrag();
+        }, HOLD_MS);
         ev.preventDefault();
       });
       el.addEventListener('pointermove', function (ev) {
-        if (!dragging) return;
-        if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 6) moved = true;
-        el.style.left = (startLeft + ev.clientX - startX) + 'px';
-        el.style.top = (startTop + ev.clientY - startY) + 'px';
+        if (!mode) return;
+        var dx = ev.clientX - startX;
+        var dy = ev.clientY - startY;
+        if (mode === 'pending') {
+          if (Math.abs(dx) + Math.abs(dy) <= MOVE_TOL) return;
+          // 長押し前に動いた → 建物は掴まずパンへ
+          clearTimeout(holdTimer);
+          mode = 'pan';
+        }
+        if (mode === 'pan') {
+          if (panStart) {
+            panStart.el.scrollLeft = panStart.sl - dx;
+            panStart.el.scrollTop = panStart.st - dy;
+          }
+          return;
+        }
+        el.style.left = (startLeft + dx) + 'px';
+        el.style.top = (startTop + dy) + 'px';
+        updateHighlight();
       });
       el.addEventListener('pointerup', function () {
-        if (!dragging) return;
-        dragging = false;
-        el.classList.remove('dragging');
-        if (!moved) {
+        clearTimeout(holdTimer);
+        if (!mode) return;
+        var finished = mode;
+        mode = null;
+        if (finished === 'pending') {
           // タップ: 自宅なら庭へ「帰宅」、それ以外は思い出チップ
           el.style.left = startLeft + 'px';
           el.style.top = startTop + 'px';
@@ -5385,25 +5504,31 @@
           }
           return;
         }
-        // ドラッグ: 足元の座標を逆投影して一番近いマスへスナップ。置けなければ差し戻し
-        var items = loadMachiItems();
-        var anchorX = parseFloat(el.style.left);
-        var anchorY = parseFloat(el.style.top) - iso.tileH / 2;
-        var cell = machiScreenToCell(iso, anchorX, anchorY);
-        var col = Math.round(cell.col - (entry.w - 1) / 2);
-        var row = Math.round(cell.row - (entry.h - 1) / 2);
-        if (machiCanPlace(items, col, row, entry.w, entry.h, item.uid)) {
-          item.col = col;
-          item.row = row;
+        if (finished === 'pan') return;
+        // 移動終了: スナップ先に置けるなら保存、置けなければ差し戻し
+        endDragVisuals();
+        var t = snapTarget();
+        if (targetPlaceable(t.col, t.row)) {
+          item.col = t.col;
+          item.row = t.row;
+          var items = loadMachiItems();
           for (var i = 0; i < items.length; i++) {
             if (items[i].uid === item.uid) {
-              items[i].col = col;
-              items[i].row = row;
+              items[i].col = t.col;
+              items[i].row = t.row;
             }
           }
           saveMachiItems(items);
         }
         machiPlaceEl(el, iso, entry, item.col, item.row);
+      });
+      el.addEventListener('pointercancel', function () {
+        clearTimeout(holdTimer);
+        if (mode === 'drag') {
+          endDragVisuals();
+          machiPlaceEl(el, iso, entry, item.col, item.row);
+        }
+        mode = null;
       });
       return el;
     }
