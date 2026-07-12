@@ -720,6 +720,41 @@
       line-height: 1.5;
       resize: vertical;
     }
+    /* バックアップ促しトースト */
+    .backup-nudge {
+      position: fixed;
+      left: 0.8rem;
+      right: 0.8rem;
+      bottom: 3.6rem;
+      z-index: 25;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-width: 26rem;
+      margin: 0 auto;
+      padding: 0.7rem 0.85rem;
+      background: rgba(255, 255, 255, 0.94);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 12px;
+      box-shadow: 0 6px 22px rgba(31, 47, 61, 0.28);
+    }
+    .backup-nudge-text {
+      margin: 0;
+      color: #33475b;
+      font-size: 0.78rem;
+      line-height: 1.55;
+    }
+    .backup-nudge-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+    .backup-nudge-actions button {
+      padding: 0.38rem 0.8rem;
+      font-size: 0.78rem;
+    }
     /* 初回起動オンボーディング */
     .onboarding-panel {
       max-width: 340px;
@@ -1670,6 +1705,15 @@
   </div>
   </div>
 
+  <!-- バックアップ促しトースト。未サインイン＆記録ありのとき14日に1回だけ出す -->
+  <div id="backupNudge" class="backup-nudge" style="display:none;">
+    <p class="backup-nudge-text">⚠️ 勉強の記録はこの端末の中にだけあります。機種変更や故障で消えないように、設定からバックアップかGoogleサインインをしておきましょう。</p>
+    <div class="backup-nudge-actions">
+      <button id="backupNudgeOpenBtn" type="button">設定を開く</button>
+      <button id="backupNudgeCloseBtn" type="button" class="btn-outline">あとで</button>
+    </div>
+  </div>
+
   <!-- 初回起動オンボーディング。教材が1件も無い初見ユーザーにだけ出す -->
   <div id="onboardingModal" class="settings-modal" style="display:none;">
     <div class="settings-panel onboarding-panel">
@@ -1984,6 +2028,9 @@
     // window.appAuth/appDbの初期化完了を待つ必要があるため、window.addEventListener('load', ...)や
     // クリックハンドラの中からではなく、ブリッジ側から能動的に呼んでもらう設計にしている。
     window.handleAuthStateChange = function (user) {
+      currentAuthUser = user;
+      // サインイン済みならデータはクラウドに残るので、バックアップ促しは畳む
+      if (user) hideBackupNudge();
       updateAccountSectionUI(user);
       if (!user || !window.appDb) return;
       setAccountSyncStatus('クラウドのデータを確認しています...');
@@ -2000,6 +2047,37 @@
         setAccountSyncStatus('クラウドとの同期に失敗しました。', true);
       });
     };
+
+    // 現在のFirebaseサインインユーザー。handleAuthStateChangeで更新し、
+    // バックアップ促しトーストの表示判定に使う（未サインインのときだけ促す）。
+    var currentAuthUser = null;
+
+    // ---- バックアップ促しトースト ----
+    function hideBackupNudge() {
+      var nudge = document.getElementById('backupNudge');
+      if (nudge) nudge.style.display = 'none';
+    }
+
+    function dismissBackupNudge() {
+      // 「あとで」から14日間は再表示しない。キーは端末ローカルのみ（同期対象外）
+      localStorage.setItem('backup-nudge-dismissed', toLocalISO(new Date()));
+      hideBackupNudge();
+    }
+
+    // 未サインインで教材（＝守るべき記録）があるユーザーに、14日に1回だけ表示する。
+    // Firebase認証の判定が終わるのを待つため、呼び出しはページ読み込みから数秒遅らせる。
+    function maybeShowBackupNudge() {
+      var nudge = document.getElementById('backupNudge');
+      if (!nudge) return;
+      if (currentAuthUser) return;
+      if (!hasAnyMaterial()) return;
+      var last = localStorage.getItem('backup-nudge-dismissed');
+      if (last) {
+        var lastDate = parseISOToDate(last);
+        if (!isNaN(lastDate) && (new Date() - lastDate) < 14 * 86400000) return;
+      }
+      nudge.style.display = 'flex';
+    }
 
     // グローバル変数の定義
     // 教材リストや詳細情報、現在選択中の教材インデックスはグローバルで管理します。
@@ -2700,6 +2778,21 @@
       document.body.classList.add('week-mobile-shell');
 
       // 設定アイコン・設定モーダルの開閉
+      // バックアップ促しトーストのボタン。「設定を開く」は設定モーダル（バックアップ節）へ
+      var backupNudgeOpenBtn = document.getElementById('backupNudgeOpenBtn');
+      var backupNudgeCloseBtn = document.getElementById('backupNudgeCloseBtn');
+      if (backupNudgeOpenBtn) {
+        backupNudgeOpenBtn.addEventListener('click', function () {
+          dismissBackupNudge();
+          // 設定ボタンのハンドラを再利用して設定モーダルを開く
+          var sBtn = document.getElementById('settingsBtn');
+          if (sBtn) sBtn.click();
+        });
+      }
+      if (backupNudgeCloseBtn) {
+        backupNudgeCloseBtn.addEventListener('click', dismissBackupNudge);
+      }
+
       // 初回起動オンボーディングの開閉。「始める」は教材追加モーダルへ直行する
       var onboardingModal = document.getElementById('onboardingModal');
       var onboardingStartBtn = document.getElementById('onboardingStartBtn');
@@ -2909,6 +3002,8 @@
         }
         // 教材の読み込みが終わってから初回オンボーディングの表示可否を判定する
         maybeShowOnboarding();
+        // バックアップ促しはFirebase認証の判定を待ってから（サインイン済みなら出さない）
+        setTimeout(maybeShowBackupNudge, 3500);
     });
     // DOMContentLoaded 用のクロージャを削除したため閉じカッコは不要になりました。
 
@@ -4307,6 +4402,7 @@
               }
             }
           }
+          onTaskStatusChanged();
           refreshStatusRows();
           closeStatusBubble();
         });
@@ -4357,10 +4453,10 @@
       });
     })();
 
-    // 「今日やること」タブの表示内容を更新します。
     // 今日より前の日付で、内容があるのに○✕が付いていないタスクの一覧。
-    // タブを開いたとき（refreshPastPendingTasks）にだけ再計算する。○✕を付けても
-    // その場ではリストから消えず、次にタブを開き直したときに消える（付け間違いをすぐ直せるように）。
+    // ○✕が変わるたびに onTaskStatusChanged() で再計算し、バッジもモーダル内リストも
+    // 即時に反映する（2026-07-12変更。旧仕様は「ベルを開いたときだけ再計算」だった）。
+    // 付け間違いは日別パネルや週表からいつでも直せる。
     var pastPendingTasks = [];
 
     function refreshPastPendingTasks() {
@@ -4383,9 +4479,7 @@
       });
     }
 
-    // 通知ベルのバッジ件数を更新する。pastPendingTasksのスナップショットに基づくため、
-    // ベルを開いて refreshPastPendingTasks() が呼ばれたタイミングでしか変わらない
-    // （リストの「その場では消えない」挙動とバッジ件数を一致させるため）。
+    // 通知ベルのバッジ件数を更新する。pastPendingTasksのスナップショットに基づく。
     function updateNotifBadge() {
       var badge = document.getElementById('notifBellBadge');
       if (!badge) return;
@@ -4395,6 +4489,12 @@
       } else {
         badge.style.display = 'none';
       }
+    }
+
+    // ○✕が変わった瞬間に呼ぶ。過去分の未チェック一覧を数え直してバッジへ即反映する。
+    function onTaskStatusChanged() {
+      refreshPastPendingTasks();
+      updateNotifBadge();
     }
 
     // 通知モーダルの中身（○✕が付いていない過去の予定）を描画する。
@@ -4505,6 +4605,7 @@
           if (statusVal === 'cross' && !wasCross && onCross) {
             onCross();
           }
+          onTaskStatusChanged();
           renderNotifList();
           refreshStatusRows();
           updateCellsForCurrentWeek();

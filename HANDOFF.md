@@ -1,6 +1,6 @@
 # HANDOFF.md
 
-最終更新: 2026-07-12（Claude Codeが①日別パネルのタイトルに西暦・和暦と「次の節気まで◯日」を追加、②教材追加欄をモーダル化、③節気写真を最大限見せる「要素単位すりガラス」UIに全面変更、④「○✕のきろく」モーダル（週ごと・月ごとの○✕集計）を追加、⑤通知ベル以外のヘッダーボタンを左上の☰メニューに統合、⑥一週間の目標（週始まり基準・一度決めたら変更不可）を追加、⑦初回起動オンボーディングと教材追加への導線を追加。ローカルPlaywrightでスマホ幅・PC幅とも表示・操作確認済み、実機は未確認）
+最終更新: 2026-07-12（Claude Codeが①日別パネルのタイトルに西暦・和暦と「次の節気まで◯日」を追加、②教材追加欄をモーダル化、③節気写真を最大限見せる「要素単位すりガラス」UIに全面変更、④「○✕のきろく」モーダル（週ごと・月ごとの○✕集計）を追加、⑤通知ベル以外のヘッダーボタンを左上の☰メニューに統合、⑥一週間の目標（週始まり基準・一度決めたら変更不可）を追加、⑦初回起動オンボーディングと教材追加への導線を追加、⑧通知バッジの即時更新化とバックアップ促しトーストを追加。ローカルPlaywrightでスマホ幅・PC幅とも表示・操作確認済み、実機は未確認）
 
 ## アプリの目的
 
@@ -72,7 +72,7 @@
 - Worker（`keikakuchou-notify`）に `GET /toc?isbn=...` を追加した。openBD/Google Booksには目次データが無いため、版元ドットコム（hanmoto.com）の書籍ページ（`https://www.hanmoto.com/bd/isbn/{ISBN}`）をWorker側で取得し、`HTMLRewriter` で `div[data-book-contents-name="toc"] p`（と中の `br`）から目次テキストを抽出してJSON `{ toc, source, isbn }` で返す。ブラウザから直接hanmoto.comへfetchするとCORSで拒否されるが、Worker〜hanmoto.com間はサーバー間通信なのでCORSの対象外という前提で実装した。`index.html` 側は `tryAutoFillToc(idx, isbn)` が教材詳細を開いたとき（ISBN付きかつ目次未入力の場合）にこのエンドポイントを呼び、取得できれば目次入力欄を自動で埋める（ユーザーが手入力済みなら上書きしない）。ISBNごとに1回だけ試みる（`tocFetchAttempted`、ページ内メモリのみ、`localStorage`には保存しない）。
 - 将来のAppStore公開（複数ユーザー対応）に向けた土台として、Firebase Auth（Googleサインインのみ）+ Firestoreによるアカウント同期を追加した。サインインは任意（opt-in）で、しなければ今まで通り`localStorage`のみで動く。詳細は下記「アカウント同期（Firebase）」節を参照。あわせて、Workerのプッシュ通知購読をKVキー1件の単一購読設計から `sub:<subscriberId>` 単位の複数購読対応へ変更した（`subscriberId`はサインイン中ならFirebaseのuid、未サインインなら`localStorage`の`device-id`）。
 - 2026-07-08、Codexが追加した日別詳細パネル（`#weekDayPanel`）が「今日やること」「Googleカレンダー」タブと機能的にかなり重複していたため、両タブを廃止し1週間タブ1本に統合した。
-  - 「今日やること」タブの「今日の予定＋○✕」部分は日別詳細パネル（日付セルタップで開く。PC幅・モバイル幅どちらでも動く）に統合済みだったため撤去。「○✕が付いていない過去の予定」一覧だけは日別パネルでは代替できない（1日ずつしか見れないため）ので、右上の**通知ベル**（`#notifBellBtn`、バッジ`#notifBellBadge`）→モーダル（`#notifModal`、リスト`#notifTaskList`）に独立させた。中身は既存の`pastPendingTasks`/`refreshPastPendingTasks()`をそのまま再利用し、描画は`renderNotifList()`（旧`updateTodayView()`の過去分ロジックを移設）。バッジ件数もリストの内容も、ベルを開いた瞬間（`refreshPastPendingTasks()`実行時）にしか更新されない設計を維持（○✕を付けてもその場では消えない、という元々の仕様どおり）。ページ読み込み時にも一度`refreshPastPendingTasks(); updateNotifBadge();`を呼ぶ。
+  - 「今日やること」タブの「今日の予定＋○✕」部分は日別詳細パネル（日付セルタップで開く。PC幅・モバイル幅どちらでも動く）に統合済みだったため撤去。「○✕が付いていない過去の予定」一覧だけは日別パネルでは代替できない（1日ずつしか見れないため）ので、右上の**通知ベル**（`#notifBellBtn`、バッジ`#notifBellBadge`）→モーダル（`#notifModal`、リスト`#notifTaskList`）に独立させた。中身は既存の`pastPendingTasks`/`refreshPastPendingTasks()`をそのまま再利用し、描画は`renderNotifList()`（旧`updateTodayView()`の過去分ロジックを移設）。ページ読み込み時にも一度`refreshPastPendingTasks(); updateNotifBadge();`を呼ぶ。（2026-07-12追記: 当初の「ベルを開いたときにしか再計算しない」設計は廃止し、○✕変更時に`onTaskStatusChanged()`で即時更新に変更。詳細は下記2026-07-12の項）
   - 「今日は何の日」（`#todayTrivia`、`loadTodayTrivia()`）はタイトル直下に常時表示する形に変更（モバイル幅では他のラベル同様`display:none`）。ページ読み込み時に`loadTodayTrivia()`を直接呼ぶ。
   - 「Googleカレンダー」タブの中身（サインイン/サインアウト、カレンダー選択、今すぐ同期、＋予定を追加、同期ステータス）は、設定モーダルの新セクション「Googleカレンダー連携」（`.google-calendar-section`、アカウント同期＝Firebaseの`.account-section`とは別区画）へ要素をそのまま（IDも変更せず）移設した。予定の閲覧・編集・追加自体は日別詳細パネル側で行う。設定モーダルを開いたときと初回ページ読み込み時に`refreshGoogleCalendarPanel()`（旧`onGoogleCalendarTabShown()`）を呼び、カレンダー一覧・予定を取得する。
   - タブバー（`.view-tabs`/`.tab-btn`）のHTML/CSS/JS配線を削除し、`body`には`week-mobile-shell`クラスを常時付与するだけにした（モバイル幅専用CSSは元々`@media (max-width:600px)`内で完結しているため、常時付与しても非モバイル幅には影響しない）。モバイル幅での`#weekView`のtop位置オフセットはタブバー分の高さ（約3rem）を差し引いて`5.9rem`→`3rem`に調整したが、実機での見た目は未確認。
@@ -124,6 +124,11 @@
   - 中身: 「ようこそ🌸」＋3ステップ（バーコード登録→予定が自動でできる→毎日○✕）＋✕繰り越しの一言。主ボタン「📚 教材を追加して始める」は教材追加モーダルへ直行、「あとで自分で見てみる」と背景タップはスキップ扱い。どの経路でもフラグが立ち二度と出ない。
   - あわせて恒久導線を2つ追加: ①日別パネルの空状態「この日の教材予定はありません。」の下に、教材ゼロのときだけ「📚 教材を追加する」ボタン（`.week-day-add-material-btn`）を表示。②教材追加モーダル内に常設ヘルプ文（`.materials-help`、「バーコードで追加が一番かんたん…」）。
   - 確認状況: ローカルPlaywright（スマホ幅）で初回表示→始めるボタン→教材モーダル直行→リロードで非表示→既存ユーザー非表示→強制プレビュー、まで確認済み。実機未確認。
+
+- 2026-07-12、AppStore準備のUX改善2件（オンボーディングの回で挙げた「決定的な穴」の残り2つ）。
+  - **通知バッジの即時更新化**: ○✕が変わるたびに`onTaskStatusChanged()`（`refreshPastPendingTasks()`＋`updateNotifBadge()`）を呼ぶようにした。呼び出し箇所は週表セルの吹き出し（`openStatusBubble`のクリックハンドラ）と、日別パネル・通知モーダル共通のボタン群（`buildTodayStatusGroup`）の2箇所で全経路を網羅。通知モーダル内のリストも即時反映され、○を付けた項目はその場で消える（旧仕様の「ベルを開いたときだけ再計算・その場では消えない」は廃止。付け間違いは日別パネルや週表からいつでも直せる）。
+  - **バックアップ促しトースト**（`#backupNudge`、`maybeShowBackupNudge()`）: 未サインイン（`currentAuthUser`がnull、`handleAuthStateChange`で更新）かつ教材あり（`hasAnyMaterial()`）のとき、画面下部（振り返りバーの上）に「記録はこの端末の中にだけあります…」を表示。「設定を開く」は却下記録後に`settingsBtn.click()`で設定モーダルへ、「あとで」は却下のみ。却下すると`backup-nudge-dismissed`（端末ローカルのみ、同期対象外）に日付を保存し14日間は再表示しない。Firebase認証の判定を待つため表示判定はload後3.5秒遅延。サインインが完了した時点で表示中でも畳む。
+  - 確認状況: ローカルPlaywright（スマホ幅）でバッジ2→○タップで即1・リストからも消える・トースト表示→あとで→14日抑止→設定を開く経路、まで確認済み。実機未確認。
 
 ## 直近でCodexが変更した内容
 
