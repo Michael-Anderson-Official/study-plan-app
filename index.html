@@ -4105,7 +4105,7 @@
         var key = 'weekly-goal-' + weekISO;
         var existing = localStorage.getItem(key);
         if (!existing || !existing.trim()) {
-          if (!confirm('この目標で決定しますか？\nこの週の目標は後から変更できません。\n\n「' + value + '」')) return;
+          if (!confirm('この目標で決定しますか？\n決定すると、この週の分は書き換えられません。\n（週が変われば、また新しい目標を決められます）\n\n「' + value + '」')) return;
           localStorage.setItem(key, value);
         }
         renderWeekGoal();
