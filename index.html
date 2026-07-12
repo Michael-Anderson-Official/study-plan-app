@@ -78,6 +78,20 @@
       position: absolute;
       opacity: 0.35;
     }
+    /* 季節の庭: ○を付けるたびに増えるモチーフ。写真の上でも見えるよう白めに光らせる */
+    #seasonDecoration svg.garden-motif {
+      opacity: 0.75;
+      color: #fff !important;
+      filter: drop-shadow(0 1px 3px rgba(31, 47, 61, 0.45));
+    }
+    #seasonDecoration svg.garden-motif.pop {
+      animation: gardenPop 0.6s ease;
+    }
+    @keyframes gardenPop {
+      0% { transform: scale(0) rotate(-20deg); }
+      60% { transform: scale(1.4); }
+      100% { transform: scale(1); }
+    }
     /* セルタップで出る○✕切り替えの吹き出し */
     #statusBubble {
       position: absolute;
@@ -2421,8 +2435,91 @@
       }
     }
 
+    // ---- 季節の庭 ----
+    // この節気の期間中に付けた○の数だけ、季節モチーフを背景の風景に「植える」。
+    // Forestの木に相当するご褒美表現。既存の-statusキーを毎回数えるだけで、
+    // localStorageに新しいキーは追加しない。節気が変わると庭は自然にまっさらへ戻る。
+    // ?garden=25 のようにURLへ付けると任意の個数をプレビューできる。
+
+    // 今日が属する節気の期間（正確な開始日テーブル基準）。テーブル範囲外はnull。
+    function getCurrentSekkiRange() {
+      var todayISO = toLocalISO(new Date());
+      var start = null;
+      var end = null;
+      for (var i = 0; i < SEKKI_EXACT_DATES.length; i++) {
+        if (SEKKI_EXACT_DATES[i][0] <= todayISO) {
+          start = SEKKI_EXACT_DATES[i][0];
+        } else {
+          if (start) end = SEKKI_EXACT_DATES[i][0];
+          break;
+        }
+      }
+      if (!start) return null;
+      return { start: start, end: end }; // endがnullの場合はテーブル末尾（期間の終わり未定義）
+    }
+
+    // 期間内（start以上、end未満）の○の個数を数える。科目1〜7のみ対象。
+    function countCirclesInRange(range) {
+      var n = 0;
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        var m = key && key.match(/^(\d{4}-\d{2}-\d{2})-sub[1-7]-status$/);
+        if (!m) continue;
+        if (m[1] < range.start) continue;
+        if (range.end && m[1] >= range.end) continue;
+        if (localStorage.getItem(key) === 'circle') n++;
+      }
+      return n;
+    }
+
+    var lastGardenCount = -1;
+
+    function renderSekkiGarden() {
+      var container = document.getElementById('seasonDecoration');
+      if (!container) return;
+      var sekki = getCurrentSekki();
+      var pathData = MOTIF_SVGS[sekki.motif];
+      if (!pathData) return;
+      var count;
+      var preview = location.search.match(/[?&]garden=(\d+)/);
+      if (preview) {
+        count = parseInt(preview[1], 10);
+      } else {
+        var range = getCurrentSekkiRange();
+        count = range ? countCirclesInRange(range) : 0;
+      }
+      count = Math.min(count, 60); // 画面が埋まりすぎない上限
+      var grown = lastGardenCount >= 0 && count > lastGardenCount;
+      lastGardenCount = count;
+      container.querySelectorAll('svg.garden-motif').forEach(function (el) { el.remove(); });
+      // 配置は節気名を種にした疑似乱数。同じ節気の間は同じ場所に生え続け、
+      // 新しい○のぶんだけ新しい場所に増える（Forestの森のように積み上がって見える）。
+      var seed = 0;
+      for (var s = 0; s < sekki.name.length; s++) seed = (seed * 31 + sekki.name.charCodeAt(s)) % 100000;
+      function nextRand() {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        return seed / 2147483648;
+      }
+      for (var n = 0; n < count; n++) {
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('class', 'garden-motif');
+        var size = 14 + Math.floor(nextRand() * 22);
+        svg.setAttribute('width', size);
+        svg.setAttribute('height', size);
+        svg.style.left = (2 + nextRand() * 92) + '%';
+        // ヘッダーを避けて画面の下側2/3に植える
+        svg.style.top = (32 + nextRand() * 62) + '%';
+        svg.innerHTML = pathData;
+        // いま増えた1個だけポップさせて「植えた瞬間」を見せる
+        if (grown && n === count - 1) svg.setAttribute('class', 'garden-motif pop');
+        container.appendChild(svg);
+      }
+    }
+
     // 起動時に現在の節気テーマを適用する（toLocalISO等の関数宣言は巻き上げにより参照可能）
     applySekkiTheme();
+    renderSekkiGarden();
 
     // 和暦（元号＋年）を「令和7年」のように返す。ブラウザ標準のIntl日本暦を使うため、
     // 将来元号が変わっても手直し不要（holidays2026のような年ごとの手動更新が要らない）。
@@ -4491,10 +4588,12 @@
       }
     }
 
-    // ○✕が変わった瞬間に呼ぶ。過去分の未チェック一覧を数え直してバッジへ即反映する。
+    // ○✕が変わった瞬間に呼ぶ。過去分の未チェック一覧を数え直してバッジへ即反映し、
+    // 季節の庭も育てる（○が増えた瞬間にモチーフが1つポップして生える）。
     function onTaskStatusChanged() {
       refreshPastPendingTasks();
       updateNotifBadge();
+      renderSekkiGarden();
     }
 
     // 通知モーダルの中身（○✕が付いていない過去の予定）を描画する。
