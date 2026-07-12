@@ -790,6 +790,13 @@
       font-weight: 700;
       cursor: pointer;
     }
+    /* 区分け行（# 第2部 など）。周回セルを持たない見出し */
+    .progress-table td.progress-heading {
+      background: #e9edf1;
+      color: #33475b;
+      font-weight: 700;
+      text-align: left;
+    }
     .progress-cell.is-empty:hover {
       background: #f2f7f4;
     }
@@ -1729,6 +1736,7 @@
     <div style="margin-bottom:0.5rem;">
       <!-- 目次や単位を自由に入力できる欄。各行ごとに1項目を入力する。 -->
       <label for="tocInput">目次／単位リスト（各行に1項目）:</label> <span id="tocCountLabel" style="font-size:0.8rem; color:#666;"></span><br/>
+      <span style="font-size:0.75rem; color:#666;">行頭に「#」を付けると区分け（部・編など）になり、単位に数えません。例: <code># 第2部 民法総則</code></span><br/>
       <textarea id="tocInput" rows="5" style="padding:0.3rem; width:90%; max-width:400px;"></textarea>
       <p id="materialDetailStatus" class="isbn-status"></p>
     </div>
@@ -3320,10 +3328,14 @@
       var tocInput = document.getElementById('tocInput');
       var label = document.getElementById('tocCountLabel');
       if (!tocInput || !label) return;
-      var count = tocInput.value.split(/\n+/).map(function (line) {
+      var lines = tocInput.value.split(/\n+/).map(function (line) {
         return line.trim();
-      }).filter(function (line) { return line !== ''; }).length;
-      label.textContent = count > 0 ? '（現在' + count + '項目 = ' + count + '単位）' : '';
+      }).filter(function (line) { return line !== ''; });
+      var headings = lines.filter(isTocHeading).length;
+      var units = lines.length - headings;
+      label.textContent = lines.length > 0
+        ? '（単位 ' + units + '件' + (headings > 0 ? '・区分け ' + headings + '件' : '') + '）'
+        : '';
     }
 
     // ISBNが分かっている教材について、hanmoto.comの目次データをWorker経由で自動取得する。
@@ -3774,16 +3786,41 @@
     // 日別パネル・週表で○を付けると自動でこの表に日付が入り、予定より先に進んだ分は
     // 表のセルを直接タップして記録できる（これが「その日の目標より進んだ分の○」になる）。
 
-    // 教材の単位ラベル一覧。目次があれば目次の行、なければ単位数から「1」「2」…を作る
-    function getUnitLabels(detail) {
+    // 行頭が「#」の目次行は区分け（部・編などの見出し）で、勉強する単位ではない。
+    // 単位数・スケジュール割り当て・進捗表の周回セルの対象から除外する。
+    function isTocHeading(line) {
+      return /^\s*#/.test(String(line || ''));
+    }
+
+    // 目次から「単位」だけを取り出す（区分け行と空行を除き、trimして返す）
+    function getTocUnits(detail) {
+      if (!detail || !Array.isArray(detail.tocList)) return [];
+      return detail.tocList
+        .map(function (l) { return String(l).trim(); })
+        .filter(function (l) { return l !== '' && !isTocHeading(l); });
+    }
+
+    // 進捗表の行構成。区分け行と単位行を目次の順に返す。
+    // unitIdxは単位だけの通し番号（0始まり）で、進捗データのキーと対応する。
+    function getTocRows(detail) {
+      var rows = [];
       if (detail && Array.isArray(detail.tocList) && detail.tocList.length) {
-        return detail.tocList.map(function (s) { return String(s); });
+        var unitIdx = 0;
+        detail.tocList.forEach(function (raw) {
+          var line = String(raw).trim();
+          if (!line) return;
+          if (isTocHeading(line)) {
+            rows.push({ heading: true, label: line.replace(/^\s*#+\s*/, '') });
+          } else {
+            rows.push({ heading: false, label: line, unitIdx: unitIdx++ });
+          }
+        });
+        return rows;
       }
       var n = parseInt(detail && detail.units, 10);
       if (isNaN(n) || n <= 0) return [];
-      var labels = [];
-      for (var i = 1; i <= n; i++) labels.push(String(i));
-      return labels;
+      for (var i = 1; i <= n; i++) rows.push({ heading: false, label: String(i), unitIdx: i - 1 });
+      return rows;
     }
 
     function getProgressMap(idx) {
@@ -3828,9 +3865,10 @@
     function matchUnitsFromContent(idx, content) {
       var detail = materialsDetails[idx] || {};
       var result = [];
-      if (Array.isArray(detail.tocList) && detail.tocList.length) {
+      var units = getTocUnits(detail);
+      if (units.length) {
         String(content || '').split('\n').forEach(function (line) {
-          var unitIdx = detail.tocList.indexOf(line.trim());
+          var unitIdx = units.indexOf(line.trim());
           if (unitIdx >= 0) result.push(unitIdx);
         });
       } else {
@@ -3888,8 +3926,8 @@
       titleEl.textContent = (materialsList[idx] || '教材') + ' の進捗表';
       wrap.innerHTML = '';
       var detail = materialsDetails[idx] || {};
-      var labels = getUnitLabels(detail);
-      if (!labels.length) {
+      var rows = getTocRows(detail);
+      if (!rows.length) {
         var p = document.createElement('p');
         p.className = 'progress-empty';
         p.textContent = '教材詳細で目次（または単位数）を設定すると、ここに進捗表が表示されます。';
@@ -3917,8 +3955,20 @@
       table.appendChild(thead);
 
       var tbody = document.createElement('tbody');
-      labels.forEach(function (label, unitIdx) {
+      rows.forEach(function (rowDef) {
         var row = document.createElement('tr');
+        // 区分け行（# 第2部 など）は見出しとして全幅で表示し、周回セルは持たない
+        if (rowDef.heading) {
+          var headCell = document.createElement('td');
+          headCell.className = 'progress-heading';
+          headCell.colSpan = laps + 1;
+          headCell.textContent = rowDef.label;
+          row.appendChild(headCell);
+          tbody.appendChild(row);
+          return;
+        }
+        var label = rowDef.label;
+        var unitIdx = rowDef.unitIdx;
         var unitCell = document.createElement('td');
         unitCell.className = 'progress-unit';
         unitCell.textContent = label;
@@ -4228,7 +4278,8 @@
       if (isNaN(completedUnits) || completedUnits < 0) {
         completedUnits = 0;
       } else {
-        var completedCap = tocLines.length > 0 ? tocLines.length : (isNaN(units) ? completedUnits : units);
+        var tocUnitCount = tocLines.filter(function (l) { return !isTocHeading(l); }).length;
+        var completedCap = tocUnitCount > 0 ? tocUnitCount : (isNaN(units) ? completedUnits : units);
         if (completedUnits > completedCap) completedUnits = completedCap;
       }
       materialsDetails[currentMaterialIndex] = Object.assign({}, existingDetail, {
@@ -4242,9 +4293,12 @@
       localStorage.setItem('material-details', JSON.stringify(materialsDetails));
       // スケジュール計算
       scheduleMaterial(currentMaterialIndex);
-      // 詳細パネルを閉じる
+      // 詳細パネルとモーダルを閉じて週表を見せる
       var detailDiv = document.getElementById('materialDetail');
       detailDiv.style.display = 'none';
+      closeMaterialsModal();
+      // 開いている日別パネルにも新しい予定を反映する
+      if (selectedWeekDayISO) renderWeekDayPanel(selectedWeekDayISO, { keepClosed: true });
     }
 
     // 現在開いている教材をリストと詳細情報から削除する
@@ -4282,7 +4336,7 @@
       // 既存の割り当てを削除してから新しい内容で置き換える
       clearMaterialContentCells(idx);
       // もし目次リストが存在する場合は章タイトルごとにスケジュールする
-      var tasks = detail.tocList;
+      var tasks = getTocUnits(detail); // 区分け行（行頭#）は割り当て対象から除外
       // 進捗（完了済み単位数）分は目次の表示自体は変えず、スケジュール対象からだけ除外する
       var completedForSchedule = parseInt(detail.completedUnits, 10);
       if (tasks && Array.isArray(tasks) && !isNaN(completedForSchedule) && completedForSchedule > 0) {
@@ -5110,7 +5164,7 @@
       // 既存の割り当てを削除してから新しい内容で置き換える
       clearMaterialContentCells(idx);
       // 目次リストがある場合は章タイトルを日毎に割り当て
-      var tasks = detail.tocList;
+      var tasks = getTocUnits(detail); // 区分け行（行頭#）は割り当て対象から除外
       // 進捗（完了済み単位数）分は目次の表示自体は変えず、スケジュール対象からだけ除外する
       var completedForDaily = parseInt(detail.completedUnits, 10);
       if (tasks && Array.isArray(tasks) && !isNaN(completedForDaily) && completedForDaily > 0) {
@@ -5140,6 +5194,8 @@
         if (ddiv) ddiv.style.display = 'none';
         closeMaterialsModal();
         updateCellsForCurrentWeek();
+        // 開いている日別パネルにも新しい予定を反映する
+        if (selectedWeekDayISO) renderWeekDayPanel(selectedWeekDayISO, { keepClosed: true });
         return;
       }
       // --- 目次がない場合は数値単位ベースで日単位割り当て ---
@@ -5178,6 +5234,8 @@
       if (detDiv) detDiv.style.display = 'none';
       closeMaterialsModal();
       updateCellsForCurrentWeek();
+      // 開いている日別パネルにも新しい予定を反映する
+      if (selectedWeekDayISO) renderWeekDayPanel(selectedWeekDayISO, { keepClosed: true });
     }
     // 通知設定: 保存済みの時刻を反映
     (function () {
