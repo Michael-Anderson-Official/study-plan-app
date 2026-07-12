@@ -4416,16 +4416,17 @@
     }
 
     // ---- 庭画面 ----
-    // 庭専用の水彩イラスト背景（季節ごと）。ステッカーと画風を揃えるため、
-    // 用意できた季節からここへ登録する（例: spring: 'img/garden/bg-spring.webp'）。
-    // 未登録の季節は節気写真にフォールバックする。
+    // 庭専用の水彩イラスト背景。ステッカーと画風を揃えるため、用意できたものからここへ登録する。
+    // キーは節気名（'小暑' など、最優先）または季節（'summer' など）。
+    // 探索順: 節気の絵 → 季節の絵 → 節気写真。最終形は二十四節気ぶん24枚を目指し、
+    // それまでは季節4枚→写真の段階的フォールバックで運用する。
     var GARDEN_BACKGROUNDS = {};
 
     function openGardenView() {
       var view = document.getElementById('gardenView');
       if (!view) return;
       var sekki = getCurrentSekki();
-      var illustrated = GARDEN_BACKGROUNDS[getSeasonOfSekki(sekki.name)];
+      var illustrated = GARDEN_BACKGROUNDS[sekki.name] || GARDEN_BACKGROUNDS[getSeasonOfSekki(sekki.name)];
       var img = illustrated || SEKKI_IMAGES[sekki.name];
       view.style.backgroundImage = img
         ? (illustrated
