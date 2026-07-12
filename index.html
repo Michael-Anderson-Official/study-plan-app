@@ -4314,7 +4314,7 @@
       { type: 'furin', name: '風鈴', emoji: '🎐', season: 'summer', img: 'img/garden/furin.webp' },
       { type: 'kakigori', name: 'かき氷', emoji: '🍧', season: 'summer', img: 'img/garden/kakigori.webp' },
       { type: 'himawari', name: 'ひまわり', emoji: '🌻', season: 'summer', img: 'img/garden/himawari.webp' },
-      { type: 'kaeru', name: 'カエル', emoji: '🐸', season: 'summer' },
+      { type: 'kaeru', name: 'カエル', emoji: '🐸', season: 'summer', img: 'img/garden/kaeru.webp' },
       { type: 'chochin', name: '提灯', emoji: '🏮', season: 'summer', img: 'img/garden/chochin.webp' },
       { type: 'momiji', name: 'もみじ', emoji: '🍁', season: 'autumn' },
       { type: 'tsukimi', name: '月見だんご', emoji: '🎑', season: 'autumn' },
@@ -4416,13 +4416,21 @@
     }
 
     // ---- 庭画面 ----
+    // 庭専用の水彩イラスト背景（季節ごと）。ステッカーと画風を揃えるため、
+    // 用意できた季節からここへ登録する（例: spring: 'img/garden/bg-spring.webp'）。
+    // 未登録の季節は節気写真にフォールバックする。
+    var GARDEN_BACKGROUNDS = {};
+
     function openGardenView() {
       var view = document.getElementById('gardenView');
       if (!view) return;
       var sekki = getCurrentSekki();
-      var img = SEKKI_IMAGES[sekki.name];
+      var illustrated = GARDEN_BACKGROUNDS[getSeasonOfSekki(sekki.name)];
+      var img = illustrated || SEKKI_IMAGES[sekki.name];
       view.style.backgroundImage = img
-        ? 'linear-gradient(rgba(253,253,253,0.08), rgba(253,253,253,0.08)), url("' + img + '")'
+        ? (illustrated
+            ? 'url("' + img + '")'
+            : 'linear-gradient(rgba(253,253,253,0.08), rgba(253,253,253,0.08)), url("' + img + '")')
         : 'linear-gradient(180deg,#eef3f7,#dfe8ef)';
       var title = document.getElementById('gardenTitle');
       if (title) title.textContent = 'じぶんの庭 〜' + sekki.name + '〜';
