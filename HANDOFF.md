@@ -147,7 +147,7 @@
   - **Workerに`GET /book?isbn=`を追加**（`handleBook`）: サーバー側で openBD → 国立国会図書館サーチ（`ndlsearch.ndl.go.jp/api/opensearch`、XMLを素朴にパース、表紙は`/thumbnail/{isbn}.jpg`）→ Google Books の3段構えで書誌を探し、クライアントの`fetchOpenBdBook()`と同じ形＋`found`フラグのJSONで返す。`cf.cacheTtl`1日でキャッシュ。openBDの著者「姓,名」形式は分割せず、複数著者区切り「／」だけで分ける。
   - クライアントの検索順は **openBD直接 → Worker `/book` → Google Books直接**（`fetchWorkerBook()`を追加）。Worker未デプロイでも従来と同じ動作に自然フォールバックする。
   - **192価格コード対策**: `normalizeIsbn()`は13桁の場合978/979始まりのみ受理するよう変更（日本の本の下段バーコード192…はEAN-13としてチェックサムが正しく素通りしていた）。`isJapaneseSecondaryBarcode()`（192/491始まり）を追加し、手入力・カメラ読み取り（native/ZXing両方）で「上段の978で始まるバーコードを読んで」と具体的な案内を出す（スキャンは止めない）。
-  - 確認状況: Workerはローカル（`wrangler dev --local`）で openBD経路・NDLフォールバック経路・400応答を確認。クライアントは実ブラウザで実ISBN検索成功と192メッセージを確認。**Worker本番デプロイは未実施**（`npx wrangler deploy`が権限確認待ち。wrangler認証自体は済んでいる。デプロイされるまで/bookは404で、クライアントは従来動作に自動フォールバック）。
+  - 確認状況: Workerはローカル（`wrangler dev --local`）で openBD経路・NDLフォールバック経路・400応答を確認。クライアントは実ブラウザで実ISBN検索成功と192メッセージを確認。Worker本番デプロイ済み（2026-07-12、`npx wrangler deploy`、Version 842d6013）。本番`/book`で実ISBNの取得成功と既存`/toc`の応答（回帰なし）を確認済み。
   - なお実機でカメラが真っ黒になった件はユーザーが再試行したところ開いたため一時的なものと判断（iOSホーム画面PWAのカメラは既知の不安定さあり。恒久対策はCapacitorネイティブ化側で解決予定）。
 
 ## 直近でCodexが変更した内容
