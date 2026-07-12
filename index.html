@@ -1047,6 +1047,28 @@
       pointer-events: none;
       z-index: 5; /* 地面(背景)より上、建物(zIndex 10+)より下 */
     }
+    /* 道路を走る車。zIndexは建物と同じ画家のアルゴリズムでJSが設定する */
+    .machi-car {
+      position: absolute;
+      pointer-events: none;
+      filter: drop-shadow(0 2px 2px rgba(31, 47, 61, 0.3));
+    }
+    .machi-car svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    /* 時刻による街の色味（朝焼け・夕方・夜）。操作は透過する */
+    #machiDaylight {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      top: 0; /* 実際のtopはJSがスクロール領域に合わせる */
+      pointer-events: none;
+      z-index: 1000;
+      transition: background 1.5s ease;
+    }
     /* アイテム獲得トースト */
     .garden-award-toast {
       position: fixed;
@@ -2135,6 +2157,7 @@
     <div id="machiScroller" class="garden-scroller">
       <div id="machiGround" class="machi-ground"></div>
     </div>
+    <div id="machiDaylight"></div>
     <p id="machiHint" class="garden-hint">スライドとピンチで街を見わたせます。建物は長押しでつかんで移動。🏠をタップすると庭へ。</p>
     <div id="machiItemInfo" class="garden-item-info" style="display:none;"></div>
   </div>
@@ -4902,36 +4925,75 @@
     // グリッド16列×10行。建物は1×1と2×2の2種類。自宅（2×2）は最初から中央にあり、
     // タップすると庭に入る（庭は自宅の庭、という世界観）。データは 'machi-items'
     // （{uid,type,earnedDate,col,row}）でFirestoreのapp/settingsに同期する。
+    // グリッドは建物が増えると広がる（16×10から6件ごとに+4列+2行、最大36×20）。
+    // 建物数から決定的に導出するので保存・同期は不要（端末間で必ず一致する）
     var MACHI_GRID_COLS = 16;
     var MACHI_GRID_ROWS = 10;
 
+    function machiBuildingCount() {
+      return loadMachiItems().filter(function (it) { return it.type !== 'home'; }).length;
+    }
+
+    function machiGridSteps() {
+      return Math.min(5, Math.floor(machiBuildingCount() / 6));
+    }
+
+    function updateMachiGridSize() {
+      var steps = machiGridSteps();
+      MACHI_GRID_COLS = 16 + steps * 4;
+      MACHI_GRID_ROWS = 10 + steps * 2;
+    }
+
     var MACHI_ITEM_CATALOG = [
       // スターター（抽選に出ない。最初から街の中心にある）
+      // pop: 人口。道路に面していると2倍（にぎわい）
       // imgScale: 表示幅 = tileW×w×imgScale（絵の底辺ダイヤがフットプリント幅に合うよう実測から算出）
       // imgBaseX: 絵の「底の頂点」のX位置（画像幅に対する割合。実測値）
       // imgFringe: 白フチの厚みぶん絵を沈める補正（画像幅に対する割合）
-      { type: 'home', name: '自宅', emoji: '🏠', w: 2, h: 2, starter: true, img: 'img/machi/home.webp', imgScale: 1.12, imgBaseX: 0.586, imgFringe: 0.014 },
+      { type: 'home', name: '自宅', emoji: '🏠', w: 2, h: 2, pop: 4, starter: true, img: 'img/machi/home.webp', imgScale: 1.12, imgBaseX: 0.586, imgFringe: 0.014 },
       // 無料（1×1）
-      { type: 'konbini', name: 'コンビニ', emoji: '🏪', w: 1, h: 1 },
-      { type: 'mansion', name: 'マンション', emoji: '🏢', w: 1, h: 1 },
-      { type: 'hospital', name: '病院', emoji: '🏥', w: 1, h: 1 },
-      { type: 'park', name: '公園', emoji: '🌳', w: 1, h: 1 },
-      { type: 'sento', name: '銭湯', emoji: '♨️', w: 1, h: 1 },
-      { type: 'ramen', name: 'ラーメン屋', emoji: '🍜', w: 1, h: 1 },
-      { type: 'honya', name: '本屋', emoji: '📕', w: 1, h: 1 },
-      { type: 'school', name: '学校', emoji: '🏫', w: 1, h: 1 },
-      { type: 'post', name: '郵便局', emoji: '🏣', w: 1, h: 1 },
-      { type: 'koban', name: '交番', emoji: '🚓', w: 1, h: 1 },
-      { type: 'namiki', name: '桜並木', emoji: '🌷', w: 1, h: 1 },
-      { type: 'jihanki', name: '自動販売機', emoji: '🥤', w: 1, h: 1 },
+      { type: 'konbini', name: 'コンビニ', emoji: '🏪', w: 1, h: 1, pop: 12 },
+      { type: 'mansion', name: 'マンション', emoji: '🏢', w: 1, h: 1, pop: 60 },
+      { type: 'hospital', name: '病院', emoji: '🏥', w: 1, h: 1, pop: 30 },
+      { type: 'park', name: '公園', emoji: '🌳', w: 1, h: 1, pop: 8 },
+      { type: 'sento', name: '銭湯', emoji: '♨️', w: 1, h: 1, pop: 15 },
+      { type: 'ramen', name: 'ラーメン屋', emoji: '🍜', w: 1, h: 1, pop: 10 },
+      { type: 'honya', name: '本屋', emoji: '📕', w: 1, h: 1, pop: 10 },
+      { type: 'school', name: '学校', emoji: '🏫', w: 1, h: 1, pop: 40 },
+      { type: 'post', name: '郵便局', emoji: '🏣', w: 1, h: 1, pop: 12 },
+      { type: 'koban', name: '交番', emoji: '🚓', w: 1, h: 1, pop: 6 },
+      { type: 'namiki', name: '桜並木', emoji: '🌷', w: 1, h: 1, pop: 5 },
+      { type: 'jihanki', name: '自動販売機', emoji: '🥤', w: 1, h: 1, pop: 2 },
       // プレミアム（🔒、課金実装まで抽選に出ない）
-      { type: 'tokyo-tower', name: '東京タワー', emoji: '🗼', w: 2, h: 2, premium: true },
-      { type: 'skytree', name: 'スカイツリー', emoji: '🌃', w: 2, h: 2, premium: true },
-      { type: 'kaminarimon', name: '雷門', emoji: '⛩️', w: 2, h: 2, premium: true },
-      { type: 'ferris-wheel', name: '観覧車', emoji: '🎡', w: 2, h: 2, premium: true },
-      { type: 'castle', name: '城', emoji: '🏯', w: 2, h: 2, premium: true },
-      { type: 'station', name: '新幹線の駅', emoji: '🚅', w: 2, h: 2, premium: true }
+      { type: 'tokyo-tower', name: '東京タワー', emoji: '🗼', w: 2, h: 2, pop: 200, premium: true },
+      { type: 'skytree', name: 'スカイツリー', emoji: '🌃', w: 2, h: 2, pop: 250, premium: true },
+      { type: 'kaminarimon', name: '雷門', emoji: '⛩️', w: 2, h: 2, pop: 120, premium: true },
+      { type: 'ferris-wheel', name: '観覧車', emoji: '🎡', w: 2, h: 2, pop: 150, premium: true },
+      { type: 'castle', name: '城', emoji: '🏯', w: 2, h: 2, pop: 180, premium: true },
+      { type: 'station', name: '新幹線の駅', emoji: '🚅', w: 2, h: 2, pop: 220, premium: true }
     ];
+
+    // 建物のフットプリントのどこかが道路に接しているか（にぎわい判定）
+    function machiNearRoad(roads, col, row, w, h) {
+      for (var dc = 0; dc < w; dc++) {
+        for (var dr = 0; dr < h; dr++) {
+          var c = col + dc, r = row + dr;
+          if (roads[(c + 1) + ',' + r] || roads[(c - 1) + ',' + r] ||
+              roads[c + ',' + (r + 1)] || roads[c + ',' + (r - 1)]) return true;
+        }
+      }
+      return false;
+    }
+
+    function machiPopulation(items, roads) {
+      var total = 0;
+      items.forEach(function (it) {
+        var entry = machiCatalogEntry(it.type);
+        if (!entry || !entry.pop) return;
+        total += entry.pop * (machiNearRoad(roads, it.col, it.row, entry.w || 1, entry.h || 1) ? 2 : 1);
+      });
+      return total;
+    }
 
     function machiCatalogEntry(type) {
       for (var i = 0; i < MACHI_ITEM_CATALOG.length; i++) {
@@ -4995,6 +5057,7 @@
 
     // (col,row) に w×h の建物を置けるか（枠内かつ空きマスか。道路の上にも建てられない）
     function machiCanPlace(items, col, row, w, h, excludeUid) {
+      updateMachiGridSize();
       if (col < 0 || row < 0 || col + w > MACHI_GRID_COLS || row + h > MACHI_GRID_ROWS) return false;
       var occupied = machiOccupiedCells(items, excludeUid);
       var roads = loadMachiRoads();
@@ -5009,6 +5072,7 @@
 
     // 新しい建物の置き場所をランダムに探す（見つからなければnull）
     function findMachiSpot(items, w, h) {
+      updateMachiGridSize();
       for (var attempt = 0; attempt < 200; attempt++) {
         var col = Math.floor(Math.random() * (MACHI_GRID_COLS - w + 1));
         var row = Math.floor(Math.random() * (MACHI_GRID_ROWS - h + 1));
@@ -5023,6 +5087,7 @@
         return !it.starter && (!it.premium || isPremiumUser());
       });
       var picked = pool[Math.floor(Math.random() * pool.length)];
+      var stepsBefore = machiGridSteps();
       var spot = findMachiSpot(items, picked.w, picked.h);
       if (!spot) spot = { col: 0, row: 0 }; // 満杯時の保険（重なっても後で動かせる）
       var newItem = {
@@ -5034,8 +5099,20 @@
       };
       items.push(newItem);
       saveMachiItems(items);
+      var grewUp = machiGridSteps() > stepsBefore;
       openMachiView();
       showMachiItemInfo(newItem, picked);
+      if (grewUp) {
+        // 6件ごとのマイルストーンで街が広がる。獲得チップのあとにお祝いを重ねる
+        setTimeout(function () {
+          var info = document.getElementById('machiItemInfo');
+          if (!info) return;
+          info.textContent = '🌆 人が集まってきた！街が広がりました';
+          info.style.display = 'block';
+          clearTimeout(showMachiItemInfo._timer);
+          showMachiItemInfo._timer = setTimeout(function () { info.style.display = 'none'; }, 3500);
+        }, 3800);
+      }
     }
 
     // ---- 街画面 ----
@@ -5046,6 +5123,150 @@
       var view = document.getElementById('machiView');
       if (view) view.style.display = 'flex';
       renderMachiGrid();
+      updateMachiDaylight();
+      startMachiCars();
+      if (!openMachiView._daylightTimer) {
+        openMachiView._daylightTimer = setInterval(updateMachiDaylight, 60000);
+      }
+    }
+
+    // ---- 生活感: 時刻で街の色味を変える ----
+    function machiDaylightColor(hour) {
+      var h = (hour != null ? hour : new Date().getHours());
+      if (h >= 5 && h < 7) return 'rgba(255,190,120,0.16)';   // 朝焼け
+      if (h >= 16 && h < 18) return 'rgba(255,160,90,0.16)';  // 夕方
+      if (h >= 18 && h < 20) return 'rgba(110,85,150,0.20)';  // たそがれ
+      if (h >= 20 || h < 5) return 'rgba(25,40,85,0.30)';     // 夜
+      return 'transparent';
+    }
+
+    function updateMachiDaylight(forceHour) {
+      var overlay = document.getElementById('machiDaylight');
+      var scroller = document.getElementById('machiScroller');
+      if (!overlay || !scroller) return;
+      overlay.style.top = scroller.offsetTop + 'px'; // ヘッダーは染めない
+      overlay.style.background = machiDaylightColor(forceHour);
+    }
+
+    // ---- 生活感: 道路を走る車 ----
+    // 道路が3マス以上あると車が現れる（10マスごとに1台追加、最大4台）。
+    // rAFループは街ビューが非表示になると自然に止まり、openMachiViewで再開する
+    var machiCarState = { cars: [], raf: 0, lastTs: 0 };
+    var MACHI_CAR_COLORS = ['#d9694f', '#5b7fa6', '#6b9a68', '#c9a44b'];
+
+    function startMachiCars() {
+      if (!machiCarState.raf) {
+        machiCarState.lastTs = 0;
+        machiCarState.raf = requestAnimationFrame(machiCarTick);
+      }
+    }
+
+    function machiCarNeighbors(roads, key) {
+      var cr = key.split(',');
+      var c = parseInt(cr[0], 10), r = parseInt(cr[1], 10);
+      var out = [];
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+        var k = (c + d[0]) + ',' + (r + d[1]);
+        if (roads[k]) out.push(k);
+      });
+      return out;
+    }
+
+    function machiCarCellCenter(iso, key) {
+      var cr = key.split(',');
+      return machiCornerToScreen(iso, parseInt(cr[0], 10) + 0.5, parseInt(cr[1], 10) + 0.5);
+    }
+
+    function machiCarTick(ts) {
+      machiCarState.raf = 0;
+      var view = document.getElementById('machiView');
+      var ground = document.getElementById('machiGround');
+      if (!view || view.style.display === 'none' || !ground) {
+        machiCarState.cars = [];
+        return; // 閉じたら停止（車は次のopenで作り直し）
+      }
+      var roads = loadMachiRoads();
+      var keys = Object.keys(roads);
+      var want = keys.length >= 3 ? Math.min(4, 1 + Math.floor(keys.length / 10)) : 0;
+      var layer = document.getElementById('machiCarLayer');
+      if (!layer) {
+        layer = document.createElement('div');
+        layer.id = 'machiCarLayer';
+        ground.appendChild(layer);
+      }
+      while (machiCarState.cars.length < want) {
+        machiCarState.cars.push({
+          cur: keys[Math.floor(Math.random() * keys.length)],
+          prev: null, next: null, t: Math.random() * 0.5,
+          speed: 0.8 + Math.random() * 0.5,
+          color: MACHI_CAR_COLORS[machiCarState.cars.length % MACHI_CAR_COLORS.length],
+          el: null
+        });
+      }
+      if (machiCarState.cars.length > want) {
+        machiCarState.cars.splice(want).forEach(function (car) {
+          if (car.el && car.el.parentNode) car.el.parentNode.removeChild(car.el);
+        });
+      }
+      var dt = machiCarState.lastTs ? Math.min(0.1, (ts - machiCarState.lastTs) / 1000) : 0.016;
+      machiCarState.lastTs = ts;
+      var iso = machiIsoParams();
+      machiCarState.cars.forEach(function (car) {
+        if (!roads[car.cur]) { // 走行中の道路が消された → 作り直し
+          car.cur = keys[Math.floor(Math.random() * keys.length)];
+          car.prev = null; car.next = null; car.t = 0;
+        }
+        if (!car.next || !roads[car.next]) {
+          var options = machiCarNeighbors(roads, car.cur);
+          var forward = options.filter(function (k) { return k !== car.prev; });
+          var pool = forward.length ? forward : options;
+          car.next = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+          car.t = 0;
+        }
+        if (car.next) {
+          car.t += car.speed * dt;
+          if (car.t >= 1) {
+            car.prev = car.cur;
+            car.cur = car.next;
+            car.next = null;
+            car.t = 0;
+          }
+        }
+        // 描画
+        if (!car.el) {
+          car.el = document.createElement('div');
+          car.el.className = 'machi-car';
+          car.el.innerHTML = '<svg viewBox="0 0 44 22" xmlns="http://www.w3.org/2000/svg">' +
+            '<rect x="2" y="7" rx="5" width="40" height="11" fill="' + car.color + '"/>' +
+            '<rect x="12" y="2" rx="4" width="18" height="9" fill="rgba(255,255,255,0.75)"/>' +
+            '<circle cx="12" cy="19" r="3" fill="#41474d"/><circle cx="32" cy="19" r="3" fill="#41474d"/></svg>';
+        }
+        if (car.el.parentNode !== layer) layer.appendChild(car.el); // 再描画でlayerが消えた後の復帰
+        var p1 = machiCarCellCenter(iso, car.cur);
+        var p2 = car.next ? machiCarCellCenter(iso, car.next) : p1;
+        var x = p1.x + (p2.x - p1.x) * car.t;
+        var y = p1.y + (p2.y - p1.y) * car.t;
+        car.el.style.width = Math.round(iso.tileW * 0.32) + 'px';
+        car.el.style.left = x + 'px';
+        car.el.style.top = y + 'px';
+        var dx = p2.x - p1.x, dy = p2.y - p1.y;
+        var base = 'translate(-50%, -62%) ';
+        if (dx || dy) {
+          car.el.style.transform = dx >= 0
+            ? base + 'rotate(' + (Math.atan2(dy, dx) * 180 / Math.PI).toFixed(1) + 'deg)'
+            : base + 'scaleX(-1) rotate(' + (Math.atan2(dy, -dx) * 180 / Math.PI).toFixed(1) + 'deg)';
+        } else {
+          car.el.style.transform = base;
+        }
+        var crCur = car.cur.split(',');
+        var zSum = parseInt(crCur[0], 10) + parseInt(crCur[1], 10);
+        if (car.next && car.t > 0.5) {
+          var crNext = car.next.split(',');
+          zSum = parseInt(crNext[0], 10) + parseInt(crNext[1], 10);
+        }
+        car.el.style.zIndex = 9 + zSum; // 同じ行の建物のすぐ下（道路上なので建物と同マスにはならない）
+      });
+      machiCarState.raf = requestAnimationFrame(machiCarTick);
     }
 
     // ---- アイソメトリック投影（斜め見下ろし・ダイヤ型マス） ----
@@ -5085,7 +5306,9 @@
       var vh = scroller ? Math.max(scroller.clientHeight, 320) : 560;
       var vw = scroller ? Math.max(scroller.clientWidth, 280) : 390;
       var usable = Math.max(vh * 1.5, vw) * machiZoom;
-      var tileH = Math.floor(usable * 2 / (MACHI_GRID_COLS + MACHI_GRID_ROWS));
+      // タイルの大きさは基本グリッド（16×10）基準で固定。
+      // マップ拡張でグリッドが増えたときは、マスが縮むのではなくマップが物理的に広がる
+      var tileH = Math.floor(usable * 2 / (16 + 10));
       var tileW = tileH * 2;
       return {
         tileW: tileW,
@@ -5137,8 +5360,48 @@
         machiCornerToScreen(iso, 0, MACHI_GRID_ROWS)
       ];
       var poly = corners.map(function (p) { return p.x + ',' + p.y; }).join(' ');
+      // 草原の表情: セルごとの緑のトーン差＋まばらな草むら・小花（座標ハッシュで決定的に散布。
+      // 再描画やマップ拡張でも同じ場所に出るのでチラつかない）
+      var cellsDecor = '';
+      var TONES = ['', '#c2d8b0', '#cfe3c2']; // ''=ベース色のまま描かない
+      var c, r;
+      for (c = 0; c < MACHI_GRID_COLS; c++) {
+        for (r = 0; r < MACHI_GRID_ROWS; r++) {
+          var hash = (c * 73856093 ^ r * 19349663) >>> 0;
+          var tone = TONES[hash % 3];
+          var cellCenter = machiCornerToScreen(iso, c + 0.5, r + 0.5);
+          if (tone) {
+            var cpts = [
+              machiCornerToScreen(iso, c, r),
+              machiCornerToScreen(iso, c + 1, r),
+              machiCornerToScreen(iso, c + 1, r + 1),
+              machiCornerToScreen(iso, c, r + 1)
+            ].map(function (p) { return p.x + ',' + p.y; }).join(' ');
+            cellsDecor += '<polygon points="' + cpts + '" fill="' + tone + '"/>';
+          }
+          var s = iso.tileH * 0.11;
+          if (hash % 7 === 3) {
+            // 草むら（3本の短い弧）
+            var gx = cellCenter.x + ((hash >> 4) % 9 - 4) * s * 0.3;
+            var gy = cellCenter.y + ((hash >> 8) % 5 - 2) * s * 0.25;
+            cellsDecor += '<path d="M' + (gx - s * 0.6) + ' ' + gy + ' q' + (s * 0.1) + ' ' + (-s) + ' ' + (-s * 0.15) + ' ' + (-s * 1.4) +
+              ' M' + gx + ' ' + gy + ' q0 ' + (-s * 1.2) + ' ' + (s * 0.2) + ' ' + (-s * 1.6) +
+              ' M' + (gx + s * 0.6) + ' ' + gy + ' q' + (-s * 0.1) + ' ' + (-s * 0.9) + ' ' + (s * 0.25) + ' ' + (-s * 1.3) +
+              '" stroke="#9cba86" stroke-width="' + Math.max(1, s * 0.16) + '" fill="none" stroke-linecap="round"/>';
+          } else if (hash % 23 === 11) {
+            // 小花（花びら3粒）
+            var fx = cellCenter.x + ((hash >> 6) % 7 - 3) * s * 0.3;
+            var fy = cellCenter.y + ((hash >> 10) % 5 - 2) * s * 0.25;
+            var fr = Math.max(1.2, s * 0.22);
+            var fcolor = (hash % 2) ? '#e8b7c4' : '#f0e3a8';
+            cellsDecor += '<circle cx="' + (fx - fr * 1.4) + '" cy="' + fy + '" r="' + fr + '" fill="' + fcolor + '"/>' +
+              '<circle cx="' + (fx + fr * 1.4) + '" cy="' + (fy - fr * 0.4) + '" r="' + fr + '" fill="' + fcolor + '"/>' +
+              '<circle cx="' + fx + '" cy="' + (fy + fr) + '" r="' + fr + '" fill="' + fcolor + '"/>';
+          }
+        }
+      }
       var lines = '';
-      var c, r, p1, p2;
+      var p1, p2;
       for (c = 0; c <= MACHI_GRID_COLS; c++) {
         p1 = machiCornerToScreen(iso, c, 0);
         p2 = machiCornerToScreen(iso, c, MACHI_GRID_ROWS);
@@ -5173,9 +5436,10 @@
           });
         });
       }
-      var gridStroke = emphasizeGrid ? 'rgba(60,95,55,0.55)' : 'rgba(90,120,80,0.28)';
+      var gridStroke = emphasizeGrid ? 'rgba(60,95,55,0.55)' : 'rgba(90,120,80,0.22)';
       var gridWidth = emphasizeGrid ? 1.6 : 1;
       return '<polygon points="' + poly + '" fill="#c8dfba" stroke="#a9c69a" stroke-width="2"/>' +
+        cellsDecor +
         '<g stroke="' + gridStroke + '" stroke-width="' + gridWidth + '">' + lines + '</g>' + roadShapes;
     }
 
@@ -5185,16 +5449,21 @@
       var countEl = document.getElementById('machiCount');
       var scroller = document.getElementById('machiScroller');
       if (!ground || !scroller) return;
+      updateMachiGridSize();
       var iso = machiIsoParams();
       ground.style.width = iso.width + 'px';
       ground.style.height = iso.height + 'px';
       ground.style.backgroundImage = 'none'; // 旧data URI背景の名残を確実に消す
       ground.innerHTML = '';
-      machiRenderGround(iso, loadMachiRoads(), false);
+      var roads = loadMachiRoads();
+      machiRenderGround(iso, roads, false);
       var items = loadMachiItems();
       if (countEl) {
         var buildings = items.filter(function (it) { return it.type !== 'home'; }).length;
-        countEl.textContent = buildings > 0 ? '建物 ' + buildings + '件' : 'まだ自宅だけの街。今日の予定を全部○にして「街に置く」を選ぶと建物が増えます。';
+        var pop = machiPopulation(items, roads);
+        countEl.textContent = buildings > 0
+          ? '人口 ' + pop.toLocaleString('ja-JP') + '人 ・ 建物 ' + buildings + '件'
+          : 'まだ自宅だけの街（人口' + pop + '人）。今日の予定を全部○にして「街に置く」を選ぶと建物が増えます。';
       }
       items.forEach(function (item) {
         ground.appendChild(buildMachiItemEl(item, iso));
@@ -5567,6 +5836,12 @@
         text += '：' + (d.getMonth() + 1) + '月' + d.getDate() + '日にやりきった日の思い出';
       } else {
         text += '：はじめからある、じぶんの家。タップで庭へ';
+      }
+      if (entry && entry.pop) {
+        var near = machiNearRoad(loadMachiRoads(), item.col, item.row, entry.w || 1, entry.h || 1);
+        text += near
+          ? '｜🛣️ 道路ぞいでにぎわい中！ 人口' + (entry.pop * 2) + '人'
+          : '｜人口' + entry.pop + '人（道路に面するとにぎわいで2倍）';
       }
       info.textContent = text;
       info.style.display = 'block';
