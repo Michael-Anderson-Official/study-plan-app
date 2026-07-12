@@ -3331,6 +3331,9 @@
             stopIsbnScan();
             setIsbnStatus('ISBN ' + isbn + ' を読み取りました。書籍情報を検索しています...');
             lookupIsbn(isbn);
+          } else if (isJapaneseSecondaryBarcode(result.getText())) {
+            // 下段の価格バーコードを読んでいる。止めずに案内だけ出して上段を待つ
+            setIsbnStatus('それは下段の価格バーコードです。上段の「978」で始まるバーコードを狙ってください。');
           }
         }
         // NotFoundException は1フレームごとに毎回発生し得るため無視する
@@ -3358,6 +3361,10 @@
             setIsbnStatus('ISBN ' + isbn + ' を読み取りました。書籍情報を検索しています...');
             lookupIsbn(isbn);
             return;
+          }
+          if (isJapaneseSecondaryBarcode(codes[i].rawValue)) {
+            // 下段の価格バーコードを読んでいる。止めずに案内だけ出して上段を待つ
+            setIsbnStatus('それは下段の価格バーコードです。上段の「978」で始まるバーコードを狙ってください。');
           }
         }
         isbnScanTimer = window.setTimeout(function () { scanIsbnFrame(detector); }, 350);
@@ -3394,9 +3401,18 @@
         var match = compact.match(/97[89][0-9]{10}/);
         if (match && isValidIsbn13(match[0])) return match[0];
       }
-      if (compact.length === 13 && isValidIsbn13(compact)) return compact;
+      // ISBNは978/979始まりのみ。日本の本の下段バーコード（192価格コード等）を
+      // 有効な番号として通さない（チェックサムはEAN-13として正しいため素通りしていた）
+      if (compact.length === 13 && /^97[89]/.test(compact) && isValidIsbn13(compact)) return compact;
       if (compact.length === 10 && isValidIsbn10(compact)) return convertIsbn10To13(compact);
       return null;
+    }
+
+    // 日本の書籍の下段バーコード（192始まりの書籍JAN2段目）や雑誌コード（491始まり）か判定する。
+    // これを読んでしまったユーザーに「上段を読んで」と案内するために使う。
+    function isJapaneseSecondaryBarcode(value) {
+      var compact = String(value || '').replace(/[^0-9]/g, '');
+      return compact.length === 13 && /^(192|491)/.test(compact) && isValidIsbn13(compact);
     }
 
     function isValidIsbn13(isbn) {
@@ -3435,12 +3451,21 @@
       var isbn = normalizeIsbn(value);
       if (!isbn) {
         resetIsbnPreview();
-        setIsbnStatus('ISBNを確認できませんでした。13桁または10桁のISBNを入力してください。', true);
+        if (isJapaneseSecondaryBarcode(value)) {
+          setIsbnStatus('それは下段の価格バーコードです。上段の「978」で始まるバーコード（ISBN）を読み取ってください。', true);
+        } else {
+          setIsbnStatus('ISBNを確認できませんでした。13桁または10桁のISBNを入力してください。', true);
+        }
         return;
       }
       resetIsbnPreview();
       setIsbnStatus('ISBN ' + isbn + ' の書籍情報を検索しています...');
+      // openBD直接 → Worker中継（openBD/国会図書館/Google Booksの3段構え）→
+      // Google Books直接（Worker未デプロイ時の保険）の順で調べる
       fetchOpenBdBook(isbn).then(function (book) {
+        if (book) return book;
+        return fetchWorkerBook(isbn);
+      }).then(function (book) {
         if (book) return book;
         return fetchGoogleBooksBook(isbn);
       }).then(function (book) {
@@ -3475,6 +3500,33 @@
             description: null,
             pageCount: null,
             source: 'openBD'
+          };
+        })
+        .catch(function () {
+          return null;
+        });
+    }
+
+    // Worker経由の書籍検索。サーバー側で openBD → 国立国会図書館 → Google Books と探す。
+    // 失敗してもnullを返すだけで、呼び出し側が直接Google Booksへフォールバックする。
+    function fetchWorkerBook(isbn) {
+      return fetch(NOTIFY_WORKER_URL + '/book?isbn=' + encodeURIComponent(isbn))
+        .then(function (response) {
+          if (!response.ok) return null;
+          return response.json();
+        })
+        .then(function (data) {
+          if (!data || !data.found || !data.title) return null;
+          return {
+            isbn: data.isbn || isbn,
+            title: data.title,
+            authors: normalizeAuthors(data.authors),
+            publisher: data.publisher || null,
+            publishedDate: data.publishedDate || null,
+            coverImage: data.coverImage || null,
+            description: data.description || null,
+            pageCount: data.pageCount || null,
+            source: data.source || 'Worker'
           };
         })
         .catch(function () {

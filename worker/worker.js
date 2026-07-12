@@ -36,6 +36,10 @@ export default {
       return handleToc(request, env);
     }
 
+    if (url.pathname === '/book' && request.method === 'GET') {
+      return handleBook(request, env);
+    }
+
     if (url.pathname === '/google/code' && request.method === 'POST') {
       return handleGoogleCode(request, env);
     }
@@ -322,6 +326,107 @@ async function handleToc(request, env) {
     .trim();
 
   return jsonResponse({ toc: tocText || null, source: 'hanmoto.com', isbn: isbn });
+}
+
+// ---- 書籍情報の代理取得 ----
+//
+// ブラウザから直接呼ぶGoogle BooksはAPIキー無しだと世界共有の無料枠に相乗りしており、
+// 枠が尽きた日は429で丸ごと失敗する（2026-07-12に実際に発生）。Worker経由で
+// openBD → 国立国会図書館サーチ(NDL) → Google Books の3段構えにして、
+// どれかが死んでいても書誌が取れるようにする。レスポンスは index.html の
+// fetchOpenBdBook() と同じ形に正規化して返す。
+async function handleBook(request, env) {
+  const url = new URL(request.url);
+  const isbn = (url.searchParams.get('isbn') || '').replace(/[^0-9Xx]/g, '');
+  if (!/^97[89]\d{10}$/.test(isbn)) {
+    return jsonResponse({ error: 'invalid isbn' }, 400);
+  }
+
+  const fetchOpts = { cf: { cacheTtl: 86400, cacheEverything: true } };
+
+  // 1. openBD
+  try {
+    const res = await fetch('https://api.openbd.jp/v1/get?isbn=' + isbn, fetchOpts);
+    if (res.ok) {
+      const items = await res.json();
+      const summary = items && items[0] && items[0].summary;
+      if (summary && (summary.title || summary.author || summary.publisher)) {
+        return bookResponse({
+          isbn: summary.isbn || isbn,
+          title: summary.title || null,
+          authors: summary.author ? summary.author.split('／').map(function (s) { return s.trim(); }).filter(Boolean) : [],
+          publisher: summary.publisher || null,
+          publishedDate: summary.pubdate || null,
+          coverImage: summary.cover || null,
+          source: 'openBD'
+        });
+      }
+    }
+  } catch (e) { /* 次のソースへ */ }
+
+  // 2. 国立国会図書館サーチ（OpenSearch、XMLをタグ単位で素朴に抜く）
+  try {
+    const res = await fetch('https://ndlsearch.ndl.go.jp/api/opensearch?isbn=' + isbn, fetchOpts);
+    if (res.ok) {
+      const xml = await res.text();
+      const item = (xml.split('<item>')[1] || '').split('</item>')[0];
+      const pick = function (tag) {
+        const m = item.match(new RegExp('<' + tag + '[^>]*>([\\s\\S]*?)</' + tag + '>'));
+        return m ? m[1].replace(/<[^>]+>/g, '').trim() : null;
+      };
+      const title = pick('title');
+      if (title) {
+        const creator = pick('dc:creator') || pick('author');
+        return bookResponse({
+          isbn: isbn,
+          title: title,
+          authors: creator ? creator.split(/[／\/]/).map(function (s) { return s.replace(/\s*(著|作|編|訳|監修)\s*$/, '').trim(); }).filter(Boolean) : [],
+          publisher: pick('dc:publisher') || null,
+          publishedDate: pick('dc:date') || null,
+          coverImage: 'https://ndlsearch.ndl.go.jp/thumbnail/' + isbn + '.jpg',
+          source: '国立国会図書館'
+        });
+      }
+    }
+  } catch (e) { /* 次のソースへ */ }
+
+  // 3. Google Books（最後の砦。共有枠が枯れていると429で失敗する）
+  try {
+    const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + isbn + '&maxResults=1', fetchOpts);
+    if (res.ok) {
+      const data = await res.json();
+      const info = data && data.items && data.items[0] && data.items[0].volumeInfo;
+      if (info && info.title) {
+        const links = info.imageLinks || {};
+        let cover = links.thumbnail || links.smallThumbnail || null;
+        if (cover && cover.indexOf('http://') === 0) cover = 'https://' + cover.slice(7);
+        return bookResponse({
+          isbn: isbn,
+          title: info.title,
+          authors: Array.isArray(info.authors) ? info.authors : [],
+          publisher: info.publisher || null,
+          publishedDate: info.publishedDate || null,
+          coverImage: cover,
+          description: info.description || null,
+          pageCount: info.pageCount || null,
+          source: 'Google Books'
+        });
+      }
+    }
+  } catch (e) { /* 見つからなかった扱い */ }
+
+  return jsonResponse({ found: false, isbn: isbn });
+}
+
+function bookResponse(book) {
+  book.found = true;
+  return new Response(JSON.stringify(book), {
+    status: 200,
+    headers: Object.assign(
+      { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' },
+      CORS_HEADERS
+    )
+  });
 }
 
 async function checkAndSend(env) {
