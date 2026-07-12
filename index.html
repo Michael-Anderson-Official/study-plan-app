@@ -842,6 +842,51 @@
       color: #33475b;
       font-size: 0.72rem;
     }
+    .garden-header-actions {
+      display: flex;
+      gap: 0.45rem;
+    }
+    /* ステッカー帳（庭画面 z-index:44 の上に出す） */
+    #stickerBookModal {
+      z-index: 47;
+    }
+    .sticker-book-season {
+      margin: 0.8rem 0 0.3rem;
+      color: #33475b;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    .sticker-book-row {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      padding: 0.32rem 0.2rem;
+      border-bottom: 1px solid #f0f2f4;
+      font-size: 0.82rem;
+      color: #22313f;
+    }
+    .sticker-book-emoji {
+      flex: 0 0 auto;
+      font-size: 1.3rem;
+    }
+    .sticker-book-row.locked {
+      opacity: 0.55;
+    }
+    .sticker-book-count {
+      margin-left: auto;
+      color: #5a6a78;
+      font-size: 0.74rem;
+      white-space: nowrap;
+    }
+    .sticker-book-badge {
+      flex: 0 0 auto;
+      padding: 0.05rem 0.4rem;
+      background: #f4e9d4;
+      border-radius: 999px;
+      color: #8a6d1f;
+      font-size: 0.66rem;
+      white-space: nowrap;
+    }
     .garden-close-btn {
       width: 2.3rem;
       height: 2.3rem;
@@ -1946,11 +1991,24 @@
         <h2 id="gardenTitle" class="garden-title">じぶんの庭</h2>
         <p id="gardenCount" class="garden-count"></p>
       </div>
-      <button id="gardenCloseBtn" type="button" class="garden-close-btn" aria-label="閉じる">×</button>
+      <div class="garden-header-actions">
+        <button id="stickerBookBtn" type="button" class="garden-close-btn" aria-label="ステッカー帳">📖</button>
+        <button id="gardenCloseBtn" type="button" class="garden-close-btn" aria-label="閉じる">×</button>
+      </div>
     </div>
     <div id="gardenGround" class="garden-ground"></div>
-    <p class="garden-hint">アイテムはドラッグで好きな場所に置けます。タップで思い出を表示。</p>
+    <p class="garden-hint">ステッカーはドラッグで好きな場所に置けます。タップで思い出を表示。</p>
     <div id="gardenItemInfo" class="garden-item-info" style="display:none;"></div>
+  </div>
+
+  <!-- ステッカー帳（全ステッカー一覧。プレミアム分は🔒表示） -->
+  <div id="stickerBookModal" class="settings-modal" style="display:none;">
+    <div class="settings-panel">
+      <button id="stickerBookCloseBtn" type="button" class="settings-close-btn" aria-label="閉じる">×</button>
+      <h2 style="font-size:1rem; margin-top:0;">ステッカー帳</h2>
+      <p class="progress-help">今日の予定を全部○にすると、その季節のステッカーが1枚もらえます。🔒はプレミアムステッカーです。</p>
+      <div id="stickerBookList"></div>
+    </div>
   </div>
 
   <!-- アイテム獲得トースト（その日の予定を全部○にしたとき） -->
@@ -3271,6 +3329,24 @@
       if (gardenAwardCloseBtn) {
         gardenAwardCloseBtn.addEventListener('click', hideGardenAwardToast);
       }
+      // ステッカー帳の開閉
+      var stickerBookBtn = document.getElementById('stickerBookBtn');
+      var stickerBookModal = document.getElementById('stickerBookModal');
+      var stickerBookCloseBtn = document.getElementById('stickerBookCloseBtn');
+      if (stickerBookBtn && stickerBookModal) {
+        stickerBookBtn.addEventListener('click', function () {
+          renderStickerBook();
+          stickerBookModal.style.display = 'flex';
+        });
+        if (stickerBookCloseBtn) {
+          stickerBookCloseBtn.addEventListener('click', function () {
+            stickerBookModal.style.display = 'none';
+          });
+        }
+        stickerBookModal.addEventListener('click', function (event) {
+          if (event.target === stickerBookModal) stickerBookModal.style.display = 'none';
+        });
+      }
 
       // 進捗表モーダルの閉じる操作
       var progressModalEl = document.getElementById('progressModal');
@@ -4236,8 +4312,24 @@
       { type: 'mikan', name: 'こたつみかん', emoji: '🍊', season: 'winter' },
       { type: 'penguin', name: 'ペンギン', emoji: '🐧', season: 'winter' },
       { type: 'kadomatsu', name: '門松', emoji: '🎍', season: 'winter' },
-      { type: 'yukiusagi', name: '雪うさぎ', emoji: '🐇', season: 'winter' }
+      { type: 'yukiusagi', name: '雪うさぎ', emoji: '🐇', season: 'winter' },
+      // ---- プレミアムステッカー（premium: true）----
+      // 課金（プレミアム）実装までは抽選プールに入らない。ステッカー帳には🔒付きで見える。
+      { type: 'koinobori', name: 'こいのぼり', emoji: '🎏', season: 'spring', premium: true },
+      { type: 'hanami-girl', name: 'お花見の女の子', emoji: '👧', season: 'spring', premium: true },
+      { type: 'mushitori-girl', name: '虫とりの少女', emoji: '👒', season: 'summer', premium: true },
+      { type: 'hanabi', name: '打ち上げ花火', emoji: '🎆', season: 'summer', premium: true },
+      { type: 'takibi', name: '焚き火', emoji: '🔥', season: 'autumn', premium: true },
+      { type: 'kakashi', name: 'かかし', emoji: '🤠', season: 'autumn', premium: true },
+      { type: 'sori', name: 'そり遊びの子ども', emoji: '🛷', season: 'winter', premium: true },
+      { type: 'kotatsu-neko', name: 'こたつで丸くなる猫', emoji: '🐈', season: 'winter', premium: true }
     ];
+
+    // プレミアム会員か。課金（IAP）実装時にここを本物の判定へ置き換える。
+    // それまでプレミアムステッカーは抽選に出ず、ステッカー帳で🔒表示になる。
+    function isPremiumUser() {
+      return false;
+    }
 
     // 節気名 → 季節。立春〜穀雨=春、立夏〜大暑=夏、立秋〜霜降=秋、立冬〜大寒=冬
     function getSeasonOfSekki(name) {
@@ -4278,8 +4370,10 @@
       if (items.some(function (it) { return it.earnedDate === iso; })) return;
       var sekki = getCurrentSekki();
       var season = getSeasonOfSekki(sekki.name);
-      var pool = GARDEN_ITEM_CATALOG.filter(function (it) { return it.season === season; });
-      if (!pool.length) pool = GARDEN_ITEM_CATALOG;
+      var pool = GARDEN_ITEM_CATALOG.filter(function (it) {
+        return it.season === season && (!it.premium || isPremiumUser());
+      });
+      if (!pool.length) pool = GARDEN_ITEM_CATALOG.filter(function (it) { return !it.premium || isPremiumUser(); });
       var picked = pool[Math.floor(Math.random() * pool.length)];
       items.push({
         uid: 'g' + Date.now(),
@@ -4299,7 +4393,7 @@
       var toast = document.getElementById('gardenAwardToast');
       var text = document.getElementById('gardenAwardText');
       if (!toast || !text) return;
-      text.textContent = '🎉 今日の予定を全部やりきった！ ' + catalogItem.emoji + '「' + catalogItem.name + '」を獲得しました。';
+      text.textContent = '🎉 今日の予定を全部やりきった！ ' + catalogItem.emoji + '「' + catalogItem.name + '」のステッカーを獲得しました。';
       toast.style.display = 'flex';
     }
 
@@ -4329,7 +4423,7 @@
       if (!ground) return;
       ground.innerHTML = '';
       var items = loadGardenItems();
-      if (countEl) countEl.textContent = items.length > 0 ? 'アイテム ' + items.length + '個' : 'まだアイテムがありません。今日の予定を全部○にすると1個もらえます。';
+      if (countEl) countEl.textContent = items.length > 0 ? 'ステッカー ' + items.length + '枚' : 'まだステッカーがありません。今日の予定を全部○にすると1枚もらえます。';
       items.forEach(function (item) {
         ground.appendChild(buildGardenItemEl(item));
       });
@@ -4385,6 +4479,47 @@
         }
       });
       return el;
+    }
+
+    // ステッカー帳: 全カタログを季節ごとに一覧し、所持枚数とプレミアム🔒を表示する
+    function renderStickerBook() {
+      var listEl = document.getElementById('stickerBookList');
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      var owned = {};
+      loadGardenItems().forEach(function (item) {
+        owned[item.type] = (owned[item.type] || 0) + 1;
+      });
+      var seasonNames = { spring: '春（立春〜穀雨）', summer: '夏（立夏〜大暑）', autumn: '秋（立秋〜霜降）', winter: '冬（立冬〜大寒）' };
+      ['spring', 'summer', 'autumn', 'winter'].forEach(function (season) {
+        var head = document.createElement('p');
+        head.className = 'sticker-book-season';
+        head.textContent = seasonNames[season];
+        listEl.appendChild(head);
+        GARDEN_ITEM_CATALOG.filter(function (it) { return it.season === season; }).forEach(function (it) {
+          var row = document.createElement('div');
+          var locked = it.premium && !isPremiumUser();
+          row.className = 'sticker-book-row' + (locked ? ' locked' : '');
+          var emoji = document.createElement('span');
+          emoji.className = 'sticker-book-emoji';
+          emoji.textContent = it.emoji;
+          var name = document.createElement('span');
+          name.textContent = it.name;
+          row.appendChild(emoji);
+          row.appendChild(name);
+          if (it.premium) {
+            var badge = document.createElement('span');
+            badge.className = 'sticker-book-badge';
+            badge.textContent = locked ? '🔒 プレミアム' : 'プレミアム';
+            row.appendChild(badge);
+          }
+          var count = document.createElement('span');
+          count.className = 'sticker-book-count';
+          count.textContent = owned[it.type] ? (owned[it.type] + '枚') : '未獲得';
+          row.appendChild(count);
+          listEl.appendChild(row);
+        });
+      });
     }
 
     // タップで「いつ・どの節気に獲得したか」の思い出を表示する
