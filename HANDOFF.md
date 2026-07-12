@@ -1,6 +1,6 @@
 # HANDOFF.md
 
-最終更新: 2026-07-08（Codexが実装したGoogleカレンダーの認可コードフロー+Worker refresh token保管をユーザーが実機確認済み。Claude Codeが「今日やること」「Googleカレンダー」タブを廃止し1週間タブ＋通知ベルに統合、節気写真の視認性改善、Googleカレンダーの複数カレンダー同時表示に対応。いずれも実ブラウザでの見た目・動作は未確認）
+最終更新: 2026-07-12（Claude Codeが日別パネルのタイトルに西暦・和暦と「次の節気まで◯日」を追加。ローカルPlaywrightでスマホ幅・PC幅とも表示確認済み、実機は未確認）
 
 ## アプリの目的
 
@@ -75,6 +75,11 @@
   - 既存予定の編集・削除は`ev._calendarId`に対して行う（`openGoogleEventModal(ev)`が`currentEditingGoogleCalendarId`にセットし、`updateGoogleEvent(id, body, calId)`/`deleteGoogleEvent(id, calId)`へ渡す）。新規作成時の追加先カレンダーは従来通り`googleEventCalendarSelect`（書き込み可能なカレンダーのみ、デフォルトはprimary）で選ぶ。
   - Firestore同期の`googleCalendarId`フィールド/`localStorage`キー`google-calendar-id`は`googleCalendarIds`/`google-calendar-ids`（JSON配列文字列）に名称変更した。
 - 2026-07-08、「西暦と和号入れて」との要望で、週表ヘッダー（`#weekYearLabel`、日付列の見出し下）に和暦を追加した。`formatJapaneseEra(date)`が`Intl.DateTimeFormat('ja-JP-u-ca-japanese', { era: 'long', year: 'numeric' })`で「令和8年」のような文字列を生成する。ブラウザ標準のIntl日本暦を使うため、`holidays2026`のような年ごとの手動更新は不要（改元後も自動追従する）。表示は西暦の下に`<br>`で改行して2行表示（幅の狭い見出しセルでの折り返し崩れを避けるため）。年またぎ週は西暦側と同じくその週の開始日（`startDate`）基準で計算する。
+
+- 2026-07-12、「7月12日 日曜日の左に西暦と和暦、曜日の右に次の節気までの日数を」との要望で、日別詳細パネルのタイトル（`#weekDayPanelTitle`）を`renderWeekDayTitle(titleEl, iso)`で描画するよう変更した（旧`formatWeekDayTitle()`は削除）。表示は「2026年（令和8年）**7月12日 日曜日**（大暑まで11日）」の形式で、西暦・和暦（`.week-day-panel-year`）と節気（`.week-day-panel-sekki`）は`font-size: 0.68em`の小さめspan。和暦は既存の`formatJapaneseEra()`を再利用。
+  - 節気までの日数計算用に、国立天文台の暦要項（令和8年・令和9年）に基づく正確な節気開始日テーブル`SEKKI_EXACT_DATES`（2026年・2027年の全48件、ISO文字列と節気名のペア配列）と`getNextSekkiInfo(iso)`を追加した。既存の`SEKKI_TABLE`は±1日ずれる近似でテーマ切り替え専用。当日が節気の日は「（大暑）」のように日数なしで名前だけ表示する。テーブル範囲外（2027-12-23以降）はnullを返し括弧ごと非表示。**2028年分は暦要項（2027年2月発表予定）を調べて追記が必要。**
+  - 確認状況: ローカルPlaywright（スマホ幅393px・PC幅1200px）でタイトル表示と日数計算（7/12→大暑まで11日、7/6→小暑まで1日、節気当日0日、年またぎ12/25→翌年小寒まで11日）を確認済み。実機未確認。
+  - なお2026-07-12時点の調査で、スマホ幅では`body.week-mobile-shell`常時付与により週間表（`.week-table-scroll`）と「週間表を表示」ボタンがCSSで常に`display:none`になっており、週表ヘッダーの`#weekYearLabel`（西暦・和暦）はスマホでは見えないことが判明している（今回の日別パネル側の表示がその代替。週間表トグルの復活は未対応のまま）。
 
 ## 直近でCodexが変更した内容
 

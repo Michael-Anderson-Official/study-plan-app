@@ -495,6 +495,19 @@
       font-size: 1.05rem;
       line-height: 1.35;
     }
+    .week-day-panel-year {
+      margin-right: 0.35rem;
+      font-size: 0.68em;
+      font-weight: 600;
+      color: #5a6a78;
+      white-space: nowrap;
+    }
+    .week-day-panel-sekki {
+      font-size: 0.68em;
+      font-weight: normal;
+      color: #5a6a78;
+      white-space: nowrap;
+    }
     .week-day-task-list {
       display: grid;
       gap: 0.45rem;
@@ -1892,6 +1905,36 @@
       { m: 12, d: 7,  name: '大雪', desc: '本格的に雪が降り出すころ', motif: 'snow', theme: ['linear-gradient(180deg,#f3f6fa,#e4ebf4)', '#e3eaf3', '#d6e1ee', '#54749b', '#425e81', '#476386', '#ecf1f8'] },
       { m: 12, d: 22, name: '冬至', desc: '一年で夜が最も長いころ', motif: 'moon',  theme: ['linear-gradient(180deg,#f4f4f8,#e6e6ef)', '#e6e6ef', '#d9d9e7', '#63639b', '#4f4f82', '#545487', '#eeeef5'] }
     ];
+
+    // 二十四節気の正確な開始日（日本時間）。国立天文台の暦要項（令和8年・令和9年）に基づく。
+    // 日別パネルの「次の節気まで◯日」表示に使う。年が進んだら暦要項を調べてここへ追記する。
+    // SEKKI_TABLEは±1日ずれる近似（テーマ切り替え用）なので、日数計算にはこちらを使うこと。
+    var SEKKI_EXACT_DATES = [
+      ['2026-01-05', '小寒'], ['2026-01-20', '大寒'], ['2026-02-04', '立春'], ['2026-02-19', '雨水'],
+      ['2026-03-05', '啓蟄'], ['2026-03-20', '春分'], ['2026-04-05', '清明'], ['2026-04-20', '穀雨'],
+      ['2026-05-05', '立夏'], ['2026-05-21', '小満'], ['2026-06-06', '芒種'], ['2026-06-21', '夏至'],
+      ['2026-07-07', '小暑'], ['2026-07-23', '大暑'], ['2026-08-07', '立秋'], ['2026-08-23', '処暑'],
+      ['2026-09-07', '白露'], ['2026-09-23', '秋分'], ['2026-10-08', '寒露'], ['2026-10-23', '霜降'],
+      ['2026-11-07', '立冬'], ['2026-11-22', '小雪'], ['2026-12-07', '大雪'], ['2026-12-22', '冬至'],
+      ['2027-01-05', '小寒'], ['2027-01-20', '大寒'], ['2027-02-04', '立春'], ['2027-02-19', '雨水'],
+      ['2027-03-06', '啓蟄'], ['2027-03-21', '春分'], ['2027-04-05', '清明'], ['2027-04-20', '穀雨'],
+      ['2027-05-06', '立夏'], ['2027-05-21', '小満'], ['2027-06-06', '芒種'], ['2027-06-21', '夏至'],
+      ['2027-07-07', '小暑'], ['2027-07-23', '大暑'], ['2027-08-08', '立秋'], ['2027-08-23', '処暑'],
+      ['2027-09-08', '白露'], ['2027-09-23', '秋分'], ['2027-10-08', '寒露'], ['2027-10-24', '霜降'],
+      ['2027-11-08', '立冬'], ['2027-11-22', '小雪'], ['2027-12-07', '大雪'], ['2027-12-22', '冬至']
+    ];
+
+    // 指定日（ISO文字列）から見た「次の節気」と残り日数を返す。当日が節気ならdays=0。
+    // SEKKI_EXACT_DATESの範囲外（2028年以降など）はnullを返し、表示側は省略する。
+    function getNextSekkiInfo(iso) {
+      for (var i = 0; i < SEKKI_EXACT_DATES.length; i++) {
+        if (SEKKI_EXACT_DATES[i][0] >= iso) {
+          var days = Math.round((parseISOToDate(SEKKI_EXACT_DATES[i][0]) - parseISOToDate(iso)) / 86400000);
+          return { name: SEKKI_EXACT_DATES[i][1], days: days };
+        }
+      }
+      return null;
+    }
 
     // 節気ごとの背景写真。画像が用意できた節気から順にここへ追加する。
     // 追加方法: img/sekki/ にJPEG（長辺1600px程度・200KB前後に圧縮）を置き、ここに1行足すだけ。
@@ -3403,9 +3446,26 @@
       return (headerCell && headerCell.textContent.trim()) || ('科目' + subNum);
     }
 
-    function formatWeekDayTitle(iso) {
+    // 日別パネルのタイトルを「西暦（和暦）＋ 月日 曜日 ＋（次の節気まで◯日）」の形で描画する。
+    // 西暦・和暦と節気は小さめのspanにして、月日・曜日を主役のまま保つ。
+    function renderWeekDayTitle(titleEl, iso) {
       var d = parseISOToDate(iso);
-      return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + dayNames[d.getDay()] + '曜日';
+      titleEl.innerHTML = '';
+      var yearSpan = document.createElement('span');
+      yearSpan.className = 'week-day-panel-year';
+      var eraText = formatJapaneseEra(d);
+      yearSpan.textContent = d.getFullYear() + '年' + (eraText ? '（' + eraText + '）' : '');
+      titleEl.appendChild(yearSpan);
+      titleEl.appendChild(document.createTextNode((d.getMonth() + 1) + '月' + d.getDate() + '日 ' + dayNames[d.getDay()] + '曜日'));
+      var sekki = getNextSekkiInfo(iso);
+      if (sekki) {
+        var sekkiSpan = document.createElement('span');
+        sekkiSpan.className = 'week-day-panel-sekki';
+        sekkiSpan.textContent = sekki.days === 0
+          ? '（' + sekki.name + '）'
+          : '（' + sekki.name + 'まで' + sekki.days + '日）';
+        titleEl.appendChild(sekkiSpan);
+      }
     }
 
     function setSelectedWeekDayLabel(iso) {
@@ -3499,7 +3559,7 @@
         total++;
         if (localStorage.getItem(iso + '-sub' + n + '-status') === 'circle') done++;
       }
-      titleEl.textContent = formatWeekDayTitle(iso);
+      renderWeekDayTitle(titleEl, iso);
       if (kickerEl) kickerEl.textContent = total > 0 ? '達成率 ' + Math.round(done / total * 100) + '% ・ ' + total + '件' : '予定なし';
 
       taskListEl.innerHTML = '';
