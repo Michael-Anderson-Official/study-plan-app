@@ -3349,10 +3349,31 @@
           if (!data || !data.toc || currentMaterialIndex !== idx) return;
           var tocInput = document.getElementById('tocInput');
           if (!tocInput || tocInput.value.trim()) return;
-          tocInput.value = data.toc;
-          setMaterialDetailStatus('目次を自動取得しました（hanmoto.comより）。内容を確認して保存してください。');
+          tocInput.value = normalizeAutoToc(data.toc);
+          updateTocCountLabel();
+          setMaterialDetailStatus('目次を自動取得しました（hanmoto.comより）。「第◯部」などは区分け（#）として自動マークしています。内容を確認して保存してください。');
         })
         .catch(function () {});
+    }
+
+    // 自動取得した目次に区分け記法（行頭#）を自動適用する。
+    // 「第◯部」「第◯編」（数字は漢数字・全角も可、後ろに表題が続いてもよい）の行を
+    // 区分けとみなす。全行が区分けになってしまう本（部自体が単位の本）では何もしない。
+    // 将来の「写真から目次読み取り」（プレミアム）でも同じ整形を通す想定。
+    function normalizeAutoToc(text) {
+      var lines = String(text || '').split('\n');
+      var headingRe = /^第[0-9０-９〇一二三四五六七八九十百]+(部|編)([\s　].*)?$/;
+      var marked = lines.map(function (line) {
+        var t = line.trim();
+        if (t && !isTocHeading(t) && headingRe.test(t)) return '# ' + t;
+        return line;
+      });
+      var unitCount = marked.filter(function (l) {
+        var t = l.trim();
+        return t !== '' && !isTocHeading(t);
+      }).length;
+      if (unitCount === 0) return text;
+      return marked.join('\n');
     }
 
     function setText(id, value) {
