@@ -35,8 +35,11 @@
       margin: 0;
       padding: 1rem;
       font-size: 1.3rem;
-      background-color: var(--theme-header-bg);
-      border-bottom: 1px solid #ccc;
+      /* 節気写真を透かすすりガラス風ヘッダー。節気色の帯は写真を隠すためやめた */
+      background: rgba(255, 255, 255, 0.3);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+      border-bottom: none;
       text-align: center;
     }
     /* 現在の節気の表示 */
@@ -109,8 +112,24 @@
       width: 2.4rem;
       height: 2.4rem;
       padding: 0;
-      background: #fff;
-      border: 1px solid #ccc;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      font-size: 1.2rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    /* 教材追加ボタン。設定ボタンのすぐ右に並べる */
+    .materials-icon-btn {
+      position: fixed;
+      top: 0.6rem;
+      left: 3.4rem;
+      z-index: 30;
+      width: 2.4rem;
+      height: 2.4rem;
+      padding: 0;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.6);
       border-radius: 50%;
       font-size: 1.2rem;
       line-height: 1;
@@ -124,8 +143,8 @@
       width: 2.4rem;
       height: 2.4rem;
       padding: 0;
-      background: #fff;
-      border: 1px solid #ccc;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.6);
       border-radius: 50%;
       font-size: 1.2rem;
       line-height: 1;
@@ -465,13 +484,22 @@
     .cell .section:focus {
       outline: 2px solid var(--theme-accent);
     }
+    /* 日別パネルは面で塗らず、文字が乗る要素だけ個別にすりガラスにする。
+       要素の隙間からは節気写真がぼかしなしでそのまま見える */
     .week-day-panel {
       margin: 0.75rem 1rem 1rem;
       padding: 0.9rem;
-      background: rgba(255, 255, 255, 0.48);
-      border: 1px solid rgba(88, 116, 145, 0.22);
+      background: transparent;
+      border: none;
+    }
+    .week-day-panel-header > div {
+      display: inline-block;
+      padding: 0.35rem 0.6rem;
+      background: rgba(255, 255, 255, 0.5);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.45);
       border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(31, 47, 61, 0.12);
     }
     .week-day-panel[hidden] {
       display: none;
@@ -519,8 +547,10 @@
       align-items: center;
       min-height: 3rem;
       padding: 0.55rem 0.65rem;
-      background: rgba(255, 255, 255, 0.6);
-      border: 1px solid rgba(88, 116, 145, 0.18);
+      background: rgba(255, 255, 255, 0.5);
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, 0.45);
       border-radius: 8px;
     }
     .week-day-task-actions {
@@ -555,7 +585,9 @@
       color: #777;
       font-size: 0.85rem;
       text-align: center;
-      background: rgba(255, 255, 255, 0.48);
+      background: rgba(255, 255, 255, 0.42);
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
       border-radius: 8px;
     }
     .week-day-section-title {
@@ -563,6 +595,13 @@
       color: #33475b;
       font-size: 0.82rem;
       font-weight: 800;
+      /* 写真の上に直接乗る見出しはすりガラスのチップにする */
+      display: inline-block;
+      padding: 0.14rem 0.5rem;
+      background: rgba(255, 255, 255, 0.5);
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
+      border-radius: 6px;
     }
     .week-day-section-row {
       display: flex;
@@ -588,9 +627,11 @@
       min-height: 5.5rem;
       box-sizing: border-box;
       padding: 0.55rem;
-      border: 1px solid #c9d3dd;
+      border: 1px solid rgba(255, 255, 255, 0.45);
       border-radius: 8px;
-      background: rgba(255, 255, 255, 0.55);
+      background: rgba(255, 255, 255, 0.42);
+      -webkit-backdrop-filter: blur(6px);
+      backdrop-filter: blur(6px);
       color: #22313f;
       font-size: 0.88rem;
       line-height: 1.5;
@@ -614,8 +655,10 @@
       min-height: 5.2rem;
       padding: 0.5rem 0.35rem;
       color: #22313f;
-      background: rgba(255, 255, 255, 0.55);
-      border: 1px solid rgba(88, 116, 145, 0.18);
+      background: rgba(255, 255, 255, 0.32);
+      -webkit-backdrop-filter: blur(8px);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.45);
       border-radius: 8px;
       box-shadow: 0 1px 4px rgba(31, 47, 61, 0.12);
       text-align: center;
@@ -624,7 +667,7 @@
       border-color: var(--theme-accent);
       outline: 2px solid var(--theme-accent);
       outline-offset: -2px;
-      background: #fffdf1;
+      background: rgba(255, 253, 241, 0.6);
     }
     .mobile-week-day-card.today {
       background: var(--theme-today-bg);
@@ -713,7 +756,7 @@
       background: var(--theme-accent-dark);
     }
     .btn-outline {
-      background: #fff;
+      background: rgba(255, 255, 255, 0.55);
       color: var(--theme-accent);
       border: 1px solid var(--theme-accent);
     }
@@ -813,7 +856,7 @@
         min-height: 0;
         overflow: hidden;
         box-sizing: border-box;
-        padding: 0 0.45rem 4.95rem;
+        padding: 0 0.45rem 2.9rem;
       }
       .week-table-scroll {
         display: none;
@@ -880,19 +923,21 @@
         justify-content: space-between;
         width: 100%;
         padding: 0.7rem 0.8rem;
-        background: rgba(255, 255, 255, 0.74);
+        background: rgba(255, 255, 255, 0.42);
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
         color: #22313f;
-        border: 1px solid rgba(88, 116, 145, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.45);
         border-radius: 8px;
         font-weight: 800;
         text-align: left;
       }
       .mobile-collapse-toggle:hover {
-        background: rgba(255, 255, 255, 0.82);
+        background: rgba(255, 255, 255, 0.6);
         color: #22313f;
       }
       .mobile-collapsible.is-open > .mobile-collapse-toggle {
-        background: rgba(255, 253, 241, 0.86);
+        background: rgba(255, 253, 241, 0.6);
       }
       .mobile-collapse-toggle::after {
         content: '+';
@@ -913,19 +958,13 @@
       .mobile-collapsible-body > h2:first-child {
         display: none;
       }
-      body.week-mobile-shell .materials-section,
       body.week-mobile-shell .weekly-summary-container {
         position: fixed;
         left: 0.55rem;
         right: 0.55rem;
+        bottom: 0.55rem;
         z-index: 20;
         margin: 0 !important;
-      }
-      body.week-mobile-shell .materials-section {
-        bottom: 3rem;
-      }
-      body.week-mobile-shell .weekly-summary-container {
-        bottom: 0.55rem;
       }
       body.week-mobile-shell .mobile-collapse-toggle {
         padding: 0.55rem 0.75rem;
@@ -936,8 +975,10 @@
         bottom: 0.55rem;
         padding: 0.65rem;
         box-sizing: border-box;
-        background: rgba(255, 255, 255, 0.55);
-        border: 1px solid rgba(88, 116, 145, 0.2);
+        background: rgba(255, 255, 255, 0.4);
+        -webkit-backdrop-filter: blur(10px);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.45);
         border-radius: 10px;
         box-shadow: 0 4px 18px rgba(31, 47, 61, 0.22);
         overflow: hidden;
@@ -945,9 +986,6 @@
       body.week-mobile-shell .mobile-collapsible.is-open .mobile-collapsible-body {
         max-height: calc(100% - 3rem);
         overflow: hidden;
-      }
-      body.week-mobile-shell .materials-section.is-open {
-        bottom: 0.55rem;
       }
       .cell {
         height: 80px;
@@ -1033,10 +1071,16 @@
         font-size: 0.74rem;
       }
       body.week-mobile-shell .week-day-reflection {
-        flex: 1 1 auto;
-        min-height: 2.8rem;
+        /* 空欄のときに写真を隠さないよう小さく畳み、書くときだけ広げる */
+        flex: 0 0 auto;
+        min-height: 2.6rem;
+        height: 2.6rem;
         resize: none;
         font-size: 0.78rem;
+        transition: height 0.2s ease;
+      }
+      body.week-mobile-shell .week-day-reflection:focus {
+        height: 7rem;
       }
     }
   </style>
@@ -1044,6 +1088,7 @@
 <body>
   <div id="seasonDecoration" aria-hidden="true"></div>
   <button id="settingsBtn" type="button" class="settings-icon-btn" aria-label="設定">⚙️</button>
+  <button id="materialsBtn" type="button" class="materials-icon-btn" aria-label="教材追加">📚</button>
   <button id="notifBellBtn" type="button" class="notif-bell-btn" aria-label="未チェックの通知">🔔<span id="notifBellBadge" class="notif-bell-badge" style="display:none;"></span></button>
   <h1>一週間の計画帳</h1>
   <p id="sekkiLabel" class="sekki-label"></p>
@@ -1336,21 +1381,19 @@
       <textarea id="weekDayDiary" class="week-day-reflection"></textarea>
     </section>
 
-  <!-- 教材追加欄 -->
-  <div class="materials-section mobile-collapsible" style="margin: 1rem;">
-    <button type="button" class="mobile-collapse-toggle">教材追加欄</button>
-    <div class="mobile-collapsible-body">
-      <h2 style="font-size:1rem; margin-bottom:0.5rem;">教材追加欄</h2>
+  <!-- 教材追加モーダル。ヘッダーの📚ボタンから開く（旧・下部の教材追加欄） -->
+  <div id="materialsModal" class="settings-modal" style="display:none;">
+    <div class="settings-panel">
+      <button id="materialsCloseBtn" type="button" class="settings-close-btn" aria-label="閉じる">×</button>
+      <h2 style="font-size:1rem; margin-top:0; margin-bottom:0.5rem;">教材追加</h2>
       <input id="materialInput" type="text" placeholder="教材名を入力" style="padding:0.4rem; width: 60%; max-width:280px;" />
       <!-- type="button" を明示してフォーム送信を防ぐ -->
       <button id="addMaterialBtn" type="button" style="padding:0.4rem 0.8rem; margin-left:0.5rem;">追加</button>
-      <button id="scanIsbnBtn" type="button" class="btn-outline" style="padding:0.4rem 0.8rem; margin-left:0.5rem;">バーコードで追加</button>
+      <button id="scanIsbnBtn" type="button" class="btn-outline" style="padding:0.4rem 0.8rem; margin-top:0.5rem;">バーコードで追加</button>
       <ul id="materialsList" style="list-style:none; padding-left:0; margin-top:0.5rem;"></ul>
-    </div>
-  </div>
 
-  <!-- 教材の詳細入力欄 -->
-  <div id="materialDetail" style="display:none; margin:1rem; padding:1rem; border:1px solid #ccc; border-radius:4px; background:#f9f9f9;">
+  <!-- 教材の詳細入力欄（教材追加モーダル内） -->
+  <div id="materialDetail" style="display:none; margin:0.75rem 0 0; padding:1rem; border:1px solid #ccc; border-radius:4px; background:#f9f9f9;">
     <h3 id="materialNameDetail" style="font-size:1rem; margin-top:0;">教材詳細</h3>
     <div id="bookMetaPanel" class="book-meta-panel" style="display:none;">
       <img id="bookMetaCover" class="book-meta-cover" alt="" />
@@ -1389,6 +1432,8 @@
     <button id="dailyScheduleBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem;">毎日</button>
     <button id="deleteMaterialBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem; background:#d9534f;">削除</button>
     <button id="cancelDetailBtn" type="button" style="padding:0.4rem 0.8rem;">キャンセル</button>
+  </div>
+    </div>
   </div>
 
   <!-- バーコード/ISBNで教材を追加するモーダル -->
@@ -2022,7 +2067,7 @@
         container.style.backgroundImage = '';
         return false;
       }
-      container.style.backgroundImage = 'linear-gradient(rgba(253,253,253,0.28), rgba(253,253,253,0.28)), url("' + img + '")';
+      container.style.backgroundImage = 'linear-gradient(rgba(253,253,253,0.12), rgba(253,253,253,0.12)), url("' + img + '")';
       container.style.backgroundSize = 'cover';
       container.style.backgroundPosition = 'center top';
       return true;
@@ -2450,6 +2495,26 @@
         settingsModal.addEventListener('click', function (event) {
           if (event.target === settingsModal) {
             settingsModal.style.display = 'none';
+          }
+        });
+      }
+
+      // 教材追加モーダル（ヘッダーの📚ボタン）の開閉
+      var materialsBtn = document.getElementById('materialsBtn');
+      var materialsModal = document.getElementById('materialsModal');
+      var materialsCloseBtn = document.getElementById('materialsCloseBtn');
+      if (materialsBtn && materialsModal) {
+        materialsBtn.addEventListener('click', function () {
+          materialsModal.style.display = 'flex';
+        });
+        if (materialsCloseBtn) {
+          materialsCloseBtn.addEventListener('click', function () {
+            materialsModal.style.display = 'none';
+          });
+        }
+        materialsModal.addEventListener('click', function (event) {
+          if (event.target === materialsModal) {
+            materialsModal.style.display = 'none';
           }
         });
       }
@@ -3063,6 +3128,12 @@
       setText('bookMetaIsbn', detail.isbn ? 'ISBN: ' + detail.isbn + (detail.source ? ' / ' + detail.source : '') : '');
     }
 
+    // 教材追加モーダルを閉じる（スケジュール反映後に週表へ戻すため）
+    function closeMaterialsModal() {
+      var modal = document.getElementById('materialsModal');
+      if (modal) modal.style.display = 'none';
+    }
+
     // 教材詳細を開く
     function openMaterialDetail(idx) {
       currentMaterialIndex = idx;
@@ -3599,6 +3670,9 @@
           detailBtn.textContent = '教材';
           detailBtn.addEventListener('click', (function (idx) {
             return function () {
+              // 教材詳細は教材追加モーダルの中にあるので、モーダルごと開く
+              var modal = document.getElementById('materialsModal');
+              if (modal) modal.style.display = 'flex';
               openMaterialDetail(idx);
               var detailDiv = document.getElementById('materialDetail');
               if (detailDiv) detailDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -3982,9 +4056,10 @@
           localStorage.setItem(key, content);
           dayOffset += 1;
         }
-        // 詳細パネルを閉じる
+        // 詳細パネルとモーダルを閉じて週表を見せる
         var ddiv = document.getElementById('materialDetail');
         if (ddiv) ddiv.style.display = 'none';
+        closeMaterialsModal();
         updateCellsForCurrentWeek();
         return;
       }
@@ -4022,6 +4097,7 @@
       }
       var detDiv = document.getElementById('materialDetail');
       if (detDiv) detDiv.style.display = 'none';
+      closeMaterialsModal();
       updateCellsForCurrentWeek();
     }
     // 通知設定: 保存済みの時刻を反映
