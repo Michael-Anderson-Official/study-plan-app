@@ -914,6 +914,19 @@
       touch-action: none;
       filter: drop-shadow(0 2px 4px rgba(31, 47, 61, 0.35));
     }
+    .garden-item img {
+      width: 4.4rem;
+      height: 4.4rem;
+      object-fit: contain;
+      pointer-events: none;
+      -webkit-user-drag: none;
+    }
+    .sticker-book-emoji img {
+      width: 1.9rem;
+      height: 1.9rem;
+      object-fit: contain;
+      vertical-align: middle;
+    }
     .garden-item.dragging {
       cursor: grabbing;
       filter: drop-shadow(0 6px 10px rgba(31, 47, 61, 0.45));
@@ -4297,12 +4310,12 @@
       { type: 'tulip', name: 'チューリップ', emoji: '🌷', season: 'spring' },
       { type: 'dango', name: '花見だんご', emoji: '🍡', season: 'spring' },
       { type: 'uguisu', name: 'うぐいす', emoji: '🐦', season: 'spring' },
-      { type: 'suika', name: 'スイカ', emoji: '🍉', season: 'summer' },
-      { type: 'furin', name: '風鈴', emoji: '🎐', season: 'summer' },
-      { type: 'kakigori', name: 'かき氷', emoji: '🍧', season: 'summer' },
-      { type: 'himawari', name: 'ひまわり', emoji: '🌻', season: 'summer' },
+      { type: 'suika', name: 'スイカ', emoji: '🍉', season: 'summer', img: 'img/garden/suika.webp' },
+      { type: 'furin', name: '風鈴', emoji: '🎐', season: 'summer', img: 'img/garden/furin.webp' },
+      { type: 'kakigori', name: 'かき氷', emoji: '🍧', season: 'summer', img: 'img/garden/kakigori.webp' },
+      { type: 'himawari', name: 'ひまわり', emoji: '🌻', season: 'summer', img: 'img/garden/himawari.webp' },
       { type: 'kaeru', name: 'カエル', emoji: '🐸', season: 'summer' },
-      { type: 'chochin', name: '提灯', emoji: '🏮', season: 'summer' },
+      { type: 'chochin', name: '提灯', emoji: '🏮', season: 'summer', img: 'img/garden/chochin.webp' },
       { type: 'momiji', name: 'もみじ', emoji: '🍁', season: 'autumn' },
       { type: 'tsukimi', name: '月見だんご', emoji: '🎑', season: 'autumn' },
       { type: 'kinoko', name: 'きのこ', emoji: '🍄', season: 'autumn' },
@@ -4434,7 +4447,16 @@
       var catalogItem = gardenCatalogEntry(item.type);
       var el = document.createElement('div');
       el.className = 'garden-item';
-      el.textContent = catalogItem ? catalogItem.emoji : '🎁';
+      if (catalogItem && catalogItem.img) {
+        // 本物のステッカー画像がある場合はそれを描画（無ければ絵文字プレースホルダー）
+        var stickerImg = document.createElement('img');
+        stickerImg.src = catalogItem.img;
+        stickerImg.alt = catalogItem.name;
+        stickerImg.draggable = false;
+        el.appendChild(stickerImg);
+      } else {
+        el.textContent = catalogItem ? catalogItem.emoji : '🎁';
+      }
       el.style.left = item.x + '%';
       el.style.top = item.y + '%';
 
@@ -4502,7 +4524,14 @@
           row.className = 'sticker-book-row' + (locked ? ' locked' : '');
           var emoji = document.createElement('span');
           emoji.className = 'sticker-book-emoji';
-          emoji.textContent = it.emoji;
+          if (it.img) {
+            var thumb = document.createElement('img');
+            thumb.src = it.img;
+            thumb.alt = it.name;
+            emoji.appendChild(thumb);
+          } else {
+            emoji.textContent = it.emoji;
+          }
           var name = document.createElement('span');
           name.textContent = it.name;
           row.appendChild(emoji);
