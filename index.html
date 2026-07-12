@@ -996,11 +996,14 @@
     }
     .machi-ground {
       position: relative;
-      /* マス目（背景イラストが入るまでの暫定表示） */
-      background-image:
-        linear-gradient(to right, rgba(100, 130, 100, 0.16) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(100, 130, 100, 0.16) 1px, transparent 1px);
       background-color: #cfe3c2;
+    }
+    /* 地面・マス目・道路の実SVGレイヤー（buildings=zIndex10+の下、ハイライト=5の下） */
+    #machiGroundSvg {
+      position: absolute;
+      left: 0;
+      top: 0;
+      pointer-events: none;
     }
     .machi-item {
       position: absolute;
@@ -5108,9 +5111,25 @@
       return { col: (a + b) / 2, row: (b - a) / 2 };
     }
 
-    // 地面（緑のひし形）・マス目線・道路をSVGで描いて背景にする。
+    // 地面（緑のひし形）・マス目線・道路を本物の<svg>要素として描く。
+    // 以前はCSS background-imageのdata URIだったが、巨大画像の差し替えは
+    // iOS Safariの再ラスタライズで残像（縞状のゴミ）が画面に残るため、実SVGに変更した。
     // emphasizeGrid=true（建物の移動中）はマス目線を濃く太くする
-    function machiGridBackground(iso, roads, emphasizeGrid) {
+    function machiRenderGround(iso, roads, emphasizeGrid) {
+      var ground = document.getElementById('machiGround');
+      if (!ground) return;
+      var svg = document.getElementById('machiGroundSvg');
+      if (!svg || svg.parentNode !== ground) {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.id = 'machiGroundSvg';
+        ground.insertBefore(svg, ground.firstChild);
+      }
+      svg.setAttribute('width', iso.width);
+      svg.setAttribute('height', iso.height);
+      svg.innerHTML = machiGroundMarkup(iso, roads, emphasizeGrid);
+    }
+
+    function machiGroundMarkup(iso, roads, emphasizeGrid) {
       var corners = [
         machiCornerToScreen(iso, 0, 0),
         machiCornerToScreen(iso, MACHI_GRID_COLS, 0),
@@ -5156,10 +5175,8 @@
       }
       var gridStroke = emphasizeGrid ? 'rgba(60,95,55,0.55)' : 'rgba(90,120,80,0.28)';
       var gridWidth = emphasizeGrid ? 1.6 : 1;
-      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + iso.width + '" height="' + iso.height + '">' +
-        '<polygon points="' + poly + '" fill="#c8dfba" stroke="#a9c69a" stroke-width="2"/>' +
-        '<g stroke="' + gridStroke + '" stroke-width="' + gridWidth + '">' + lines + '</g>' + roadShapes + '</svg>';
-      return 'url("data:image/svg+xml;utf8,' + encodeURIComponent(svg) + '")';
+      return '<polygon points="' + poly + '" fill="#c8dfba" stroke="#a9c69a" stroke-width="2"/>' +
+        '<g stroke="' + gridStroke + '" stroke-width="' + gridWidth + '">' + lines + '</g>' + roadShapes;
     }
 
     // keepScroll: ズーム変更時など、スクロール位置を呼び出し元が管理するときtrue
@@ -5171,8 +5188,9 @@
       var iso = machiIsoParams();
       ground.style.width = iso.width + 'px';
       ground.style.height = iso.height + 'px';
-      ground.style.backgroundImage = machiGridBackground(iso, loadMachiRoads());
+      ground.style.backgroundImage = 'none'; // 旧data URI背景の名残を確実に消す
       ground.innerHTML = '';
+      machiRenderGround(iso, loadMachiRoads(), false);
       var items = loadMachiItems();
       if (countEl) {
         var buildings = items.filter(function (it) { return it.type !== 'home'; }).length;
@@ -5252,8 +5270,7 @@
           roads[key] = true;
         }
         saveMachiRoads(roads);
-        var ground = document.getElementById('machiGround');
-        if (ground) ground.style.backgroundImage = machiGridBackground(iso, roads);
+        machiRenderGround(iso, roads, false);
       }
 
       function startPan(x, y) {
@@ -5425,8 +5442,7 @@
         var roads = loadMachiRoads();
         blockedCells = machiOccupiedCells(loadMachiItems(), item.uid);
         Object.keys(roads).forEach(function (k) { blockedCells[k] = true; });
-        var ground = document.getElementById('machiGround');
-        if (ground) ground.style.backgroundImage = machiGridBackground(iso, roads, true);
+        machiRenderGround(iso, roads, true);
         updateHighlight();
       }
 
@@ -5458,8 +5474,7 @@
       function endDragVisuals() {
         el.classList.remove('dragging');
         machiHideCellHighlight();
-        var ground = document.getElementById('machiGround');
-        if (ground) ground.style.backgroundImage = machiGridBackground(iso, loadMachiRoads());
+        machiRenderGround(iso, loadMachiRoads(), false);
       }
 
       el.addEventListener('pointerdown', function (ev) {
