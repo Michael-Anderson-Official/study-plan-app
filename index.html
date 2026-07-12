@@ -734,6 +734,70 @@
       line-height: 1.5;
       resize: vertical;
     }
+    /* 教材の進捗表モーダル */
+    .progress-panel {
+      max-width: 560px;
+    }
+    .progress-help {
+      margin: 0.2rem 0 0.6rem;
+      color: #666;
+      font-size: 0.74rem;
+      line-height: 1.5;
+    }
+    .progress-table-wrap {
+      max-height: 62vh;
+      overflow: auto;
+      border: 1px solid #e2e6ea;
+      border-radius: 8px;
+    }
+    .progress-table {
+      border-collapse: collapse;
+      font-size: 0.76rem;
+      width: 100%;
+    }
+    .progress-table th,
+    .progress-table td {
+      padding: 0.34rem 0.45rem;
+      border: 1px solid #e8ebee;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .progress-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #f4f6f8;
+      color: #33475b;
+      font-weight: 700;
+    }
+    .progress-table .progress-unit {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      max-width: 10.5rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      background: #fff;
+      text-align: left;
+    }
+    .progress-table thead th.progress-unit {
+      z-index: 3;
+      background: #f4f6f8;
+    }
+    .progress-cell {
+      min-width: 3.2rem;
+      color: #12855a;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .progress-cell.is-empty:hover {
+      background: #f2f7f4;
+    }
+    .progress-empty {
+      margin: 0.6rem 0;
+      color: #777;
+      font-size: 0.8rem;
+    }
     /* バックアップ促しトースト */
     .backup-nudge {
       position: fixed;
@@ -1678,6 +1742,16 @@
     <button id="deleteMaterialBtn" type="button" style="padding:0.4rem 0.8rem; margin-right:0.5rem; background:#d9534f;">削除</button>
     <button id="cancelDetailBtn" type="button" style="padding:0.4rem 0.8rem;">キャンセル</button>
   </div>
+    </div>
+  </div>
+
+  <!-- 教材の進捗表モーダル（縦=単位、横=周回、セル=○を付けた日付） -->
+  <div id="progressModal" class="settings-modal" style="display:none;">
+    <div class="settings-panel progress-panel">
+      <button id="progressCloseBtn" type="button" class="settings-close-btn" aria-label="閉じる">×</button>
+      <h2 id="progressTitle" style="font-size:1rem; margin-top:0;"></h2>
+      <p class="progress-help">日別の○は自動でこの表に入ります。予定より先に進んだ分は、セルをタップすると今日の日付で○が付きます。</p>
+      <div id="progressTableWrap" class="progress-table-wrap"></div>
     </div>
   </div>
 
@@ -2723,6 +2797,17 @@
             detailBtn.style.textDecoration = 'underline';
             detailBtn.style.cursor = 'pointer';
             li.appendChild(detailBtn);
+            // 進捗表（単位×周回）を開くボタン
+            var progressBtn = document.createElement('button');
+            progressBtn.textContent = '進捗表';
+            progressBtn.setAttribute('data-progress-index', i);
+            progressBtn.style.marginLeft = '0.35rem';
+            progressBtn.style.background = 'none';
+            progressBtn.style.border = 'none';
+            progressBtn.style.color = '#0066cc';
+            progressBtn.style.textDecoration = 'underline';
+            progressBtn.style.cursor = 'pointer';
+            li.appendChild(progressBtn);
             listEl.appendChild(li);
           });
         }
@@ -2792,6 +2877,11 @@
       if (materialsListEl) {
         materialsListEl.addEventListener('click', function (event) {
           var target = event.target;
+          // 進捗表ボタン（単位×周回の表を開く）
+          if (target && target.hasAttribute && target.hasAttribute('data-progress-index')) {
+            openProgressModal(parseInt(target.getAttribute('data-progress-index'), 10));
+            return;
+          }
           // data-index 属性を持つ要素をクリックした場合に詳細を開く
           if (target && target.hasAttribute && target.hasAttribute('data-index')) {
             var idx = parseInt(target.getAttribute('data-index'), 10);
@@ -2991,6 +3081,18 @@
           if (event.target === statsModal) {
             statsModal.style.display = 'none';
           }
+        });
+      }
+
+      // 進捗表モーダルの閉じる操作
+      var progressModalEl = document.getElementById('progressModal');
+      var progressCloseBtn = document.getElementById('progressCloseBtn');
+      if (progressCloseBtn && progressModalEl) {
+        progressCloseBtn.addEventListener('click', function () {
+          progressModalEl.style.display = 'none';
+        });
+        progressModalEl.addEventListener('click', function (event) {
+          if (event.target === progressModalEl) progressModalEl.style.display = 'none';
         });
       }
 
@@ -3663,6 +3765,194 @@
     function closeMaterialsModal() {
       var modal = document.getElementById('materialsModal');
       if (modal) modal.style.display = 'none';
+    }
+
+    // ---- 教材ごとの進捗表（単位×周回） ----
+    // 縦=目次の単位、横=何周目か、セル=○を付けた日付。
+    // データは materialsDetails[idx].progress に {"u<単位番号>-l<周番号>": "YYYY-MM-DD"}
+    // のスパースなマップで保存する（material-detailsの中なのでFirestore同期にも自動で乗る）。
+    // 日別パネル・週表で○を付けると自動でこの表に日付が入り、予定より先に進んだ分は
+    // 表のセルを直接タップして記録できる（これが「その日の目標より進んだ分の○」になる）。
+
+    // 教材の単位ラベル一覧。目次があれば目次の行、なければ単位数から「1」「2」…を作る
+    function getUnitLabels(detail) {
+      if (detail && Array.isArray(detail.tocList) && detail.tocList.length) {
+        return detail.tocList.map(function (s) { return String(s); });
+      }
+      var n = parseInt(detail && detail.units, 10);
+      if (isNaN(n) || n <= 0) return [];
+      var labels = [];
+      for (var i = 1; i <= n; i++) labels.push(String(i));
+      return labels;
+    }
+
+    function getProgressMap(idx) {
+      var detail = materialsDetails[idx];
+      return (detail && detail.progress && typeof detail.progress === 'object') ? detail.progress : {};
+    }
+
+    function setProgressDate(idx, unitIdx, lap, iso) {
+      if (!materialsDetails[idx]) materialsDetails[idx] = {};
+      var detail = materialsDetails[idx];
+      if (!detail.progress || typeof detail.progress !== 'object') detail.progress = {};
+      var key = 'u' + unitIdx + '-l' + lap;
+      if (iso) {
+        detail.progress[key] = iso;
+      } else {
+        delete detail.progress[key];
+      }
+      localStorage.setItem('material-details', JSON.stringify(materialsDetails));
+    }
+
+    // その単位で「まだ日付が入っていない一番早い周」（1始まり）
+    function firstEmptyLap(idx, unitIdx) {
+      var progress = getProgressMap(idx);
+      var lap = 1;
+      while (progress['u' + unitIdx + '-l' + lap]) lap++;
+      return lap;
+    }
+
+    // 教材内で使われている最大の周番号
+    function maxUsedLap(idx) {
+      var progress = getProgressMap(idx);
+      var max = 0;
+      Object.keys(progress).forEach(function (key) {
+        var m = key.match(/^u\d+-l(\d+)$/);
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+      });
+      return max;
+    }
+
+    // 日別セルの内容を教材の単位番号（0始まり）に対応付ける。
+    // 目次モードは行テキストの一致、数値モード（「5, 6」）は数値-1。
+    function matchUnitsFromContent(idx, content) {
+      var detail = materialsDetails[idx] || {};
+      var result = [];
+      if (Array.isArray(detail.tocList) && detail.tocList.length) {
+        String(content || '').split('\n').forEach(function (line) {
+          var unitIdx = detail.tocList.indexOf(line.trim());
+          if (unitIdx >= 0) result.push(unitIdx);
+        });
+      } else {
+        String(content || '').split(',').forEach(function (part) {
+          var num = parseInt(part.trim(), 10);
+          if (!isNaN(num) && num >= 1) result.push(num - 1);
+        });
+      }
+      return result;
+    }
+
+    // 日別の○が付いた: そのセルの単位を「まだ空いている一番早い周」へ記録する
+    function recordProgressFromDay(iso, subNum) {
+      var idx = subNum - 1;
+      if (!materialsList[idx]) return;
+      var content = localStorage.getItem(iso + '-sub' + subNum + '-content');
+      matchUnitsFromContent(idx, content).forEach(function (unitIdx) {
+        setProgressDate(idx, unitIdx, firstEmptyLap(idx, unitIdx), iso);
+      });
+    }
+
+    // 日別の○が外れた: その日付で記録されていた分を取り消す。
+    // 同じ単位を同じ日に複数の周で記録している場合（日別○＋手動タップ等）に
+    // 巻き添えで全部消さないよう、日付が一致する「一番後ろの周」を1つだけ消す。
+    function unrecordProgressFromDay(iso, subNum) {
+      var idx = subNum - 1;
+      if (!materialsList[idx]) return;
+      var content = localStorage.getItem(iso + '-sub' + subNum + '-content');
+      var units = matchUnitsFromContent(idx, content);
+      var progress = getProgressMap(idx);
+      units.forEach(function (unitIdx) {
+        var targetLap = 0;
+        Object.keys(progress).forEach(function (key) {
+          var m = key.match(new RegExp('^u' + unitIdx + '-l(\\d+)$'));
+          if (m && progress[key] === iso) targetLap = Math.max(targetLap, parseInt(m[1], 10));
+        });
+        if (targetLap > 0) setProgressDate(idx, unitIdx, targetLap, null);
+      });
+    }
+
+    // ---- 進捗表モーダル ----
+    var currentProgressIndex = null;
+
+    function openProgressModal(idx) {
+      currentProgressIndex = idx;
+      renderProgressGrid(idx);
+      var modal = document.getElementById('progressModal');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function renderProgressGrid(idx) {
+      var titleEl = document.getElementById('progressTitle');
+      var wrap = document.getElementById('progressTableWrap');
+      if (!titleEl || !wrap) return;
+      titleEl.textContent = (materialsList[idx] || '教材') + ' の進捗表';
+      wrap.innerHTML = '';
+      var detail = materialsDetails[idx] || {};
+      var labels = getUnitLabels(detail);
+      if (!labels.length) {
+        var p = document.createElement('p');
+        p.className = 'progress-empty';
+        p.textContent = '教材詳細で目次（または単位数）を設定すると、ここに進捗表が表示されます。';
+        wrap.appendChild(p);
+        return;
+      }
+      var progress = getProgressMap(idx);
+      // 使っている周＋1列（次の周をすぐ始められるように）。最低3列。
+      var laps = Math.max(maxUsedLap(idx) + 1, 3);
+
+      var table = document.createElement('table');
+      table.className = 'progress-table';
+      var thead = document.createElement('thead');
+      var headRow = document.createElement('tr');
+      var unitHead = document.createElement('th');
+      unitHead.className = 'progress-unit';
+      unitHead.textContent = '単位';
+      headRow.appendChild(unitHead);
+      for (var l = 1; l <= laps; l++) {
+        var th = document.createElement('th');
+        th.textContent = l + '周目';
+        headRow.appendChild(th);
+      }
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      var tbody = document.createElement('tbody');
+      labels.forEach(function (label, unitIdx) {
+        var row = document.createElement('tr');
+        var unitCell = document.createElement('td');
+        unitCell.className = 'progress-unit';
+        unitCell.textContent = label;
+        unitCell.title = label;
+        row.appendChild(unitCell);
+        for (var lap = 1; lap <= laps; lap++) {
+          var cell = document.createElement('td');
+          cell.className = 'progress-cell';
+          var iso = progress['u' + unitIdx + '-l' + lap];
+          if (iso) {
+            var d = parseISOToDate(iso);
+            cell.textContent = (d.getMonth() + 1) + '/' + d.getDate();
+            cell.title = iso;
+          } else {
+            cell.classList.add('is-empty');
+          }
+          cell.addEventListener('click', (function (uIdx, lp, existingISO) {
+            return function () {
+              if (existingISO) {
+                if (!confirm('この○（' + existingISO + '）を取り消しますか？')) return;
+                setProgressDate(idx, uIdx, lp, null);
+              } else {
+                // 予定より先に進んだ分も、ここをタップすれば今日の日付で○が付く
+                setProgressDate(idx, uIdx, lp, toLocalISO(new Date()));
+              }
+              renderProgressGrid(idx);
+            };
+          })(unitIdx, lap, iso));
+          row.appendChild(cell);
+        }
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      wrap.appendChild(table);
     }
 
     // ---- 初回起動オンボーディング ----
@@ -4424,6 +4714,15 @@
             };
           })(subNum - 1));
           actions.appendChild(detailBtn);
+          // 進捗表（単位×周回）。予定より先に進んだ分はここから記録する
+          var progressBtn = document.createElement('button');
+          progressBtn.type = 'button';
+          progressBtn.className = 'btn-outline';
+          progressBtn.textContent = '進捗';
+          progressBtn.addEventListener('click', (function (idx) {
+            return function () { openProgressModal(idx); };
+          })(subNum - 1));
+          actions.appendChild(progressBtn);
         }
         item.appendChild(actions);
         taskListEl.appendChild(item);
@@ -4551,7 +4850,7 @@
               }
             }
           }
-          onTaskStatusChanged();
+          onTaskStatusChanged(statusKey, localStorage.getItem(statusKey), existing);
           refreshStatusRows();
           closeStatusBubble();
         });
@@ -4641,11 +4940,26 @@
     }
 
     // ○✕が変わった瞬間に呼ぶ。過去分の未チェック一覧を数え直してバッジへ即反映し、
-    // 季節の庭も育てる（○が増えた瞬間にモチーフが1つポップして生える）。
-    function onTaskStatusChanged() {
+    // 季節の庭も育てる。statusKey/newVal/oldValが渡された場合は、教材の進捗表にも
+    // 日付を記録／取り消しする（○が付いた→記録、○が外れた・✕に変わった→取り消し）。
+    function onTaskStatusChanged(statusKey, newVal, oldVal) {
+      if (statusKey) {
+        var m = statusKey.match(/^(\d{4}-\d{2}-\d{2})-sub([1-7])-status$/);
+        if (m) {
+          var becameCircle = newVal === 'circle';
+          var wasCircle = oldVal === 'circle';
+          if (becameCircle && !wasCircle) recordProgressFromDay(m[1], parseInt(m[2], 10));
+          else if (!becameCircle && wasCircle) unrecordProgressFromDay(m[1], parseInt(m[2], 10));
+        }
+      }
       refreshPastPendingTasks();
       updateNotifBadge();
       renderSekkiGarden();
+      // 進捗表モーダルが開いていれば描き直す
+      var progressModal = document.getElementById('progressModal');
+      if (progressModal && progressModal.style.display !== 'none' && currentProgressIndex !== null) {
+        renderProgressGrid(currentProgressIndex);
+      }
     }
 
     // 通知モーダルの中身（○✕が付いていない過去の予定）を描画する。
@@ -4756,7 +5070,7 @@
           if (statusVal === 'cross' && !wasCross && onCross) {
             onCross();
           }
-          onTaskStatusChanged();
+          onTaskStatusChanged(statusKey, localStorage.getItem(statusKey), existing);
           renderNotifList();
           refreshStatusRows();
           updateCellsForCurrentWeek();
