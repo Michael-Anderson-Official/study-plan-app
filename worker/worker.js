@@ -17,7 +17,7 @@
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type'
+  'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token'
 };
 
 export default {
@@ -46,6 +46,14 @@ export default {
 
     if (url.pathname === '/google/token' && request.method === 'POST') {
       return handleGoogleToken(request, env);
+    }
+
+    if (url.pathname === '/techo/stat' && request.method === 'POST') {
+      return handleTechoStat(request, env);
+    }
+
+    if (url.pathname === '/techo/stats' && request.method === 'GET') {
+      return handleTechoStats(request, env);
     }
 
     return new Response('not found', { status: 404, headers: CORS_HEADERS });
@@ -268,6 +276,69 @@ function jsonResponse(obj, status) {
     status: status || 200,
     headers: Object.assign({ 'Content-Type': 'application/json' }, CORS_HEADERS)
   });
+}
+
+// ---- 手ざわり手帳の匿名利用統計 ----
+// 受け取るのは「数」と紙/字のIDだけ。書いた内容・予定・個人情報は受け取らない。
+// 匿名IDごとに1日1ドキュメント（上書き）なのでカウンタ競合も起きない。400日で自動消滅
+async function handleTechoStat(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: 'invalid json' }, 400);
+  }
+  if (!body || typeof body.id !== 'string' || !/^[A-Za-z0-9_-]{8,40}$/.test(body.id) ||
+      typeof body.d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.d) ||
+      typeof body.m !== 'object' || body.m === null) {
+    return jsonResponse({ error: 'bad request' }, 400);
+  }
+  // 数値カウンタだけを通す（文字列などが混ざっていたら捨てる）
+  const metrics = {};
+  for (const k of Object.keys(body.m).slice(0, 20)) {
+    const v = body.m[k];
+    if (/^[a-z]{1,16}$/.test(k) && typeof v === 'number' && v >= 0 && v < 100000) {
+      metrics[k] = Math.round(v);
+    }
+  }
+  const sel = typeof body.v === 'string' && /^[a-z]{0,16}\/[a-z]{0,16}\/[01]$/.test(body.v) ? body.v : '';
+  await env.NOTIFY_KV.put(
+    'techostat:' + body.d + ':' + body.id,
+    JSON.stringify({ m: metrics, v: sel }),
+    { expirationTtl: 60 * 60 * 24 * 400 }
+  );
+  return jsonResponse({ ok: true });
+}
+
+// 集計の照会（管理トークン必須。開発者だけが見られる）
+async function handleTechoStats(request, env) {
+  if (!env.TECHO_ADMIN_TOKEN || request.headers.get('X-Admin-Token') !== env.TECHO_ADMIN_TOKEN) {
+    return jsonResponse({ error: 'unauthorized' }, 401);
+  }
+  const url = new URL(request.url);
+  const date = url.searchParams.get('date') || new Date().toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return jsonResponse({ error: 'bad date' }, 400);
+  const agg = { date: date, users: 0, metrics: {}, papers: {}, fonts: {}, gcal: 0 };
+  let cursor;
+  do {
+    const list = await env.NOTIFY_KV.list({ prefix: 'techostat:' + date + ':', cursor });
+    for (const key of list.keys) {
+      const doc = await env.NOTIFY_KV.get(key.name, 'json');
+      if (!doc) continue;
+      agg.users++;
+      for (const k of Object.keys(doc.m || {})) {
+        agg.metrics[k] = (agg.metrics[k] || 0) + doc.m[k];
+      }
+      if (doc.v) {
+        const parts = doc.v.split('/');
+        if (parts[0]) agg.papers[parts[0]] = (agg.papers[parts[0]] || 0) + 1;
+        if (parts[1]) agg.fonts[parts[1]] = (agg.fonts[parts[1]] || 0) + 1;
+        if (parts[2] === '1') agg.gcal++;
+      }
+    }
+    cursor = list.list_complete ? null : list.cursor;
+  } while (cursor);
+  return jsonResponse(agg);
 }
 
 // ---- 目次取得（hanmoto.comのスクレイピング） ----
