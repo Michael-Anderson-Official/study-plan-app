@@ -56,15 +56,9 @@ export default {
       return handleTechoStats(request, env);
     }
 
-    // 手ざわり計画表 ⇄ 手ざわり手帳 の連携フィード中継
-    if (url.pathname === '/link/push' && request.method === 'POST') {
-      return handleLinkPush(request, env);
-    }
-    if (url.pathname === '/link/pull' && request.method === 'GET') {
-      return handleLinkPull(request, env);
-    }
-    if (url.pathname === '/link/pullmany' && request.method === 'POST') {
-      return handleLinkPullMany(request, env);
+    // 手ざわり計画表 ⇄ 手ざわり手帳 の連携（即時同期。codeごとのDurable Objectへ転送）
+    if (url.pathname.indexOf('/link/') === 0) {
+      return handleLink(request, env, url);
     }
 
     return new Response('not found', { status: 404, headers: CORS_HEADERS });
@@ -289,94 +283,153 @@ function jsonResponse(obj, status) {
   });
 }
 
-// ---- 手ざわり計画表 ⇄ 手ざわり手帳 の連携フィード中継 ----
+// ---- 手ざわり計画表 ⇄ 手ざわり手帳 の即時連携 ----
 // 別々のiOSアプリ（ホーム画面PWA）はlocalStorageを共有できないため、共有コードごとに
 // 勉強計画を中継する。保存するのは 日付・教材名・やること・○ だけ（個人情報は持たない）。
-// マージ: 計画表(plan)=教材/やることの持ち主・○は手帳ぶんを保持 / 手帳(techo)=○だけ更新。
+// KVはエッジで最大60秒キャッシュされ「即時」に向かないため、codeごとのDurable Object
+// （強整合ストレージ＋WebSocketブロードキャスト）で同期する。
 const LINK_CODE_RE = /^[A-Za-z0-9_-]{8,40}$/;
 const LINK_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const LINK_TTL = 60 * 60 * 24 * 400;
-
-function linkKey(code, date) { return 'link:' + code + ':' + date; }
 
 function sanitizeFeed(feed) {
   if (!feed || typeof feed !== 'object' || !Array.isArray(feed.items)) return null;
   const items = [];
-  for (const it of feed.items.slice(0, 60)) {
+  for (const it of feed.items.slice(0, 80)) {
     if (!it || typeof it.id !== 'string' || !it.id || it.id.length > 40) continue;
     items.push({
       id: it.id,
       subject: typeof it.subject === 'string' ? it.subject.slice(0, 60) : '',
       text: typeof it.text === 'string' ? it.text.slice(0, 200) : '',
-      done: !!it.done
+      done: !!it.done,
+      u: (typeof it.u === 'number' && isFinite(it.u)) ? it.u : Date.now()
     });
   }
   return { v: 1, updated: new Date().toISOString(), items: items };
 }
 
-async function readLinkFeed(env, code, date) {
-  try { return JSON.parse(await env.NOTIFY_KV.get(linkKey(code, date)) || 'null'); } catch (e) { return null; }
-}
-
-async function handleLinkPush(request, env) {
-  let body;
-  try { body = await request.json(); } catch (e) { return jsonResponse({ error: 'invalid json' }, 400); }
-  if (!body || !LINK_CODE_RE.test(body.code || '') || !LINK_DATE_RE.test(body.date || '') ||
-      (body.role !== 'plan' && body.role !== 'techo')) {
-    return jsonResponse({ error: 'bad request' }, 400);
-  }
-  const incoming = sanitizeFeed(body.feed);
-  if (!incoming) return jsonResponse({ error: 'bad feed' }, 400);
-
-  const key = linkKey(body.code, body.date);
-  const existing = await readLinkFeed(env, body.code, body.date);
+// 1アイテム単位の last-write-wins（u=最終更新ms）。存在集合は計画表(plan)が持ち主。
+function mergeFeed(existing, incoming, role) {
+  const now = Date.now();
+  const exItems = (existing && Array.isArray(existing.items)) ? existing.items : [];
+  const exById = {}; exItems.forEach(function (it) { exById[it.id] = it; });
+  const inById = {}; incoming.items.forEach(function (it) { inById[it.id] = it; });
   let items;
-  if (body.role === 'plan') {
-    // 教材・やることは計画表が持ち主。○は既存（手帳が付けたぶん）を優先で残す
-    const oldDone = {};
-    if (existing && Array.isArray(existing.items)) existing.items.forEach(function (e) { oldDone[e.id] = e.done; });
+  if (role === 'techo') {
+    // 手帳は既存アイテムの中身（text/done/subject）だけ更新。追加・削除はしない
+    items = exItems.map(function (old) {
+      const inc = inById[old.id];
+      if (inc && (inc.u || 0) > (old.u || 0)) return { id: old.id, subject: inc.subject || old.subject, text: inc.text, done: inc.done, u: inc.u || now };
+      return old;
+    });
+  } else {
+    // 計画表がアイテムの集合の持ち主。中身は u が新しい方を採用（手帳の編集も残す）
     items = incoming.items.map(function (it) {
-      return { id: it.id, subject: it.subject, text: it.text, done: (it.id in oldDone) ? oldDone[it.id] : it.done };
-    });
-  } else {
-    // 手帳は○だけ更新。教材・やることは既存を保つ（無ければ受け取ったものを土台に）
-    const base = (existing && Array.isArray(existing.items)) ? existing : incoming;
-    const newDone = {};
-    incoming.items.forEach(function (it) { newDone[it.id] = it.done; });
-    items = base.items.map(function (it) {
-      return { id: it.id, subject: it.subject, text: it.text, done: (it.id in newDone) ? newDone[it.id] : it.done };
+      const old = exById[it.id];
+      if (old && (old.u || 0) > (it.u || 0)) return old;   // 手帳の編集の方が新しい
+      return { id: it.id, subject: it.subject, text: it.text, done: it.done, u: it.u || now };
     });
   }
-  const merged = { v: 1, updated: new Date().toISOString(), items: items };
-  if (!items.length) {
-    await env.NOTIFY_KV.delete(key);
-  } else {
-    await env.NOTIFY_KV.put(key, JSON.stringify(merged), { expirationTtl: LINK_TTL });
-  }
-  return jsonResponse({ ok: true, feed: merged });
+  return { v: 1, updated: new Date().toISOString(), items: items };
 }
 
-async function handleLinkPull(request, env) {
-  const url = new URL(request.url);
+// Workerは code から Durable Object を引いて、そのまま転送する（WSのUpgradeも本文もそのまま）
+async function handleLink(request, env, url) {
   const code = url.searchParams.get('code') || '';
-  const date = url.searchParams.get('date') || '';
-  if (!LINK_CODE_RE.test(code) || !LINK_DATE_RE.test(date)) return jsonResponse({ error: 'bad request' }, 400);
-  return jsonResponse({ feed: await readLinkFeed(env, code, date) });
+  if (!LINK_CODE_RE.test(code)) return jsonResponse({ error: 'bad code' }, 400);
+  const id = env.LINK_DO.idFromName(code);
+  return env.LINK_DO.get(id).fetch(request);
 }
 
-async function handleLinkPullMany(request, env) {
-  let body;
-  try { body = await request.json(); } catch (e) { return jsonResponse({ error: 'invalid json' }, 400); }
-  const code = (body && body.code) || '';
-  const dates = (body && Array.isArray(body.dates)) ? body.dates.slice(0, 40) : null;
-  if (!LINK_CODE_RE.test(code) || !dates) return jsonResponse({ error: 'bad request' }, 400);
-  const out = {};
-  for (const date of dates) {
-    if (!LINK_DATE_RE.test(date)) continue;
-    const feed = await readLinkFeed(env, code, date);
-    if (feed) out[date] = feed;
+// codeごとの部屋。強整合ストレージに日付ごとのフィードを持ち、接続中の全端末へ即ブロードキャスト
+export class LinkRoom {
+  constructor(state, env) {
+    this.state = state;
+    this.sessions = new Set();
   }
-  return jsonResponse({ feeds: out });
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    if (path === '/link/ws') {
+      if ((request.headers.get('Upgrade') || '').toLowerCase() !== 'websocket') {
+        return new Response('expected websocket', { status: 426 });
+      }
+      const pair = new WebSocketPair();
+      const client = pair[0], server = pair[1];
+      await this.accept(server);
+      return new Response(null, { status: 101, webSocket: client });
+    }
+
+    if (path === '/link/push' && request.method === 'POST') {
+      let body;
+      try { body = await request.json(); } catch (e) { return this.json({ error: 'invalid json' }, 400); }
+      if (!body || !LINK_DATE_RE.test(body.date || '') || (body.role !== 'plan' && body.role !== 'techo')) {
+        return this.json({ error: 'bad request' }, 400);
+      }
+      const incoming = sanitizeFeed(body.feed);
+      if (!incoming) return this.json({ error: 'bad feed' }, 400);
+      const merged = await this.applyPush(body.date, body.role, incoming);
+      return this.json({ ok: true, feed: merged });
+    }
+
+    if (path === '/link/pull' && request.method === 'GET') {
+      const date = url.searchParams.get('date') || '';
+      if (!LINK_DATE_RE.test(date)) return this.json({ error: 'bad request' }, 400);
+      return this.json({ feed: (await this.state.storage.get('feed:' + date)) || null });
+    }
+
+    if (path === '/link/pullmany' && request.method === 'POST') {
+      let body;
+      try { body = await request.json(); } catch (e) { return this.json({ error: 'invalid json' }, 400); }
+      const dates = (body && Array.isArray(body.dates)) ? body.dates.slice(0, 60) : null;
+      if (!dates) return this.json({ error: 'bad request' }, 400);
+      const feeds = {};
+      for (const date of dates) {
+        if (!LINK_DATE_RE.test(date)) continue;
+        const f = await this.state.storage.get('feed:' + date);
+        if (f) feeds[date] = f;
+      }
+      return this.json({ feeds: feeds });
+    }
+
+    return new Response('not found', { status: 404, headers: CORS_HEADERS });
+  }
+
+  async accept(ws) {
+    ws.accept();
+    this.sessions.add(ws);
+    // 接続時に現在の全フィードを渡す（開いた瞬間に同期される）
+    const feeds = {};
+    const map = await this.state.storage.list({ prefix: 'feed:' });
+    for (const [k, v] of map) feeds[k.slice('feed:'.length)] = v;
+    try { ws.send(JSON.stringify({ type: 'snapshot', feeds: feeds })); } catch (e) {}
+    ws.addEventListener('close', () => this.sessions.delete(ws));
+    ws.addEventListener('error', () => this.sessions.delete(ws));
+  }
+
+  async applyPush(date, role, incoming) {
+    const existing = await this.state.storage.get('feed:' + date);
+    const merged = mergeFeed(existing, incoming, role);
+    if (merged.items.length) await this.state.storage.put('feed:' + date, merged);
+    else await this.state.storage.delete('feed:' + date);
+    const result = merged.items.length ? merged : { v: 1, items: [] };
+    this.broadcast(JSON.stringify({ type: 'update', date: date, feed: result }));
+    return result;
+  }
+
+  broadcast(str) {
+    for (const ws of this.sessions) {
+      try { ws.send(str); } catch (e) { this.sessions.delete(ws); }
+    }
+  }
+
+  json(obj, status) {
+    return new Response(JSON.stringify(obj), {
+      status: status || 200,
+      headers: Object.assign({ 'Content-Type': 'application/json' }, CORS_HEADERS)
+    });
+  }
 }
 
 // ---- 手ざわり手帳の匿名利用統計 ----

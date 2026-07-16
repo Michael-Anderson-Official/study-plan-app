@@ -12,6 +12,15 @@ GOOGLE_OAUTH_CLIENT_ID = "313439643849-h299dp5h354joksqhuegfp4s89oc2dkd.apps.goo
 binding = "NOTIFY_KV"
 id = "a9643ad25f174787b034e5ec184f431e"
 
+# 手ざわり計画表⇄手帳の即時連携（codeごとの部屋）。SQLiteバックエンドは無料枠でも使える
+[[durable_objects.bindings]]
+name = "LINK_DO"
+class_name = "LinkRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LinkRoom"]
+
 # 毎分だとKV listの無料枠(1日1000回)を超えるため5分ごとに（288回/日）。
 # 通知は最大5分遅れるだけで、1日1回のリマインダーには十分。
 [triggers]
