@@ -56,6 +56,17 @@ export default {
       return handleTechoStats(request, env);
     }
 
+    // 手ざわり計画表 ⇄ 手ざわり手帳 の連携フィード中継
+    if (url.pathname === '/link/push' && request.method === 'POST') {
+      return handleLinkPush(request, env);
+    }
+    if (url.pathname === '/link/pull' && request.method === 'GET') {
+      return handleLinkPull(request, env);
+    }
+    if (url.pathname === '/link/pullmany' && request.method === 'POST') {
+      return handleLinkPullMany(request, env);
+    }
+
     return new Response('not found', { status: 404, headers: CORS_HEADERS });
   },
 
@@ -276,6 +287,96 @@ function jsonResponse(obj, status) {
     status: status || 200,
     headers: Object.assign({ 'Content-Type': 'application/json' }, CORS_HEADERS)
   });
+}
+
+// ---- 手ざわり計画表 ⇄ 手ざわり手帳 の連携フィード中継 ----
+// 別々のiOSアプリ（ホーム画面PWA）はlocalStorageを共有できないため、共有コードごとに
+// 勉強計画を中継する。保存するのは 日付・教材名・やること・○ だけ（個人情報は持たない）。
+// マージ: 計画表(plan)=教材/やることの持ち主・○は手帳ぶんを保持 / 手帳(techo)=○だけ更新。
+const LINK_CODE_RE = /^[A-Za-z0-9_-]{8,40}$/;
+const LINK_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const LINK_TTL = 60 * 60 * 24 * 400;
+
+function linkKey(code, date) { return 'link:' + code + ':' + date; }
+
+function sanitizeFeed(feed) {
+  if (!feed || typeof feed !== 'object' || !Array.isArray(feed.items)) return null;
+  const items = [];
+  for (const it of feed.items.slice(0, 60)) {
+    if (!it || typeof it.id !== 'string' || !it.id || it.id.length > 40) continue;
+    items.push({
+      id: it.id,
+      subject: typeof it.subject === 'string' ? it.subject.slice(0, 60) : '',
+      text: typeof it.text === 'string' ? it.text.slice(0, 200) : '',
+      done: !!it.done
+    });
+  }
+  return { v: 1, updated: new Date().toISOString(), items: items };
+}
+
+async function readLinkFeed(env, code, date) {
+  try { return JSON.parse(await env.NOTIFY_KV.get(linkKey(code, date)) || 'null'); } catch (e) { return null; }
+}
+
+async function handleLinkPush(request, env) {
+  let body;
+  try { body = await request.json(); } catch (e) { return jsonResponse({ error: 'invalid json' }, 400); }
+  if (!body || !LINK_CODE_RE.test(body.code || '') || !LINK_DATE_RE.test(body.date || '') ||
+      (body.role !== 'plan' && body.role !== 'techo')) {
+    return jsonResponse({ error: 'bad request' }, 400);
+  }
+  const incoming = sanitizeFeed(body.feed);
+  if (!incoming) return jsonResponse({ error: 'bad feed' }, 400);
+
+  const key = linkKey(body.code, body.date);
+  const existing = await readLinkFeed(env, body.code, body.date);
+  let items;
+  if (body.role === 'plan') {
+    // 教材・やることは計画表が持ち主。○は既存（手帳が付けたぶん）を優先で残す
+    const oldDone = {};
+    if (existing && Array.isArray(existing.items)) existing.items.forEach(function (e) { oldDone[e.id] = e.done; });
+    items = incoming.items.map(function (it) {
+      return { id: it.id, subject: it.subject, text: it.text, done: (it.id in oldDone) ? oldDone[it.id] : it.done };
+    });
+  } else {
+    // 手帳は○だけ更新。教材・やることは既存を保つ（無ければ受け取ったものを土台に）
+    const base = (existing && Array.isArray(existing.items)) ? existing : incoming;
+    const newDone = {};
+    incoming.items.forEach(function (it) { newDone[it.id] = it.done; });
+    items = base.items.map(function (it) {
+      return { id: it.id, subject: it.subject, text: it.text, done: (it.id in newDone) ? newDone[it.id] : it.done };
+    });
+  }
+  const merged = { v: 1, updated: new Date().toISOString(), items: items };
+  if (!items.length) {
+    await env.NOTIFY_KV.delete(key);
+  } else {
+    await env.NOTIFY_KV.put(key, JSON.stringify(merged), { expirationTtl: LINK_TTL });
+  }
+  return jsonResponse({ ok: true, feed: merged });
+}
+
+async function handleLinkPull(request, env) {
+  const url = new URL(request.url);
+  const code = url.searchParams.get('code') || '';
+  const date = url.searchParams.get('date') || '';
+  if (!LINK_CODE_RE.test(code) || !LINK_DATE_RE.test(date)) return jsonResponse({ error: 'bad request' }, 400);
+  return jsonResponse({ feed: await readLinkFeed(env, code, date) });
+}
+
+async function handleLinkPullMany(request, env) {
+  let body;
+  try { body = await request.json(); } catch (e) { return jsonResponse({ error: 'invalid json' }, 400); }
+  const code = (body && body.code) || '';
+  const dates = (body && Array.isArray(body.dates)) ? body.dates.slice(0, 40) : null;
+  if (!LINK_CODE_RE.test(code) || !dates) return jsonResponse({ error: 'bad request' }, 400);
+  const out = {};
+  for (const date of dates) {
+    if (!LINK_DATE_RE.test(date)) continue;
+    const feed = await readLinkFeed(env, code, date);
+    if (feed) out[date] = feed;
+  }
+  return jsonResponse({ feeds: out });
 }
 
 // ---- 手ざわり手帳の匿名利用統計 ----
