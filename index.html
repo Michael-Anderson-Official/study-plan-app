@@ -2033,6 +2033,13 @@
       <label for="dailyGoalInput">一日あたりの目標単位数（任意）:</label><br/>
       <input id="dailyGoalInput" type="number" min="1" style="padding:0.3rem; width:60%; max-width:200px;" />
     </div>
+    <div style="margin-bottom:0.5rem;">
+      <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+        <input id="autoReviewInput" type="checkbox" style="width:1.1rem; height:1.1rem;" />
+        <span>🔁 復習も自動で組み込む</span>
+      </label>
+      <div style="font-size:0.78rem; color:#666; margin-top:0.2rem;">忘却曲線に合わせて、学んだ単位の復習を翌日・1週間後・1ヶ月後の予定に「🔁復習」として自動で入れます。復習日に○を付けると進捗表の次の周回にも記録されます。</div>
+    </div>
     <!-- 目次入力欄: ユーザーが各章タイトルを1行ごとに入力できるようにする -->
     <div style="margin-bottom:0.5rem;">
       <!-- 目次や単位を自由に入力できる欄。各行ごとに1項目を入力する。 -->
@@ -3593,12 +3600,14 @@
             var completedCapForDaily = dailyTocLines.length > 0 ? dailyTocLines.length : (isNaN(unitsVal) ? completedUnitsForDaily : unitsVal);
             if (completedUnitsForDaily > completedCapForDaily) completedUnitsForDaily = completedCapForDaily;
           }
+          var autoReviewInputForDaily = document.getElementById('autoReviewInput');
           materialsDetails[currentMaterialIndex] = Object.assign({}, existingDailyDetail, {
             units: isNaN(unitsVal) ? null : unitsVal,
             targetDate: null,
             dailyGoal: isNaN(dailyGoalVal) ? null : dailyGoalVal,
             tocList: tocInputForDaily ? (dailyTocLines.length > 0 ? dailyTocLines : null) : (existingDailyDetail.tocList || null),
-            completedUnits: completedUnitsForDaily > 0 ? completedUnitsForDaily : null
+            completedUnits: completedUnitsForDaily > 0 ? completedUnitsForDaily : null,
+            autoReview: (autoReviewInputForDaily && autoReviewInputForDaily.checked) ? true : null
           });
           localStorage.setItem('material-details', JSON.stringify(materialsDetails));
           scheduleMaterialDaily(currentMaterialIndex);
@@ -4333,19 +4342,26 @@
 
     // 日別セルの内容を教材の単位番号（0始まり）に対応付ける。
     // 目次モードは行テキストの一致、数値モード（「5, 6」）は数値-1。
+    // 「🔁復習: 」行はプレフィックスを外して同様に照合する（復習日の○が
+    // 進捗表の「次の空いている周」に記録される＝周回として数える）。
     function matchUnitsFromContent(idx, content) {
       var detail = materialsDetails[idx] || {};
       var result = [];
       var units = getTocUnits(detail);
+      var lines = String(content || '').split('\n').map(function (line) {
+        return line.trim().replace(/^🔁\s*復習[:：]\s*/, '');
+      });
       if (units.length) {
-        String(content || '').split('\n').forEach(function (line) {
-          var unitIdx = units.indexOf(line.trim());
+        lines.forEach(function (line) {
+          var unitIdx = units.indexOf(line);
           if (unitIdx >= 0) result.push(unitIdx);
         });
       } else {
-        String(content || '').split(',').forEach(function (part) {
-          var num = parseInt(part.trim(), 10);
-          if (!isNaN(num) && num >= 1) result.push(num - 1);
+        lines.forEach(function (line) {
+          line.split(',').forEach(function (part) {
+            var num = parseInt(part.trim(), 10);
+            if (!isNaN(num) && num >= 1) result.push(num - 1);
+          });
         });
       }
       return result;
@@ -6081,6 +6097,8 @@
       targetDateInput.value = detail && detail.targetDate ? detail.targetDate : '';
       dailyGoalInput.value = detail && detail.dailyGoal ? detail.dailyGoal : '';
       if (completedUnitsInput) completedUnitsInput.value = (detail && detail.completedUnits) ? detail.completedUnits : '';
+      var autoReviewInput = document.getElementById('autoReviewInput');
+      if (autoReviewInput) autoReviewInput.checked = !!(detail && detail.autoReview);
       // 目次リストを入力欄に反映
       if (tocInput) {
         if (detail && detail.tocList && Array.isArray(detail.tocList)) {
@@ -6128,12 +6146,14 @@
         var completedCap = tocUnitCount > 0 ? tocUnitCount : (isNaN(units) ? completedUnits : units);
         if (completedUnits > completedCap) completedUnits = completedCap;
       }
+      var autoReviewInputForSave = document.getElementById('autoReviewInput');
       materialsDetails[currentMaterialIndex] = Object.assign({}, existingDetail, {
         units: isNaN(units) ? null : units,
         targetDate: targetDate || null,
         dailyGoal: isNaN(dailyGoal) ? null : dailyGoal,
         tocList: tocLines.length > 0 ? tocLines : null,
-        completedUnits: completedUnits > 0 ? completedUnits : null
+        completedUnits: completedUnits > 0 ? completedUnits : null,
+        autoReview: (autoReviewInputForSave && autoReviewInputForSave.checked) ? true : null
       });
       // 保存
       localStorage.setItem('material-details', JSON.stringify(materialsDetails));
@@ -6175,6 +6195,39 @@
       keysToRemove.forEach(function (k) { localStorage.removeItem(k); });
     }
 
+    // 復習の間隔（学習日から何日後か）。翌日→1週間後→1ヶ月後の3回で、
+    // 忘却曲線の減衰に合わせて間隔を広げる（間隔反復）。
+    var REVIEW_INTERVALS = [1, 7, 30];
+    var REVIEW_PREFIX = '🔁復習: ';
+
+    // 1教材ぶんの割り当て計画（iso日付→内容行の配列）をセルへ書き込む。
+    // autoReviewが有効なら、各学習日の内容にREVIEW_INTERVALS日後の復習行を追加してから書き込む。
+    // 復習行は「🔁復習: 」プレフィックス付きで、matchUnitsFromContentが周回記録として認識する。
+    function writeScheduleCells(idx, plan, autoReview) {
+      if (autoReview) {
+        var reviews = {};
+        Object.keys(plan).forEach(function (iso) {
+          var studyLines = plan[iso];
+          var d = parseISOToDate(iso);
+          REVIEW_INTERVALS.forEach(function (days) {
+            var r = new Date(d);
+            r.setDate(d.getDate() + days);
+            var rIso = toLocalISO(r);
+            if (!reviews[rIso]) reviews[rIso] = [];
+            studyLines.forEach(function (line) {
+              reviews[rIso].push(REVIEW_PREFIX + line);
+            });
+          });
+        });
+        Object.keys(reviews).forEach(function (iso) {
+          plan[iso] = (plan[iso] || []).concat(reviews[iso]);
+        });
+      }
+      Object.keys(plan).forEach(function (iso) {
+        localStorage.setItem(iso + '-sub' + (idx + 1) + '-content', plan[iso].join('\n'));
+      });
+    }
+
     // 教材のスケジュールを計算しカレンダーに追加
     function scheduleMaterial(idx) {
       var detail = materialsDetails[idx];
@@ -6208,33 +6261,33 @@
             tasksPerDay = Math.ceil(tasks.length / days);
           }
           var taskIndex = 0;
+          var plan = {};
           for (var day = 0; day < days && taskIndex < tasks.length; day++) {
             var current = new Date(start);
             current.setDate(start.getDate() + day);
             var iso = toLocalISO(current);
             var subTasks = tasks.slice(taskIndex, taskIndex + tasksPerDay);
             taskIndex += tasksPerDay;
-            var content = subTasks.join('\n');
-            var key = iso + '-sub' + (colIndex + 1) + '-content';
-            localStorage.setItem(key, content);
+            plan[iso] = subTasks;
           }
+          writeScheduleCells(colIndex, plan, !!detail.autoReview);
         } else {
           // 期日がない場合は毎日順番に dailyGoal または1単位ずつ割り当て
           var daily = parseInt(detail.dailyGoal, 10);
           var tasksPerDay2 = (!isNaN(daily) && daily > 0) ? daily : 1;
           var taskIdx = 0;
           var dayOffset = 0;
+          var plan2 = {};
           while (taskIdx < tasks.length) {
             var currentDay = new Date(start);
             currentDay.setDate(start.getDate() + dayOffset);
             var iso2 = toLocalISO(currentDay);
             var sub = tasks.slice(taskIdx, taskIdx + tasksPerDay2);
             taskIdx += tasksPerDay2;
-            var content2 = sub.join('\n');
-            var key2 = iso2 + '-sub' + (colIndex + 1) + '-content';
-            localStorage.setItem(key2, content2);
+            plan2[iso2] = sub;
             dayOffset++;
           }
+          writeScheduleCells(colIndex, plan2, !!detail.autoReview);
         }
         // スケジュール後、表示更新
         updateCellsForCurrentWeek();
@@ -6273,6 +6326,7 @@
       }
       // 各日に割り当てて保存
       var dayIndex = 0;
+      var planNum = {};
       for (var startIdx = 0; startIdx < tasksArray.length; startIdx += tasksPerDay) {
         var currDate = new Date(startDate);
         currDate.setDate(startDate.getDate() + dayIndex);
@@ -6280,11 +6334,10 @@
         // 当日のタスクグループ
         var group = tasksArray.slice(startIdx, startIdx + tasksPerDay);
         if (group.length === 0) break;
-        var contentStr = group.join(', ');
-        var key3 = isoDate + '-sub' + (idx + 1) + '-content';
-        localStorage.setItem(key3, contentStr);
+        planNum[isoDate] = [group.join(', ')];
         dayIndex++;
       }
+      writeScheduleCells(idx, planNum, !!detail.autoReview);
       // スケジュール後に表示を更新
       updateCellsForCurrentWeek();
     }
@@ -6301,6 +6354,8 @@
         }
       });
       updateDayRates();
+      // スケジュール変更を日付カード（件数・達成率）にも即時反映する
+      renderMobileWeekSelector();
     }
 
     // 週の表示を更新する関数。現在の週開始日 (window.currentWeekStartISO) を基準にラベルや data-key を更新します。
@@ -7029,17 +7084,17 @@
         var taskIndex = 0;
         var dayOffset = 0;
         var colIdx = idx;
+        var plan = {};
         while (taskIndex < tasks.length) {
           var current = new Date(start);
           current.setDate(start.getDate() + dayOffset);
           var iso = toLocalISO(current);
           var subTasks = tasks.slice(taskIndex, taskIndex + tasksPerDay);
           taskIndex += tasksPerDay;
-          var content = subTasks.join('\n');
-          var key = iso + '-sub' + (colIdx + 1) + '-content';
-          localStorage.setItem(key, content);
+          plan[iso] = subTasks;
           dayOffset += 1;
         }
+        writeScheduleCells(colIdx, plan, !!detail.autoReview);
         // 詳細パネルとモーダルを閉じて週表を見せる
         var ddiv = document.getElementById('materialDetail');
         if (ddiv) ddiv.style.display = 'none';
@@ -7069,6 +7124,7 @@
       startDate.setHours(0, 0, 0, 0);
       var columnIndex = idx;
       var offset = 0;
+      var planNum = {};
       // Group sequential units by dailyGoal and assign each group to consecutive days
       for (var s = 0; s < tasksArray.length; s += dailyGoal) {
         var currentDate = new Date(startDate);
@@ -7076,11 +7132,10 @@
         var isoStr = toLocalISO(currentDate);
         var group = tasksArray.slice(s, s + dailyGoal);
         if (group.length === 0) break;
-        var contentStr = group.join(', ');
-        var key = isoStr + '-sub' + (columnIndex + 1) + '-content';
-        localStorage.setItem(key, contentStr);
+        planNum[isoStr] = [group.join(', ')];
         offset++;
       }
+      writeScheduleCells(columnIndex, planNum, !!detail.autoReview);
       var detDiv = document.getElementById('materialDetail');
       if (detDiv) detDiv.style.display = 'none';
       closeMaterialsModal();
